@@ -34,7 +34,7 @@ function moduleToRoute(module: AppModule): RouteObject {
 const routes: RouteObject[] = [
   {
     path: "/",
-    element: <AppLayout />,
+    element: <AppLayout modules={appModules} />,
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       ...appModules.map(moduleToRoute),
