@@ -1,17 +1,26 @@
-import { Outlet, useLocation } from "react-router"
+import { useCallback, useState } from "react"
+import { Outlet } from "react-router"
+import Sidebar from "@/shared/layouts/Sidebar"
+import Topbar from "@/shared/layouts/Topbar"
+import type { AppModule } from "@/shared/types/module"
 
-/** Provisional: el Sidebar y la barra superior se agregan en la siguiente pieza. */
-export default function AppLayout() {
-  const { pathname } = useLocation()
+interface AppLayoutProps {
+  modules: AppModule[]
+}
+
+export default function AppLayout({ modules }: AppLayoutProps) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), [])
 
   return (
     <div className="min-h-svh">
-      <header className="border-b border-border bg-card px-6 py-3 text-sm text-muted-foreground">
-        Ruta actual: <code>{pathname}</code>
-      </header>
-      <main className="p-6">
-        <Outlet />
-      </main>
+      <Sidebar modules={modules} open={mobileMenuOpen} onClose={closeMobileMenu} />
+      <div className="lg:pl-64">
+        <Topbar modules={modules} onMenuClick={() => setMobileMenuOpen(true)} />
+        <main className="p-4 md:p-6">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }
