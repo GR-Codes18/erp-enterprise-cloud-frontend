@@ -2,10 +2,10 @@ import { delay, http, HttpResponse, type RequestHandler } from "msw"
 import { env } from "@/config/env"
 import type { ApiErrorBody, Paginated } from "@/shared/lib/api/types"
 
-interface CrudOptions<T extends { id: number }> {
+interface CrudOptions<T extends { id: string }> {
   /** Nombre del recurso en la URL, ej. "customers" */
   resource: string
-  /** Datos iniciales */
+  /** Datos iniciales. Cada registro trae un UUID fijo (predecible para las pruebas) */
   seed: T[]
   /** Campos de texto donde busca el parámetro ?search= */
   searchFields: (keyof T)[]
@@ -27,16 +27,17 @@ function toPositiveInt(value: string | null, fallback: number, max?: number): nu
 /**
  * Crea los 5 endpoints de un CRUD con paginación y búsqueda, siguiendo el
  * contrato de API. Los datos viven en memoria: se reinician al recargar.
+ * Los ids son UUID (texto opaco): los datos semilla traen el suyo y los
+ * registros nuevos reciben uno generado con crypto.randomUUID().
  * Para una regla propia de un módulo, registra su handler ANTES de este.
  */
-export function createCrudHandlers<T extends { id: number }>({
+export function createCrudHandlers<T extends { id: string }>({
   resource,
   seed,
   searchFields,
   latency = 400,
 }: CrudOptions<T>): RequestHandler[] {
   let items: T[] = [...seed]
-  let nextId = Math.max(0, ...items.map((item) => item.id)) + 1
   const base = env.apiBaseUrl + "/" + resource
 
   const notFound = () => errorResponse(404, "NOT_FOUND", "Recurso no encontrado")
@@ -71,7 +72,7 @@ export function createCrudHandlers<T extends { id: number }>({
 
     http.get(base + "/:id", async ({ params }) => {
       await delay(latency)
-      const item = items.find((candidate) => candidate.id === Number(params.id))
+      const item = items.find((candidate) => candidate.id === params.id)
       return item ? HttpResponse.json(item) : notFound()
     }),
 
@@ -83,7 +84,8 @@ export function createCrudHandlers<T extends { id: number }>({
       } catch {
         return invalidBody()
       }
-      const created = { ...data, id: nextId++ } as T
+      // El id va después del spread: el cliente nunca puede imponer el suyo
+      const created = { ...data, id: crypto.randomUUID() } as T
       items = [...items, created]
       return HttpResponse.json(created, { status: 201 })
     }),
@@ -91,7 +93,7 @@ export function createCrudHandlers<T extends { id: number }>({
     ...(["put", "patch"] as const).map((method) =>
       http[method](base + "/:id", async ({ request, params }) => {
         await delay(latency)
-        const index = items.findIndex((candidate) => candidate.id === Number(params.id))
+        const index = items.findIndex((candidate) => candidate.id === params.id)
         if (index === -1) return notFound()
         let data: Partial<T>
         try {
@@ -107,9 +109,9 @@ export function createCrudHandlers<T extends { id: number }>({
 
     http.delete(base + "/:id", async ({ params }) => {
       await delay(latency)
-      const exists = items.some((candidate) => candidate.id === Number(params.id))
+      const exists = items.some((candidate) => candidate.id === params.id)
       if (!exists) return notFound()
-      items = items.filter((candidate) => candidate.id !== Number(params.id))
+      items = items.filter((candidate) => candidate.id !== params.id)
       return new HttpResponse(null, { status: 204 })
     }),
   ]
