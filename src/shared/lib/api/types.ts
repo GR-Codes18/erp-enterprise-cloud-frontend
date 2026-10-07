@@ -12,6 +12,11 @@ export interface PageParams {
   page?: number
   size?: number
   search?: string
+  /** Rango de fechas en formato AAAA-MM-DD, ambos extremos incluidos */
+  date_from?: string
+  date_to?: string
+  /** Filtros exactos por campo, ej. { status: "active", warehouse_id: "..." } */
+  filters?: Record<string, string | undefined>
 }
 
 export interface FieldError {
