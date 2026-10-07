@@ -9,7 +9,7 @@ export const maintenanceModule: AppModule = {
   sections: [
     {
       items: [
-        { label: "Clientes", path: "customers" },
+        { label: "Clientes", path: "customers", page: () => import("./pages/CustomersPage") },
         { label: "Proveedores", path: "suppliers" },
         { label: "Productos", path: "products" },
         { label: "Categorías", path: "categories" },
