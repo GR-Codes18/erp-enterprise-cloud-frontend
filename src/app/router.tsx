@@ -21,13 +21,26 @@ function moduleToRoute(module: AppModule): RouteObject {
   }
 
   const items = module.sections.flatMap((section) => section.items)
+  const childRoutes: RouteObject[] = []
+
+  if (items.length > 0) {
+    childRoutes.push({ index: true, element: <Navigate to={items[0].path} replace /> })
+  }
+
+  for (const item of items) {
+    childRoutes.push(toRoute(item.path, item.label, item.page))
+
+    if (item.subRoutes) {
+      for (const sub of item.subRoutes) {
+        const fullSubPath = `${item.path}/${sub.path}`
+        childRoutes.push(toRoute(fullSubPath, sub.label, sub.page))
+      }
+    }
+  }
 
   return {
     path: module.basePath,
-    children: [
-      { index: true, element: <Navigate to={items[0].path} replace /> },
-      ...items.map((item) => toRoute(item.path, item.label, item.page)),
-    ],
+    children: childRoutes,
   }
 }
 
