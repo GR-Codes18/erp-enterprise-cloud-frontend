@@ -1,6 +1,7 @@
-import { useState, type ReactNode } from "react"
+import { useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { Field } from "@/shared/components/Field"
 import { Button } from "@/shared/components/ui/button"
 import {
   Dialog,
@@ -11,7 +12,6 @@ import {
   DialogTitle,
 } from "@/shared/components/ui/dialog"
 import { Input } from "@/shared/components/ui/input"
-import { Label } from "@/shared/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -48,27 +48,6 @@ function toFormValues(customer: Customer): CustomerInput {
     credit_limit: customer.credit_limit,
     status: customer.status,
   }
-}
-
-interface FieldProps {
-  id: string
-  label: string
-  error?: string
-  children: ReactNode
-}
-
-function Field({ id, label, error, children }: FieldProps) {
-  return (
-    <div className="grid gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      {children}
-      {error && (
-        <p id={`${id}-error`} className="text-sm text-danger-text">
-          {error}
-        </p>
-      )}
-    </div>
-  )
 }
 
 function CustomerForm({ customer, onDone }: { customer: Customer | null; onDone: () => void }) {
