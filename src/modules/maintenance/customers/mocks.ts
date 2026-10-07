@@ -44,4 +44,5 @@ export const customerHandlers = createCrudHandlers<Customer>({
   resource: "customers",
   seed,
   searchFields: ["name", "document_number", "email"],
+  filterFields: ["status", "document_type"],
 })

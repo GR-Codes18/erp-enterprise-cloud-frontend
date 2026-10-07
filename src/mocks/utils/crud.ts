@@ -1,6 +1,7 @@
 import { delay, http, HttpResponse, type RequestHandler } from "msw"
 import { env } from "@/config/env"
 import type { ApiErrorBody, Paginated } from "@/shared/lib/api/types"
+import { applyListFilters } from "@/mocks/utils/filters"
 
 interface CrudOptions<T extends { id: string }> {
   /** Nombre del recurso en la URL, ej. "customers" */
@@ -9,6 +10,10 @@ interface CrudOptions<T extends { id: string }> {
   seed: T[]
   /** Campos de texto donde busca el parámetro ?search= */
   searchFields: (keyof T)[]
+    /** Campos que aceptan filtro exacto, ej. ["status"] */
+  filterFields?: (keyof T)[]
+  /** Campo de fecha ISO sobre el que actúa el rango date_from / date_to */
+  dateField?: keyof T
   /** Latencia simulada en ms, para poder ver los estados de carga */
   latency?: number
 }
@@ -35,6 +40,8 @@ export function createCrudHandlers<T extends { id: string }>({
   resource,
   seed,
   searchFields,
+  filterFields,
+  dateField,
   latency = 400,
 }: CrudOptions<T>): RequestHandler[] {
   let items: T[] = [...seed]
@@ -50,15 +57,10 @@ export function createCrudHandlers<T extends { id: string }>({
       const params = new URL(request.url).searchParams
       const page = toPositiveInt(params.get("page"), 1)
       const size = toPositiveInt(params.get("size"), 20, 100)
-      const search = (params.get("search") ?? "").trim().toLowerCase()
-
-      const filtered = search
-        ? items.filter((item) =>
-            searchFields.some((field) =>
-              String(item[field] ?? "").toLowerCase().includes(search),
-            ),
-          )
-        : items
+      const result = applyListFilters(items, params, { searchFields, filterFields, dateField })
+      
+      if (!result.ok) return errorResponse(result.status, result.code, result.message)
+      const filtered = result.items
 
       const body: Paginated<T> = {
         items: filtered.slice((page - 1) * size, page * size),
