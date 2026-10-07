@@ -24,7 +24,15 @@ export default function Topbar({ modules, onMenuClick }: TopbarProps) {
       </button>
 
       <nav aria-label="Ubicación" className="min-w-0 flex-1 truncate text-sm">
-        {breadcrumb?.itemLabel ? (
+        {breadcrumb?.subItemLabel ? (
+          <>
+            <span className="text-muted-foreground">{breadcrumb.moduleLabel}</span>
+            <span className="mx-2 text-muted-foreground">/</span>
+            <span className="text-muted-foreground">{breadcrumb.itemLabel}</span>
+            <span className="mx-2 text-muted-foreground">/</span>
+            <span className="font-medium">{breadcrumb.subItemLabel}</span>
+          </>
+        ) : breadcrumb?.itemLabel ? (
           <>
             <span className="text-muted-foreground">{breadcrumb.moduleLabel}</span>
             <span className="mx-2 text-muted-foreground">/</span>
