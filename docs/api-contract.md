@@ -98,7 +98,7 @@ Respuesta (200):
 - El `id` lo asigna siempre el servidor. Si el cliente envía uno en el cuerpo, se ignora.
 - `PUT` reemplaza todos los campos editables. El frontend envía siempre el recurso completo.
 - Un `id` con formato inválido debe responder 404, no 500.
-- **Por confirmar:** si eliminar es borrado definitivo o desactivación (`status = inactive`). Si el recurso está referenciado (por ejemplo, un cliente con ventas), debe responder 409 con un mensaje claro.
+- Eliminar solo se permite para borradores y registros sin uso. Un registro referenciado por otros (por ejemplo, un cliente con ventas) no se borra: se desactiva (status = inactive), y si se intenta borrar el backend responde 409 con un mensaje claro.
 
 ## 6. Recurso: Clientes (`/customers`)
 
@@ -117,7 +117,7 @@ Implementado en el frontend. Reglas de validación en `src/modules/maintenance/c
 
 Notas para el backend:
 
-- Los campos opcionales se devuelven como `""`, no como `null`. El frontend lo asume así. Si el backend prefiere `null`, hay que acordarlo para ajustar el frontend.
+- Los campos opcionales se devuelven como "", nunca como null. (Decidido.)
 - La búsqueda `search` debe cubrir `name`, `document_number` y `email`.
 - Se espera validar con las mismas reglas de la tabla y devolver 422 con `errors` por campo.
 - Un documento duplicado (mismo `document_type` + `document_number`) debe responder 409. **Por confirmar** con la regla de negocio.
@@ -184,8 +184,6 @@ Las pantallas existen o se planean, pero falta su ruta:
 |---|---|---|
 | 1 | Formato de fechas por campo | Frontend + backend |
 | 2 | Mecanismo de autenticación y permisos | Frontend + backend |
-| 3 | Borrado definitivo vs desactivación | Backend + negocio |
-| 4 | `""` o `null` en campos opcionales | Frontend + backend |
-| 5 | Orden por defecto y filtros de los listados | Frontend + backend |
-| 6 | Rutas y campos de los recursos pendientes | Backend (propuesta) y frontend (revisión) |
-| 7 | Cómo se indica la moneda en documentos | Frontend + backend |
+| 3 | Orden por defecto y filtros de los listados | Frontend + backend |
+| 4 | Rutas y campos de los recursos pendientes | Backend (propuesta) y frontend (revisión) |
+| 5 | Cómo se indica la moneda en documentos | Frontend + backend |
