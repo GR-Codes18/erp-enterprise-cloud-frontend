@@ -65,6 +65,8 @@ Reglas de seguridad:
 | `page` | Entero desde 1. Si es inválido, usar 1 |
 | `size` | Entero desde 1. Valor por defecto 20, máximo 100 |
 | `search` | Texto libre. Coincidencia parcial, sin distinguir mayúsculas. Opcional |
+| `date_from`, `date_to` | Fechas `AAAA-MM-DD`, ambos extremos incluidos, ambos opcionales. Formato inválido: 400. `date_from` mayor que `date_to`: 422 |
+| `<campo>` | Filtro exacto por cualquier campo permitido del recurso (`status`, `warehouse_id`, ...). Cada recurso documenta cuáles acepta. Un campo no permitido se ignora |
 
 Respuesta (200):
 
