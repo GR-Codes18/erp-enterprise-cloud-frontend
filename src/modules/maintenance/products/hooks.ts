@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { PageParams } from "@/shared/lib/api/types"
 import { productService } from "./service"
-import type { ProductInput } from "./schema"
+import type { Product, ProductCreateInput, ProductUpdateInput } from "./schema"
 
 export const productKeys = {
   all: ["products"] as const,
@@ -17,7 +17,7 @@ export function useProducts(params: PageParams) {
   })
 }
 
-/** Hook para selectores en módulos de Ventas/Compras/Inventario (Regla 0.5). */
+/** Hook de opciones rápidas para selectores en Ventas/Compras/Inventario (Regla 0.5). */
 export function useProductOptions() {
   const params: PageParams = { page: 1, size: 100, filters: { status: "active" } }
   return useQuery({
@@ -41,7 +41,7 @@ function useInvalidateProducts() {
 export function useCreateProduct() {
   const invalidate = useInvalidateProducts()
   return useMutation({
-    mutationFn: (input: ProductInput) => productService.create(input),
+    mutationFn: (input: ProductCreateInput) => productService.create(input),
     onSuccess: invalidate,
   })
 }
@@ -49,8 +49,17 @@ export function useCreateProduct() {
 export function useUpdateProduct() {
   const invalidate = useInvalidateProducts()
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: ProductInput }) =>
+    mutationFn: ({ id, input }: { id: string; input: ProductUpdateInput }) =>
       productService.update(id, input),
+    onSuccess: invalidate,
+  })
+}
+
+export function usePatchProduct() {
+  const invalidate = useInvalidateProducts()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Partial<Product> }) =>
+      productService.patch(id, input),
     onSuccess: invalidate,
   })
 }
