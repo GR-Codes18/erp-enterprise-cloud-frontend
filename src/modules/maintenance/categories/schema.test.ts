@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { EMPTY_CATEGORY, categoryInputSchema } from "./schema"
+import { EMPTY_CATEGORY, categoryInputSchema, type CategoryStatus } from "./schema"
 
 describe("categoryInputSchema", () => {
   it("valida una categoría correcta", () => {
@@ -40,7 +40,7 @@ describe("categoryInputSchema", () => {
     const invalidCategory = {
       ...EMPTY_CATEGORY,
       name: "Electrónicos",
-      status: "pending" as any,
+      status: "pending" as unknown as CategoryStatus,
     }
 
     const result = categoryInputSchema.safeParse(invalidCategory)
