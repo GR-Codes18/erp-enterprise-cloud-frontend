@@ -27,7 +27,7 @@ const supplierFields = z.object({
     .max(120, "Máximo 120 caracteres"),
   email: z.union([z.literal(""), z.email("Correo no válido")]),
   phone: z.string().trim().max(20, "Máximo 20 caracteres"),
-  credit_days: z.coerce
+  credit_days: z
     .number({ message: "Ingresa un número entero" })
     .int("Los días de crédito deben ser un número entero")
     .min(0, "Los días de crédito no pueden ser negativos"),
