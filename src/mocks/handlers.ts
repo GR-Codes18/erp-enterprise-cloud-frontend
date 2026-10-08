@@ -6,7 +6,7 @@ import { userHandlers } from "@/modules/administration/usuarios/users/mocks"
 import { auditHandlers } from "@/modules/administration/audit/mocks"
 import { settingsHandlers } from "@/modules/administration/settings/mocks"
 import { permissionHandlers } from "@/modules/administration/permissions/mocks"
-
+import { documentHandlers } from "@/modules/documents/files/mocks"
 
 /** Aquí se agregan los handlers de cada módulo (modules/<módulo>/.../mocks). */
 export const handlers: RequestHandler[] = [
@@ -17,4 +17,5 @@ export const handlers: RequestHandler[] = [
   ...auditHandlers,
   ...settingsHandlers,
   ...permissionHandlers,
+  ...documentHandlers,
 ]
