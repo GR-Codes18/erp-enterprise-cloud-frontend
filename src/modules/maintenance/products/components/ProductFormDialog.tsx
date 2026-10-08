@@ -57,8 +57,18 @@ function ProductCreateForm({ onDone }: { onDone: () => void }) {
 
   const handleError = (error: unknown) => {
     if (isApiError(error)) {
-      for (const item of error.fieldErrors) {
-        setError(item.field as keyof ProductCreateInput, { message: item.message })
+      if (error.status === 409) {
+        const codeMessage =
+          error.fieldErrors?.find((f) => f.field === "code")?.message ||
+          "Ya existe un producto con este código"
+        setError("code", { message: codeMessage })
+        return
+      }
+      if (error.fieldErrors && error.fieldErrors.length > 0) {
+        for (const item of error.fieldErrors) {
+          setError(item.field as keyof ProductCreateInput, { message: item.message })
+        }
+        return
       }
     }
     setServerError(getErrorMessage(error))
