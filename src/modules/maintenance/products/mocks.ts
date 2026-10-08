@@ -61,7 +61,7 @@ const IN_USE_IDS = [uuid(1), uuid(2)]
 
 export const productHandlers = [
   // LISTAR
-  http.get("/products", ({ request }) => {
+  http.get("*/products", ({ request }) => {
     const url = new URL(request.url)
     const search = url.searchParams.get("search")?.toLowerCase().trim() || ""
     const status = url.searchParams.get("status")
@@ -89,7 +89,7 @@ export const productHandlers = [
   }),
 
   // CREAR (Nace con stock 0; verifica duplicidad de código)
-  http.post("/products", async ({ request }) => {
+  http.post("*/products", async ({ request }) => {
     const body = (await request.json()) as ProductCreateInput
     const codeNormalized = body.code.trim().toUpperCase()
 
@@ -123,7 +123,7 @@ export const productHandlers = [
   }),
 
   // ACTUALIZAR (PUT - Inmutable: conserva el código original y el stock)
-  http.put("/products/:id", async ({ request, params }) => {
+  http.put("*/products/:id", async ({ request, params }) => {
     const { id } = params
     const body = (await request.json()) as ProductUpdateInput
 
@@ -149,7 +149,7 @@ export const productHandlers = [
   }),
 
   // ACTUALIZACIÓN PARCIAL (PATCH - para desactivar/activar)
-  http.patch("/products/:id", async ({ request, params }) => {
+  http.patch("*/products/:id", async ({ request, params }) => {
     const { id } = params
     const body = (await request.json()) as Partial<Product>
 
@@ -163,7 +163,7 @@ export const productHandlers = [
   }),
 
   // ELIMINAR (DELETE - 409 si el producto está en uso)
-  http.delete("/products/:id", ({ params }) => {
+  http.delete("*/products/:id", ({ params }) => {
     const { id } = params
 
     if (IN_USE_IDS.includes(String(id))) {
