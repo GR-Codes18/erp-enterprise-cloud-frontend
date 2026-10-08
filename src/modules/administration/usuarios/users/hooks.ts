@@ -6,6 +6,14 @@ import type { UserInput } from "./schema"
 export const userKeys = {
   all: ["users"] as const,
   list: (params: PageParams) => [...userKeys.all, "list", params] as const,
+  options: () => [...userKeys.all, "options"] as const,
+}
+
+export interface UserOption {
+  value: string
+  label: string
+  /** Para que quien consuma el hook pueda excluir inactivos (regla 4 del manual) */
+  active: boolean
 }
 
 export function useUsers(params: PageParams) {
@@ -17,7 +25,26 @@ export function useUsers(params: PageParams) {
   })
 }
 
-/** Tras crear o editar se invalidan todos los listados de usuarios. */
+/**
+ * Opciones para selectores de usuario en otros módulos (regla 0.5).
+ * Incluye inactivos: la auditoría y los documentos antiguos los siguen mostrando.
+ * Un documento nuevo debe filtrar por `active`.
+ */
+export function useUserOptions() {
+  return useQuery({
+    queryKey: userKeys.options(),
+    queryFn: ({ signal }) => userService.list({ page: 1, size: 100 }, signal),
+    select: (data): UserOption[] =>
+      data.items.map((user) => ({
+        value: user.id,
+        label: user.name,
+        active: user.status === "active",
+      })),
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+/** Tras crear o editar se invalidan los listados y las opciones de usuarios. */
 function useInvalidateUsers() {
   const queryClient = useQueryClient()
   return () => queryClient.invalidateQueries({ queryKey: userKeys.all })

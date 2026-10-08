@@ -41,3 +41,6 @@ export const userHandlers = createCrudHandlers<User>({
   searchFields: ["name", "email"],
   filterFields: ["status", "role_id"],
 })
+
+/** Para que otros mocks del módulo (por ejemplo, auditoría) referencien usuarios reales */
+export const userId = uuid

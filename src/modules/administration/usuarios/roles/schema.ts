@@ -14,3 +14,17 @@ export const roleSchema = z.object({
 })
 
 export type Role = z.infer<typeof roleSchema>
+
+export const roleInputSchema = z.object({
+  name: z.string().trim().min(2, "Ingresa un nombre para el rol").max(80, "Máximo 80 caracteres"),
+  description: z.string().trim().max(200, "Máximo 200 caracteres"),
+  permissions: z.array(z.string()),
+})
+
+export type RoleInput = z.infer<typeof roleInputSchema>
+
+export const EMPTY_ROLE: RoleInput = {
+  name: "",
+  description: "",
+  permissions: [],
+}
