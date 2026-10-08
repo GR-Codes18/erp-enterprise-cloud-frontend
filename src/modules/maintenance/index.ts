@@ -3,6 +3,7 @@ import type { AppModule } from "@/shared/types/module"
 
 export { useSupplierOptions } from "./suppliers/hooks"
 export { useCategoryOptions } from "./categories/hooks"
+export { useWarehouseOptions } from "./warehouses/hooks"
 
 export const maintenanceModule: AppModule = {
   id: "maintenance",
@@ -16,7 +17,7 @@ export const maintenanceModule: AppModule = {
         { label: "Proveedores", path: "suppliers", page: () => import("./pages/SuppliersPage") },
         { label: "Productos", path: "products" },
         { label: "Categorías", path: "categories", page: () => import("./pages/CategoriesPage") },
-        { label: "Almacenes", path: "warehouses" },
+        { label: "Almacenes", path: "warehouses", page: () => import("./pages/WarehousesPage") },
       ],
     },
   ],
