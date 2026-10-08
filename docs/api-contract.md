@@ -137,16 +137,47 @@ Ejemplo (respuesta de `GET /customers/{id}`):
 }
 ```
 
-## 7. Autenticación y permisos — Por confirmar
+## 7. Autenticación y permisos
 
-Aún no está definido. Hay que acordar:
+Definido y con soporte simulado (MSW) en el frontend.
 
-- Mecanismo: token en cabecera `Authorization: Bearer ...` o cookie `HttpOnly`.
-- Rutas de login, cierre de sesión y renovación (`/api/v1/auth/...`).
-- Duración del token y qué hace el frontend al recibir 401.
-- Cómo el frontend conoce los permisos del usuario (en la respuesta de login o en una ruta propia) para ocultar menús y acciones.
+### 7.1 Mecanismo
+- **Token de acceso:** El cliente envía la cabecera `Authorization: Bearer <token>` en todas las peticiones a rutas protegidas.
+- **Manejo en cliente:** El token se almacena **exclusivamente en memoria** (`AuthContext`). Nunca se guarda en `localStorage` ni `sessionStorage`.
+- **Expiración (401):** Ante una respuesta HTTP `401 Unauthorized` en una ruta protegida, el frontend limpia la sesión en memoria y redirige a `/login`.
 
-El frontend no se apoya en esto para la seguridad: el backend debe comprobar permisos en cada ruta.
+### 7.2 Rutas de autenticación
+
+#### Iniciar sesión (`POST /api/v1/auth/login`)
+- **Petición:**
+  ```json
+  {
+    "email": "admin@enterprise.com",
+    "password": "..."
+  }
+
+- **Respuesta exitosa (200 OK):**
+  ```json
+  {
+    "token": "cadena-de-token-jwt",
+    "user": {
+      "id": "00000000-0000-4000-8010-000000000001",
+      "name": "Gabriel Romero",
+      "email": "admin@enterprise.com",
+      "role": "Administrador",
+      "permissions": ["*"]
+    }
+  }
+
+- **Credenciales inválidas (401 Unauthorized):**
+  ```json
+  {
+  "code": "INVALID_CREDENTIALS",
+  "message": "Credenciales inválidas."
+  }
+
+- **Cerrar sesión (POST /api/v1/auth/logout)**
+  Respuesta exitosa (204 No Content): Sin cuerpo. El frontend remueve el token de la memoria.
 
 ## 8. Rutas del documento maestro
 
@@ -183,7 +214,7 @@ Las pantallas existen o se planean, pero falta su ruta:
 | # | Decisión | Quién |
 |---|---|---|
 | 1 | Formato de fechas por campo | Frontend + backend |
-| 2 | Mecanismo de autenticación y permisos | Frontend + backend |
+| 2 | Mecanismo de autenticación y permisos | Decidido (Bearer token en memoria) |
 | 3 | Orden por defecto y filtros de los listados | Frontend + backend |
 | 4 | Rutas y campos de los recursos pendientes | Backend (propuesta) y frontend (revisión) |
 | 5 | Cómo se indica la moneda en documentos | Frontend + backend |
