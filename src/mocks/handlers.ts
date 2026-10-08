@@ -4,11 +4,13 @@ import { roleHandlers } from "@/modules/administration/usuarios/roles/mocks"
 import { userHandlers } from "@/modules/administration/usuarios/users/mocks"
 import { customerHandlers } from "@/modules/maintenance/customers/mocks"
 import { supplierHandlers } from "@/modules/maintenance/suppliers/mocks"
+import { categoryHandlers } from "@/modules/maintenance/categories/mocks"
 
 /** Aquí se agregan los handlers de cada módulo (modules/<módulo>/.../mocks). */
 export const handlers: RequestHandler[] = [
   ...customerHandlers,
   ...supplierHandlers,
+  ...categoryHandlers,
   ...roleHandlers,
   ...userHandlers,
   ...authHandlers,
