@@ -10,7 +10,7 @@ export const administrationModule: AppModule = {
     {
       label: "Seguridad",
       items: [
-        { label: "Usuarios", path: "users" },
+        { label: "Usuarios", path: "users", page: () => import("./pages/UsersPage") },
         { label: "Roles", path: "roles" },
         { label: "Permisos", path: "permissions" },
         { label: "Auditoría", path: "audit" },
