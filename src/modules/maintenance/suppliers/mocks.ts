@@ -1,4 +1,4 @@
-import { createCrudHandlers } from "@/mocks/utils/crud"
+import { createCrudHandlers } from "@/mocks/createCrudHandlers"
 import type { DocumentType, Supplier, SupplierStatus } from "./schema"
 
 /** UUID fijos y legibles (válidos v4): 00000000-0000-4000-8001-000000000001, ...002, etc. */
@@ -12,7 +12,7 @@ const supplier = (
   email: string,
   phone: string,
   credit_days: number,
-  status: SupplierStatus,
+  status: SupplierStatus
 ): Supplier => ({
   id: uuid(n),
   document_type,
@@ -40,9 +40,39 @@ const seed: Supplier[] = [
   supplier(12, "CE", "006234567", "Pierre Dupont", "pierre.dupont@example.com", "988000012", 0, "inactive"),
 ]
 
+/** Proveedores 1 y 2 tienen operaciones asociadas */
+const IN_USE_IDS = [uuid(1), uuid(2)]
+
 export const supplierHandlers = createCrudHandlers<Supplier>({
-  resource: "suppliers",
-  seed,
+  endpoint: "*/suppliers",
+  items: seed,
   searchFields: ["name", "document_number", "email"],
   filterFields: ["status", "document_type"],
+  uniqueFields: [
+    {
+      field: "document_number",
+      label: "número de documento",
+      normalize: (val: unknown) => String(val ?? "").trim(),
+    },
+  ],
+  immutableFields: ["document_type", "document_number"],
+  inUseIds: IN_USE_IDS,
+  inUseMessage:
+    "Este proveedor tiene comprobantes u operaciones registradas y no se puede eliminar. Puedes desactivarlo para evitar nuevas operaciones.",
+  onBeforeCreate: (body: Record<string, unknown>, currentItems: Supplier[]) => ({
+    id: uuid(currentItems.length + 1),
+    document_type: (body.document_type as DocumentType) || "RUC",
+    document_number: String(body.document_number ?? "").trim(),
+    name: String(body.name ?? "").trim(),
+    email: String(body.email ?? "").trim(),
+    phone: String(body.phone ?? "").trim(),
+    credit_days: Number(body.credit_days ?? 0),
+    status: (body.status as SupplierStatus) || "active",
+  }),
+  onBeforeUpdate: (_current: Supplier, body: Record<string, unknown>) => ({
+    name: String(body.name ?? "").trim(),
+    email: String(body.email ?? "").trim(),
+    phone: String(body.phone ?? "").trim(),
+    credit_days: Number(body.credit_days ?? 0),
+  }),
 })

@@ -4,15 +4,17 @@ import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
 import { DataTable, type Column } from "@/shared/components/DataTable"
 import { EmptyState } from "@/shared/components/EmptyState"
 import { ErrorState } from "@/shared/components/ErrorState"
+import InUseDialog from "@/shared/components/InUseDialog"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
+import { useDeleteOrDeactivate } from "@/shared/hooks/useDeleteOrDeactivate"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import { SupplierFormDialog } from "../suppliers/components/SupplierFormDialog"
-import { useDeleteSupplier, useSuppliers } from "../suppliers/hooks"
+import { useDeleteSupplier, usePatchSupplier, useSuppliers } from "../suppliers/hooks"
 import { STATUS_LABELS, type Supplier } from "../suppliers/schema"
 
 const PAGE_SIZE = 10
@@ -31,19 +33,35 @@ export default function SuppliersPage() {
 
   const suppliers = useSuppliers({ page, size: PAGE_SIZE, search })
   const deleteSupplier = useDeleteSupplier()
+  const patchSupplier = usePatchSupplier()
 
-  const handleConfirmDelete = () => {
+  const {
+    isInUseDialogOpen,
+    setIsInUseDialogOpen,
+    isDeleting,
+    isDeactivating,
+    handleDelete,
+    handleConfirmDeactivate,
+  } = useDeleteOrDeactivate<Supplier>({
+    resourceName: "Proveedor",
+    onDelete: async (item) => {
+      await deleteSupplier.mutateAsync(item.id)
+      if ((suppliers.data?.items.length ?? 0) === 1 && page > 1) {
+        setPage(page - 1)
+      }
+    },
+    onDeactivate: async (item) => {
+      await patchSupplier.mutateAsync({ id: item.id, input: { status: "inactive" } })
+    },
+    onError: (msg) => setActionError(msg),
+    onSuccess: () => setActionError(null),
+  })
+
+  const handleConfirmDelete = async () => {
     if (!toDelete) return
-    deleteSupplier.mutate(toDelete.id, {
-      onSuccess: () => {
-        if ((suppliers.data?.items.length ?? 0) === 1 && page > 1) setPage(page - 1)
-        setToDelete(null)
-      },
-      onError: (error) => {
-        setToDelete(null)
-        setActionError(getErrorMessage(error))
-      },
-    })
+    const target = toDelete
+    setToDelete(null)
+    await handleDelete(target)
   }
 
   const columns: Column<Supplier>[] = [
@@ -186,8 +204,16 @@ export default function SuppliersPage() {
         }}
         title="Eliminar proveedor"
         description={`¿Seguro que quieres eliminar a "${toDelete?.name ?? ""}"? Esta acción no se puede deshacer.`}
-        isLoading={deleteSupplier.isPending}
+        isLoading={isDeleting}
         onConfirm={handleConfirmDelete}
+      />
+
+      <InUseDialog
+        open={isInUseDialogOpen}
+        onOpenChange={setIsInUseDialogOpen}
+        resourceName="Proveedor"
+        isPending={isDeactivating}
+        onDeactivate={handleConfirmDeactivate}
       />
     </>
   )
