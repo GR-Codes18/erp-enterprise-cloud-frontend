@@ -19,7 +19,12 @@ export const salesKeys = {
 
 function useInvalidateSales() {
   const queryClient = useQueryClient()
-  return () => queryClient.invalidateQueries({ queryKey: salesKeys.all })
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: salesKeys.all }),
+      queryClient.invalidateQueries({ queryKey: ["stock"] }),
+      queryClient.invalidateQueries({ queryKey: ["kardex"] }),
+    ])
 }
 
 /** Mutación de Ventas que, al terminar bien, refresca todos sus listados y detalles */

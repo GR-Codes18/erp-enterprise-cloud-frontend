@@ -1,66 +1,47 @@
-import { createCrudHandlers } from "@/mocks/utils/crud"
-import { PRODUCTS, WAREHOUSES, categoryRef, productRef, warehouseRef } from "../mockRefs"
-import type { StockRow, StockStatus } from "./schema"
+import { delay, http, HttpResponse, type RequestHandler } from "msw"
+import { env } from "@/config/env"
+import { applyListFilters } from "@/mocks/utils/filters"
+import type { Paginated } from "@/shared/lib/api/types"
+import { getStockRows } from "../state"
 
-/** UUID fijos con el prefijo de stock (8030) */
-const uuid = (n: number) => `00000000-0000-4000-8030-${String(n).padStart(12, "0")}`
+const base = `${env.apiBaseUrl}/inventory/stock`
 
-type ProductSeed = (typeof PRODUCTS)[keyof typeof PRODUCTS]
-type WarehouseSeed = (typeof WAREHOUSES)[keyof typeof WAREHOUSES]
-
-/** Solo para sembrar datos coherentes: en la app real el estado lo calcula el backend */
-function seedStatus(quantity: number, min: number): StockStatus {
-  if (quantity === 0) return "out"
-  return quantity <= min ? "low" : "normal"
+const positiveInt = (value: string | null, fallback: number, max?: number) => {
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed < 1) return fallback
+  return max ? Math.min(parsed, max) : parsed
 }
 
-const row = (
-  n: number,
-  product: ProductSeed,
-  warehouse: WarehouseSeed,
-  quantity: number,
-): StockRow => ({
-  id: uuid(n),
-  product_id: productRef(product.n),
-  product_sku: product.sku,
-  product_name: product.name,
-  category_id: categoryRef(product.category),
-  category_name: product.categoryName,
-  warehouse_id: warehouseRef(warehouse.n),
-  warehouse_name: warehouse.name,
-  unit: product.unit,
-  quantity,
-  min_stock: product.minStock,
-  status: seedStatus(quantity, product.minStock),
-  below_min: quantity <= product.minStock,
-})
+export const stockHandlers: RequestHandler[] = [
+  http.get(base, async ({ request }) => {
+    await delay(250)
+    const items = getStockRows()
+    const params = new URL(request.url).searchParams
+    const result = applyListFilters(items, params, {
+      searchFields: ["product_name", "product_sku"],
+      filterFields: ["status", "warehouse_id", "category_id", "product_id", "below_min"],
+    })
+    if (!result.ok) {
+      return HttpResponse.json({ code: result.code, message: result.message }, { status: result.status })
+    }
+    const page = positiveInt(params.get("page"), 1)
+    const size = positiveInt(params.get("size"), 20, 100)
+    const body: Paginated<typeof items[number]> = {
+      items: result.items.slice((page - 1) * size, page * size),
+      total: result.items.length,
+      page,
+      size,
+      pages: Math.max(1, Math.ceil(result.items.length / size)),
+    }
+    return HttpResponse.json(body)
+  }),
 
-// 18 registros (2 páginas con size=10). Por cada producto, la suma de sus almacenes
-// coincide con el `stock` de su ficha en Mantenimiento.
-const seed: StockRow[] = [
-  row(1, PRODUCTS.hammer, WAREHOUSES.central, 15),
-  row(2, PRODUCTS.hammer, WAREHOUSES.finished, 10),
-  row(3, PRODUCTS.screwdrivers, WAREHOUSES.central, 40),
-  row(4, PRODUCTS.cement, WAREHOUSES.rawMaterial, 100),
-  row(5, PRODUCTS.cement, WAREHOUSES.central, 50),
-  row(6, PRODUCTS.brick, WAREHOUSES.rawMaterial, 800),
-  row(7, PRODUCTS.brick, WAREHOUSES.south, 400),
-  row(8, PRODUCTS.helmet, WAREHOUSES.central, 80),
-  row(9, PRODUCTS.gloves, WAREHOUSES.central, 120),
-  row(10, PRODUCTS.gloves, WAREHOUSES.north, 80),
-  row(11, PRODUCTS.paint, WAREHOUSES.finished, 35),
-  row(12, PRODUCTS.pvc, WAREHOUSES.rawMaterial, 60),
-  row(13, PRODUCTS.pvc, WAREHOUSES.south, 30),
-  row(14, PRODUCTS.cable, WAREHOUSES.central, 15),
-  row(15, PRODUCTS.padlock, WAREHOUSES.tools, 50),
-  row(16, PRODUCTS.led, WAREHOUSES.sanJuan, 12),
-  row(17, PRODUCTS.led, WAREHOUSES.ate, 8),
-  row(18, PRODUCTS.silicone, WAREHOUSES.central, 0),
+  http.get(`${base}/:id`, async ({ params }) => {
+    await delay(250)
+    const row = getStockRows().find((item) => item.id === params.id)
+    if (!row) {
+      return HttpResponse.json({ code: "NOT_FOUND", message: "Recurso no encontrado" }, { status: 404 })
+    }
+    return HttpResponse.json(row)
+  }),
 ]
-
-export const stockHandlers = createCrudHandlers<StockRow>({
-  resource: "inventory/stock",
-  seed,
-  searchFields: ["product_name", "product_sku"],
-  filterFields: ["status", "warehouse_id", "category_id", "product_id", "below_min"],
-})

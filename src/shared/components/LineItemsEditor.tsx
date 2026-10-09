@@ -21,16 +21,23 @@ export interface LineProductOption {
   unit: string
 }
 
+export interface WarehouseOption {
+  id: string
+  name: string
+}
+
 export interface EditableLine {
   /** Clave estable de la fila (el `id` de useFieldArray), nunca el índice */
   key: string
   product_id: string
+  warehouse_id?: string
   quantity: number
   unit_price: string
 }
 
 export interface LineErrors {
   product_id?: string
+  warehouse_id?: string
   quantity?: string
   unit_price?: string
 }
@@ -46,7 +53,9 @@ interface LineItemsEditorProps {
   listError?: string
   disabled?: boolean
   /** Al elegir un producto la página propone su precio o costo (editable) */
+  warehouseOptionsByProduct?: Record<string, WarehouseOption[]>
   onProductChange: (index: number, productId: string) => void
+  onWarehouseChange?: (index: number, warehouseId: string) => void
   onQuantityChange: (index: number, quantity: number) => void
   onPriceChange: (index: number, price: string) => void
   onAdd: () => void
@@ -67,7 +76,9 @@ export function LineItemsEditor({
   errors,
   listError,
   disabled = false,
+  warehouseOptionsByProduct,
   onProductChange,
+  onWarehouseChange,
   onQuantityChange,
   onPriceChange,
   onAdd,
@@ -98,15 +109,21 @@ export function LineItemsEditor({
         const lineErrors = errors[index]
         const subtotal = lineSubtotalCents(line)
         const unit = products.find((product) => product.id === line.product_id)?.unit
+        const warehouseOptions = line.product_id ? warehouseOptionsByProduct?.[line.product_id] ?? [] : []
         const ids = {
           product: `line-${index}-product`,
+          warehouse: `line-${index}-warehouse`,
           quantity: `line-${index}-quantity`,
           price: `line-${index}-price`,
         }
         return (
           <div
             key={line.key}
-            className="grid gap-3 rounded-md border p-3 md:grid-cols-[minmax(14rem,3fr)_minmax(6rem,1fr)_minmax(8rem,1fr)_minmax(7rem,1fr)_auto]"
+            className={`grid gap-3 rounded-md border p-3 ${
+              warehouseOptionsByProduct && onWarehouseChange
+                ? "md:grid-cols-[minmax(12rem,2.6fr)_minmax(12rem,2.2fr)_minmax(6rem,1fr)_minmax(8rem,1fr)_minmax(7rem,1fr)_auto]"
+                : "md:grid-cols-[minmax(14rem,3fr)_minmax(6rem,1fr)_minmax(8rem,1fr)_minmax(7rem,1fr)_auto]"
+            }`}
           >
             <Field id={ids.product} label="Producto" error={lineErrors?.product_id}>
               <Select
@@ -131,6 +148,36 @@ export function LineItemsEditor({
                 </SelectContent>
               </Select>
             </Field>
+
+            {warehouseOptionsByProduct && onWarehouseChange && (
+              <Field id={ids.warehouse} label="Almacén" error={lineErrors?.warehouse_id}>
+                <Select
+                  value={line.warehouse_id || undefined}
+                  onValueChange={(value) => onWarehouseChange(index, value)}
+                  disabled={disabled || warehouseOptions.length === 0}
+                >
+                  <SelectTrigger
+                    id={ids.warehouse}
+                    className="w-full"
+                    aria-invalid={!!lineErrors?.warehouse_id}
+                    aria-describedby={describedBy(ids.warehouse, lineErrors?.warehouse_id)}
+                  >
+                    <SelectValue placeholder={line.product_id ? "Selecciona un almacén" : "Primero elige un producto"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {warehouseOptions.length === 0 ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">No hay almacenes con stock disponible</div>
+                    ) : (
+                      warehouseOptions.map((warehouse) => (
+                        <SelectItem key={warehouse.id} value={warehouse.id}>
+                          {warehouse.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
 
             <Field id={ids.quantity} label={unit ? `Cantidad (${unit})` : "Cantidad"} error={lineErrors?.quantity}>
               <Input
@@ -182,7 +229,7 @@ export function LineItemsEditor({
               </Button>
             </div>
 
-            {lineHint && <div className="md:col-span-5">{lineHint(index)}</div>}
+            {lineHint && <div className={warehouseOptionsByProduct && onWarehouseChange ? "md:col-span-6" : "md:col-span-5"}>{lineHint(index)}</div>}
           </div>
         )
       })}

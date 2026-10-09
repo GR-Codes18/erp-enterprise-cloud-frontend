@@ -1,5 +1,6 @@
-import { PRODUCTS, customerRef, findCustomer, findProduct, productName, productRef } from "@/mocks/refs"
+import { PRODUCTS, customerRef, findCustomer, productName, productRef, warehouseRef } from "@/mocks/refs"
 import { createDocumentHandlers, nextNumber, totalsOf } from "@/mocks/utils/documents"
+import { applyInventoryMovement, getAvailableQuantity } from "@/modules/inventory/state"
 import { addDays, todayInLima } from "@/shared/lib/dates"
 import { fromCents, toCents } from "@/shared/lib/money"
 import { canIssueAs, issueInvoiceSchema, type Invoice } from "./invoices/schema"
@@ -14,16 +15,31 @@ const orderId = (n: number) => uuid("8041", n)
 const invoiceId = (n: number) => uuid("8042", n)
 const returnId = (n: number) => uuid("8043", n)
 
-type Line = { product_id: string; quantity: number; unit_price: string }
+type Line = { product_id: string; warehouse_id: string; warehouse_name?: string; quantity: number; unit_price: string }
+
+const WAREHOUSE_NAMES: Record<string, string> = {
+  [warehouseRef(1)]: "Almacén Central Principal",
+  [warehouseRef(2)]: "Almacén de Materia Prima",
+  [warehouseRef(3)]: "Almacén de Productos Terminados",
+  [warehouseRef(4)]: "Depósito San Juan de Lurigancho",
+  [warehouseRef(5)]: "Almacén Sur Villa El Salvador",
+  [warehouseRef(6)]: "Almacén Norte Los Olivos",
+  [warehouseRef(8)]: "Almacén Repuestos y Herramientas",
+  [warehouseRef(10)]: "Almacén Auxiliar Ate",
+}
+
+const warehouseName = (id: string) => WAREHOUSE_NAMES[id] ?? "Almacén registrado en esta sesión"
 
 /** Línea con el precio de venta del producto semilla */
-const line = (productN: number, quantity: number, unit_price?: string): Line => ({
+const line = (productN: number, quantity: number, unit_price?: string, warehouseN: number = 1): Line => ({
   product_id: productRef(productN),
+  warehouse_id: warehouseRef(warehouseN),
+  warehouse_name: warehouseName(warehouseRef(warehouseN)),
   quantity,
   unit_price: unit_price ?? PRODUCTS.find((p) => p.n === productN)?.sale_price ?? "0.00",
 })
 const withNames = (lines: readonly Line[]) =>
-  lines.map((item) => ({ ...item, product_name: productName(item.product_id) }))
+  lines.map((item) => ({ ...item, product_name: productName(item.product_id), warehouse_name: warehouseName(item.warehouse_id) }))
 const customerName = (id: string) => findCustomer(id)?.name ?? "Cliente registrado en esta sesión"
 
 // ---------------------------------------------------------------- Cotizaciones
@@ -84,13 +100,13 @@ const cash = { payment_condition: "cash" as const, credit_days: 0 }
 const credit = (days: number) => ({ payment_condition: "credit" as const, credit_days: days })
 
 const orderSeed: Order[] = [
-  makeOrder(1, { customer_id: customerRef(1), quote_id: quoteId(1), items: quoteSeed[0].items.map(({ product_id, quantity, unit_price }) => ({ product_id, quantity, unit_price })), ...credit(10), notes: "" }, "invoiced", { quote_number: quoteSeed[0].number, invoice_id: invoiceId(1), created_at: "2026-09-22T15:00:00Z" }),
+  makeOrder(1, { customer_id: customerRef(1), quote_id: quoteId(1), items: quoteSeed[0].items.map(({ product_id, warehouse_id, quantity, unit_price }) => ({ product_id, warehouse_id, quantity, unit_price })), ...credit(10), notes: "" }, "invoiced", { quote_number: quoteSeed[0].number, invoice_id: invoiceId(1), created_at: "2026-09-22T15:00:00Z" }),
   makeOrder(2, { customer_id: customerRef(3), quote_id: "", items: [line(6, 4), line(8, 2)], ...cash, notes: "" }, "invoiced", { invoice_id: invoiceId(2), created_at: "2026-09-28T15:00:00Z" }),
   makeOrder(3, { customer_id: customerRef(2), quote_id: "", items: [line(3, 30), line(4, 200)], ...credit(15), notes: "Coordinar despacho con almacén." }, "confirmed", { created_at: "2026-10-05T15:00:00Z" }),
   makeOrder(4, { customer_id: customerRef(10), quote_id: "", items: [line(11, 2)], ...cash, notes: "" }, "draft", { created_at: "2026-10-07T15:00:00Z" }),
   makeOrder(5, { customer_id: customerRef(11), quote_id: "", items: [line(2, 3)], ...cash, notes: "" }, "cancelled", { cancel_reason: "El cliente anuló la compra.", created_at: "2026-09-30T15:00:00Z" }),
-  // A crédito por encima de su límite (S/ 800): al confirmar responde 409
-  makeOrder(6, { customer_id: customerRef(3), quote_id: "", items: [line(7, 15)], ...credit(30), notes: "" }, "draft", { created_at: "2026-10-06T15:00:00Z" }),
+  // A crédito por encima de su límite (S/ 800): al confirmar responde 409, usando el almacén con stock disponible
+  makeOrder(6, { customer_id: customerRef(3), quote_id: "", items: [line(7, 15, undefined, 3)], ...credit(30), notes: "" }, "draft", { created_at: "2026-10-06T15:00:00Z" }),
   makeOrder(7, { customer_id: customerRef(4), quote_id: "", items: [line(1, 1), line(10, 2)], ...cash, notes: "" }, "confirmed", { created_at: "2026-10-06T16:00:00Z" }),
   // Pide más cable del que hay (15): al confirmar responde 409 con el faltante
   makeOrder(8, { customer_id: customerRef(8), quote_id: "", items: [line(9, 20)], ...credit(30), notes: "" }, "draft", { created_at: "2026-10-07T16:00:00Z" }),
@@ -234,7 +250,7 @@ const quotes = createDocumentHandlers<Quote, QuoteInput, Quote["status"]>({
           {
             customer_id: quote.customer_id,
             quote_id: quote.id,
-            items: quote.items.map(({ product_id, quantity, unit_price }) => ({ product_id, quantity, unit_price })),
+            items: quote.items.map(({ product_id, warehouse_id, quantity, unit_price }) => ({ product_id, warehouse_id, quantity, unit_price })),
             ...cash,
             notes: quote.notes,
           },
@@ -255,15 +271,6 @@ function checkOrderCanBeConfirmed(order: Order) {
   if (customer && !customer.active) {
     return { status: 409, code: "CUSTOMER_INACTIVE", message: "El cliente está inactivo: no se le puede vender." }
   }
-  const shortages = order.items.flatMap((item) => {
-    const product = findProduct(item.product_id)
-    return product && item.quantity > product.stock_total
-      ? [`${product.name} (disponible ${product.stock_total}, pedido ${item.quantity})`]
-      : []
-  })
-  if (shortages.length > 0) {
-    return { status: 409, code: "INSUFFICIENT_STOCK", message: `Stock insuficiente: ${shortages.join("; ")}.` }
-  }
   if (order.payment_condition === "credit" && customer) {
     // Saldo pendiente del cliente (comprobantes vigentes con deuda) + este pedido <= límite
     const pending = invoices.store
@@ -273,6 +280,15 @@ function checkOrderCanBeConfirmed(order: Order) {
     if (pending + toCents(order.total) > toCents(customer.credit_limit)) {
       return { status: 409, code: "CREDIT_LIMIT_EXCEEDED", message: "Excede el límite de crédito del cliente." }
     }
+  }
+  const shortages = order.items.flatMap((item) => {
+    const available = getAvailableQuantity(item.product_id, item.warehouse_id)
+    return item.quantity > available
+      ? [`${productName(item.product_id)} (disponible ${available}, pedido ${item.quantity})`]
+      : []
+  })
+  if (shortages.length > 0) {
+    return { status: 409, code: "INSUFFICIENT_STOCK", message: `Stock insuficiente: ${shortages.join("; ")}.` }
   }
   return undefined
 }
@@ -297,7 +313,25 @@ const orders = createDocumentHandlers<Order, OrderInput, Order["status"]>({
     created_at: current.created_at,
   }),
   actions: [
-    { action: "confirm", from: ["draft"], to: "confirmed", check: checkOrderCanBeConfirmed },
+    {
+      action: "confirm",
+      from: ["draft"],
+      to: "confirmed",
+      check: checkOrderCanBeConfirmed,
+      respond: (order) => {
+        order.items.forEach((item) => {
+          applyInventoryMovement({
+            product_id: item.product_id,
+            warehouse_id: item.warehouse_id,
+            quantity: item.quantity,
+            direction: "out",
+            type: "sale",
+            reference: order.number,
+          })
+        })
+        return order
+      },
+    },
     { action: "cancel", from: ["draft", "confirmed"], to: "cancelled", requiresReason: true, apply: (_o, body) => ({ cancel_reason: String(body.reason).trim() }) },
     {
       action: "invoice",
@@ -384,8 +418,17 @@ const returns = createDocumentHandlers<SalesReturn, ReturnInput, SalesReturn["st
       from: ["draft"],
       to: "confirmed",
       check: (salesReturn) => checkReturnQuantities(salesReturn),
-      // Dentro de Ventas: el comprobante registra lo devuelto. Nota de crédito, stock y deuda: backend
+      // Dentro de Ventas: el comprobante registra lo devuelto. El stock vuelve al almacén disponible.
       respond: (salesReturn) => {
+        salesReturn.items.forEach((item) => {
+          applyInventoryMovement({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            direction: "in",
+            type: "return",
+            reference: salesReturn.number,
+          })
+        })
         const invoice = invoices.store.find(salesReturn.invoice_id)
         if (invoice) {
           invoices.store.update(invoice.id, {

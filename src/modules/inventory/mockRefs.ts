@@ -30,6 +30,10 @@ export const WAREHOUSES = {
   sanJuan: { n: 4, name: "Depósito San Juan de Lurigancho" },
   south: { n: 5, name: "Almacén Sur Villa El Salvador" },
   north: { n: 6, name: "Almacén Norte Los Olivos" },
+  temporaryCallao: { n: 7, name: "Depósito Temporal Callao" },
   tools: { n: 8, name: "Almacén Repuestos y Herramientas" },
+  maintenanceInactive: { n: 9, name: "Depósito Mantenimiento Inactivo" },
   ate: { n: 10, name: "Almacén Auxiliar Ate" },
+  transitoryArequipa: { n: 11, name: "Almacén Transitorio Arequipa" },
+  oldChorrillos: { n: 12, name: "Depósito Antiguo Chorrillos" },
 }
