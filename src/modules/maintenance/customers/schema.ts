@@ -20,7 +20,7 @@ const DOCUMENT_RULES: Record<DocumentType, { pattern: RegExp; message: string }>
 /** Monto en texto decimal del contrato: "1500", "1500.5", "1500.00" */
 const AMOUNT_PATTERN = /^\d+(\.\d{1,2})?$/
 
-const customerFields = z.object({
+const baseCreateFields = z.object({
   document_type: z.enum(DOCUMENT_TYPES),
   document_number: z.string().trim(),
   name: z
@@ -28,27 +28,45 @@ const customerFields = z.object({
     .trim()
     .min(2, "Ingresa el nombre o razón social")
     .max(120, "Máximo 120 caracteres"),
-  email: z.union([z.literal(""), z.email("Correo no válido")]),
+  email: z.union([z.literal(""), z.string().email("Correo no válido")]),
   phone: z.string().trim().max(20, "Máximo 20 caracteres"),
   credit_limit: z.string().trim().regex(AMOUNT_PATTERN, "Monto no válido, ejemplo: 1500.00"),
   status: z.enum(CUSTOMER_STATUSES),
 })
 
-/** Lo que envía el formulario (sin id: lo asigna el servidor). */
-export const customerInputSchema = customerFields.superRefine((value, ctx) => {
+/** Esquema para crear cliente (tipo y número de documento editables). */
+export const customerCreateSchema = baseCreateFields.superRefine((value, ctx) => {
   const rule = DOCUMENT_RULES[value.document_type]
   if (!rule.pattern.test(value.document_number)) {
     ctx.addIssue({ code: "custom", path: ["document_number"], message: rule.message })
   }
 })
 
-/** Lo que devuelve la API. */
-export const customerSchema = customerFields.extend({ id: z.string() })
+/** Alias de compatibilidad para pruebas unitarias. */
+export const customerInputSchema = customerCreateSchema
 
-export type CustomerInput = z.infer<typeof customerInputSchema>
+/** Esquema para actualizar cliente (documento inmutable). */
+export const customerUpdateSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, "Ingresa el nombre o razón social")
+    .max(120, "Máximo 120 caracteres"),
+  email: z.union([z.literal(""), z.string().email("Correo no válido")]),
+  phone: z.string().trim().max(20, "Máximo 20 caracteres"),
+  credit_limit: z.string().trim().regex(AMOUNT_PATTERN, "Monto no válido, ejemplo: 1500.00"),
+  status: z.enum(CUSTOMER_STATUSES),
+})
+
+/** Lo que devuelve la API. */
+export const customerSchema = baseCreateFields.extend({ id: z.string() })
+
+export type CustomerCreateInput = z.infer<typeof customerCreateSchema>
+export type CustomerUpdateInput = z.infer<typeof customerUpdateSchema>
+export type CustomerInput = CustomerCreateInput
 export type Customer = z.infer<typeof customerSchema>
 
-export const EMPTY_CUSTOMER: CustomerInput = {
+export const EMPTY_CUSTOMER: CustomerCreateInput = {
   document_type: "DNI",
   document_number: "",
   name: "",

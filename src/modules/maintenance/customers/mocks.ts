@@ -1,4 +1,4 @@
-import { createCrudHandlers } from "@/mocks/utils/crud"
+import { createCrudHandlers } from "@/mocks/createCrudHandlers"
 import type { Customer, CustomerStatus, DocumentType } from "./schema"
 
 /** UUID fijos y legibles (válidos v4): 00000000-0000-4000-8000-000000000001, ...002, etc. */
@@ -12,7 +12,7 @@ const customer = (
   email: string,
   phone: string,
   credit_limit: string,
-  status: CustomerStatus,
+  status: CustomerStatus
 ): Customer => ({
   id: uuid(n),
   document_type,
@@ -40,9 +40,39 @@ const seed: Customer[] = [
   customer(12, "CE", "002345678", "Marie Dubois", "marie.dubois@example.com", "999000012", "0.00", "inactive"),
 ]
 
+/** Clientes 1 y 2 tienen ventas o cotizaciones asociadas */
+const IN_USE_IDS = [uuid(1), uuid(2)]
+
 export const customerHandlers = createCrudHandlers<Customer>({
-  resource: "customers",
-  seed,
+  endpoint: "*/customers",
+  items: seed,
   searchFields: ["name", "document_number", "email"],
   filterFields: ["status", "document_type"],
+  uniqueFields: [
+    {
+      field: "document_number",
+      label: "número de documento",
+      normalize: (val: unknown) => String(val ?? "").trim(),
+    },
+  ],
+  immutableFields: ["document_type", "document_number"],
+  inUseIds: IN_USE_IDS,
+  inUseMessage:
+    "Este cliente tiene ventas, cotizaciones o comprobantes registrados y no se puede eliminar. Puedes desactivarlo para evitar nuevas operaciones.",
+  onBeforeCreate: (body: Record<string, unknown>, currentItems: Customer[]) => ({
+    id: uuid(currentItems.length + 1),
+    document_type: (body.document_type as DocumentType) || "DNI",
+    document_number: String(body.document_number ?? "").trim(),
+    name: String(body.name ?? "").trim(),
+    email: String(body.email ?? "").trim(),
+    phone: String(body.phone ?? "").trim(),
+    credit_limit: String(body.credit_limit ?? "0.00").trim(),
+    status: (body.status as CustomerStatus) || "active",
+  }),
+  onBeforeUpdate: (_current: Customer, body: Record<string, unknown>) => ({
+    name: String(body.name ?? "").trim(),
+    email: String(body.email ?? "").trim(),
+    phone: String(body.phone ?? "").trim(),
+    credit_limit: String(body.credit_limit ?? "0.00").trim(),
+  }),
 })

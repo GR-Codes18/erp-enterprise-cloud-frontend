@@ -4,16 +4,18 @@ import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
 import { DataTable, type Column } from "@/shared/components/DataTable"
 import { EmptyState } from "@/shared/components/EmptyState"
 import { ErrorState } from "@/shared/components/ErrorState"
+import InUseDialog from "@/shared/components/InUseDialog"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
+import { useDeleteOrDeactivate } from "@/shared/hooks/useDeleteOrDeactivate"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import { formatMoney } from "@/shared/lib/money"
 import { CustomerFormDialog } from "../customers/components/CustomerFormDialog"
-import { useCustomers, useDeleteCustomer } from "../customers/hooks"
+import { useCustomers, useDeleteCustomer, usePatchCustomer } from "../customers/hooks"
 import { STATUS_LABELS, type Customer } from "../customers/schema"
 
 const PAGE_SIZE = 10
@@ -23,7 +25,6 @@ export default function CustomersPage() {
   const [searchInput, setSearchInput] = useState("")
   const search = useDebouncedValue(searchInput.trim(), 300)
 
-  // customer se conserva al cerrar para que el título no cambie durante la animación
   const [dialog, setDialog] = useState<{ open: boolean; customer: Customer | null }>({
     open: false,
     customer: null,
@@ -33,20 +34,35 @@ export default function CustomersPage() {
 
   const customers = useCustomers({ page, size: PAGE_SIZE, search })
   const deleteCustomer = useDeleteCustomer()
+  const patchCustomer = usePatchCustomer()
 
-  const handleConfirmDelete = () => {
+  const {
+    isInUseDialogOpen,
+    setIsInUseDialogOpen,
+    isDeleting,
+    isDeactivating,
+    handleDelete,
+    handleConfirmDeactivate,
+  } = useDeleteOrDeactivate<Customer>({
+    resourceName: "Cliente",
+    onDelete: async (item) => {
+      await deleteCustomer.mutateAsync(item.id)
+      if ((customers.data?.items.length ?? 0) === 1 && page > 1) {
+        setPage(page - 1)
+      }
+    },
+    onDeactivate: async (item) => {
+      await patchCustomer.mutateAsync({ id: item.id, input: { status: "inactive" } })
+    },
+    onError: (msg) => setActionError(msg),
+    onSuccess: () => setActionError(null),
+  })
+
+  const handleConfirmDelete = async () => {
     if (!toDelete) return
-    deleteCustomer.mutate(toDelete.id, {
-      onSuccess: () => {
-        // Si se borró el último de la página, se retrocede una
-        if ((customers.data?.items.length ?? 0) === 1 && page > 1) setPage(page - 1)
-        setToDelete(null)
-      },
-      onError: (error) => {
-        setToDelete(null)
-        setActionError(getErrorMessage(error))
-      },
-    })
+    const target = toDelete
+    setToDelete(null)
+    await handleDelete(target)
   }
 
   const columns: Column<Customer>[] = [
@@ -189,8 +205,16 @@ export default function CustomersPage() {
         }}
         title="Eliminar cliente"
         description={`¿Seguro que quieres eliminar a "${toDelete?.name ?? ""}"? Esta acción no se puede deshacer.`}
-        isLoading={deleteCustomer.isPending}
+        isLoading={isDeleting}
         onConfirm={handleConfirmDelete}
+      />
+
+      <InUseDialog
+        open={isInUseDialogOpen}
+        onOpenChange={setIsInUseDialogOpen}
+        resourceName="Cliente"
+        isPending={isDeactivating}
+        onDeactivate={handleConfirmDeactivate}
       />
     </>
   )
