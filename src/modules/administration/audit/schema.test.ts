@@ -39,7 +39,7 @@ describe("auditEventSchema", () => {
   })
 
   it("rechaza un evento sin usuario", () => {
-    const { user_id: _omit, ...withoutUser } = valid
+    const withoutUser = { ...valid, user_id: undefined }
     expect(auditEventSchema.safeParse(withoutUser).success).toBe(false)
   })
 })

@@ -204,7 +204,7 @@ Las pantallas existen o se planean, pero falta su ruta:
 - Mantenimiento: categorías, almacenes.
 - Ventas: cotizaciones, comprobantes, devoluciones.
 - Compras: solicitudes, recepciones, facturas, devoluciones.
-- Inventario: kardex, transferencias, ajustes.
+- Inventario: kardex, transferencias, ajustes (propuesta de rutas frontend en la sección 11; pendiente de acuerdo con backend).
 - Finanzas: cuentas por cobrar, cuentas por pagar, caja, bancos, estados de cuenta.
 - Administración: roles, permisos, auditoría, configuración.
 - Dashboard: indicadores resumidos.
@@ -218,3 +218,60 @@ Las pantallas existen o se planean, pero falta su ruta:
 | 3 | Orden por defecto y filtros de los listados | Frontend + backend |
 | 4 | Rutas y campos de los recursos pendientes | Backend (propuesta) y frontend (revisión) |
 | 5 | Cómo se indica la moneda en documentos | Frontend + backend |
+
+## 11. Propuesta del frontend: inventario
+
+Las rutas y los cuerpos de esta sección son la propuesta usada por la implementación del frontend y sus mocks. **No son un contrato acordado con el backend**; deben revisarse con el equipo de backend antes de integrar la API real.
+
+### 11.1 Transferencias (`/inventory/transfers`)
+
+| Operación | Ruta | Regla |
+|---|---|---|
+| Listar | `GET /inventory/transfers` | Paginado; filtros `status`, `origin_warehouse_id`, `destination_warehouse_id`; rango sobre `created_at` |
+| Obtener | `GET /inventory/transfers/{id}` | Incluye nombres de almacenes y producto para mostrar el documento |
+| Crear | `POST /inventory/transfers` | Crea en estado `draft` |
+| Editar | `PUT /inventory/transfers/{id}` | Solo en `draft`; reemplaza el documento completo |
+| Enviar | `POST /inventory/transfers/{id}/send` | Solo `draft`; cambia a `in_transit` y descuenta stock del origen |
+| Recibir | `POST /inventory/transfers/{id}/receive` | Solo `in_transit`; cambia a `received` y suma stock al destino |
+| Cancelar | `POST /inventory/transfers/{id}/cancel` | Solo `draft`; cambia a `cancelled` |
+| Eliminar borrador | `DELETE /inventory/transfers/{id}` | Solo `draft` |
+
+Cuerpo de creación/edición:
+
+```json
+{
+  "origin_warehouse_id": "UUID",
+  "destination_warehouse_id": "UUID",
+  "items": [{ "product_id": "UUID", "quantity": 3 }]
+}
+```
+
+Origen y destino deben ser diferentes, cada producto aparece una sola vez y `quantity` es entero positivo que no supera la existencia disponible en origen. El backend vuelve a validar disponibilidad al enviar. El frontend no simula movimientos de stock en sus mocks.
+
+### 11.2 Ajustes (`/inventory/adjustments`)
+
+| Operación | Ruta | Regla |
+|---|---|---|
+| Listar | `GET /inventory/adjustments` | Paginado; filtros `status`, `warehouse_id`, `reason`; rango sobre `created_at` |
+| Obtener | `GET /inventory/adjustments/{id}` | Incluye nombre del almacén y nombres de producto |
+| Crear | `POST /inventory/adjustments` | Crea en estado `draft` |
+| Editar | `PUT /inventory/adjustments/{id}` | Solo en `draft`; reemplaza el documento completo |
+| Aplicar | `POST /inventory/adjustments/{id}/apply` | Requiere permiso `inventory.adjustments:approve`; cambia a `applied` |
+| Eliminar borrador | `DELETE /inventory/adjustments/{id}` | Solo `draft` |
+
+Cuerpo de creación/edición:
+
+```json
+{
+  "warehouse_id": "UUID",
+  "items": [{ "product_id": "UUID", "direction": "increase", "quantity": 3 }],
+  "reason": "physical_count",
+  "notes": ""
+}
+```
+
+`direction` acepta `increase` o `decrease`; `reason` acepta `physical_count`, `shrinkage`, `damage`, `expiration` u `other`. El motivo es obligatorio, `notes` es opcional como cadena vacía, la cantidad es entero positivo y no se repite producto. Al aplicar, el backend rechaza con 409 si una disminución deja stock negativo. Los mocks solo cambian el estado del ajuste: no modifican stock ni kardex.
+
+Las respuestas de ambos recursos incluyen `id`, `status`, `created_at` y los nombres de almacenes/productos necesarios para lectura. Se recomienda incluir `product_name` en cada línea de respuesta para preservar la etiqueta de productos inactivos en documentos históricos; ese campo no se envía al crear o editar.
+
+Las respuestas de 400, 403, 404, 409 y 422 siguen los formatos generales de las secciones 2 y 3. El backend debe aplicar las reglas de autorización y validación aunque el frontend oculte acciones.
