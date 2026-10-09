@@ -20,15 +20,18 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select"
 import { getErrorMessage, isApiError } from "@/shared/lib/api/errors"
+import type { FieldError } from "@/shared/lib/api/types"
 import { useCreateCustomer, useUpdateCustomer } from "../hooks"
 import {
   CUSTOMER_STATUSES,
   DOCUMENT_TYPES,
   EMPTY_CUSTOMER,
   STATUS_LABELS,
-  customerInputSchema,
+  customerCreateSchema,
+  customerUpdateSchema,
   type Customer,
-  type CustomerInput,
+  type CustomerCreateInput,
+  type CustomerUpdateInput,
 } from "../schema"
 
 interface CustomerFormDialogProps {
@@ -38,22 +41,8 @@ interface CustomerFormDialogProps {
   customer: Customer | null
 }
 
-function toFormValues(customer: Customer): CustomerInput {
-  return {
-    document_type: customer.document_type,
-    document_number: customer.document_number,
-    name: customer.name,
-    email: customer.email,
-    phone: customer.phone,
-    credit_limit: customer.credit_limit,
-    status: customer.status,
-  }
-}
-
-function CustomerForm({ customer, onDone }: { customer: Customer | null; onDone: () => void }) {
+function CustomerCreateForm({ onDone }: { onDone: () => void }) {
   const createCustomer = useCreateCustomer()
-  const updateCustomer = useUpdateCustomer()
-  const isPending = createCustomer.isPending || updateCustomer.isPending
   const [serverError, setServerError] = useState<string | null>(null)
 
   const {
@@ -62,29 +51,46 @@ function CustomerForm({ customer, onDone }: { customer: Customer | null; onDone:
     handleSubmit,
     setError,
     formState: { errors },
-  } = useForm<CustomerInput>({
-    resolver: zodResolver(customerInputSchema),
-    defaultValues: customer ? toFormValues(customer) : EMPTY_CUSTOMER,
+  } = useForm<CustomerCreateInput>({
+    resolver: zodResolver(customerCreateSchema),
+    defaultValues: EMPTY_CUSTOMER,
   })
 
   const handleError = (error: unknown) => {
-    // Errores por campo que devuelva el backend se muestran junto a su campo
-    if (isApiError(error)) {
-      for (const item of error.fieldErrors) {
-        setError(item.field as keyof CustomerInput, { message: item.message })
-      }
+    const status = isApiError(error)
+      ? error.status
+      : (error as { status?: number; response?: { status?: number } })?.status ??
+        (error as { response?: { status?: number } })?.response?.status
+
+    if (status === 409) {
+      const fieldErrors = isApiError(error)
+        ? error.fieldErrors
+        : (error as { fieldErrors?: FieldError[] })?.fieldErrors
+      const docMessage =
+        fieldErrors?.find((f) => f.field === "document_number")?.message ||
+        "Ya existe un cliente con este número de documento"
+      setError("document_number", { message: docMessage })
+      return
     }
+
+    if (isApiError(error) && error.fieldErrors && error.fieldErrors.length > 0) {
+      for (const item of error.fieldErrors) {
+        if (item.field) {
+          setError(item.field as keyof CustomerCreateInput, { message: item.message })
+        }
+      }
+      return
+    }
+
     setServerError(getErrorMessage(error))
   }
 
-  const onSubmit = (values: CustomerInput) => {
+  const onSubmit = (values: CustomerCreateInput) => {
     setServerError(null)
-    const options = { onSuccess: onDone, onError: handleError }
-    if (customer) {
-      updateCustomer.mutate({ id: customer.id, input: values }, options)
-    } else {
-      createCustomer.mutate(values, options)
-    }
+    createCustomer.mutate(values, {
+      onSuccess: onDone,
+      onError: handleError,
+    })
   }
 
   return (
@@ -193,11 +199,159 @@ function CustomerForm({ customer, onDone }: { customer: Customer | null; onDone:
       )}
 
       <DialogFooter>
-        <Button type="button" variant="outline" disabled={isPending} onClick={onDone}>
+        <Button type="button" variant="outline" disabled={createCustomer.isPending} onClick={onDone}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Guardando..." : customer ? "Guardar cambios" : "Crear cliente"}
+        <Button type="submit" disabled={createCustomer.isPending}>
+          {createCustomer.isPending ? "Guardando..." : "Crear cliente"}
+        </Button>
+      </DialogFooter>
+    </form>
+  )
+}
+
+function CustomerUpdateForm({ customer, onDone }: { customer: Customer; onDone: () => void }) {
+  const updateCustomer = useUpdateCustomer()
+  const [serverError, setServerError] = useState<string | null>(null)
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm<CustomerUpdateInput>({
+    resolver: zodResolver(customerUpdateSchema),
+    defaultValues: {
+      name: customer.name,
+      email: customer.email ?? "",
+      phone: customer.phone ?? "",
+      credit_limit: customer.credit_limit,
+      status: customer.status,
+    },
+  })
+
+  const handleError = (error: unknown) => {
+    if (isApiError(error) && error.fieldErrors && error.fieldErrors.length > 0) {
+      for (const item of error.fieldErrors) {
+        if (item.field) {
+          setError(item.field as keyof CustomerUpdateInput, { message: item.message })
+        }
+      }
+      return
+    }
+    setServerError(getErrorMessage(error))
+  }
+
+  const onSubmit = (values: CustomerUpdateInput) => {
+    setServerError(null)
+    updateCustomer.mutate(
+      { id: customer.id, input: values },
+      {
+        onSuccess: onDone,
+        onError: handleError,
+      }
+    )
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} noValidate className="grid gap-4">
+      <div className="grid grid-cols-[8rem_1fr] gap-3">
+        <Field id="document_type-disabled" label="Tipo (Inmutable)">
+          <Input
+            id="document_type-disabled"
+            value={customer.document_type}
+            disabled
+            className="bg-muted opacity-70"
+          />
+        </Field>
+        <Field id="document_number-disabled" label="N.º de documento (Inmutable)">
+          <Input
+            id="document_number-disabled"
+            value={customer.document_number}
+            disabled
+            className="bg-muted opacity-70"
+          />
+        </Field>
+      </div>
+
+      <Field id="name" label="Nombre o razón social" error={errors.name?.message}>
+        <Input
+          id="name"
+          autoComplete="off"
+          aria-invalid={!!errors.name}
+          aria-describedby={errors.name ? "name-error" : undefined}
+          {...register("name")}
+        />
+      </Field>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field id="email" label="Correo" error={errors.email?.message}>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="off"
+            aria-invalid={!!errors.email}
+            aria-describedby={errors.email ? "email-error" : undefined}
+            {...register("email")}
+          />
+        </Field>
+        <Field id="phone" label="Teléfono" error={errors.phone?.message}>
+          <Input
+            id="phone"
+            autoComplete="off"
+            aria-invalid={!!errors.phone}
+            aria-describedby={errors.phone ? "phone-error" : undefined}
+            {...register("phone")}
+          />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field id="credit_limit" label="Límite de crédito (S/)" error={errors.credit_limit?.message}>
+          <Input
+            id="credit_limit"
+            inputMode="decimal"
+            autoComplete="off"
+            aria-invalid={!!errors.credit_limit}
+            aria-describedby={errors.credit_limit ? "credit_limit-error" : undefined}
+            {...register("credit_limit")}
+          />
+        </Field>
+        <Field id="status" label="Estado">
+          <Controller
+            control={control}
+            name="status"
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger id="status" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CUSTOMER_STATUSES.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {STATUS_LABELS[status]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+        </Field>
+      </div>
+
+      {serverError && (
+        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-text">
+          {serverError}
+        </p>
+      )}
+
+      <DialogFooter>
+        <Button type="button" variant="outline" disabled={updateCustomer.isPending} onClick={onDone}>
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={updateCustomer.isPending}>
+          {updateCustomer.isPending ? "Guardando..." : "Guardar cambios"}
         </Button>
       </DialogFooter>
     </form>
@@ -211,16 +365,16 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
         <DialogHeader>
           <DialogTitle>{customer ? "Editar cliente" : "Nuevo cliente"}</DialogTitle>
           <DialogDescription>
-            {customer ? "Modifica los datos del cliente." : "Completa los datos del nuevo cliente."}
+            {customer
+              ? "Modifica los datos del cliente. El documento es inmutable."
+              : "Completa los datos del nuevo cliente."}
           </DialogDescription>
         </DialogHeader>
-        {/* El formulario solo existe mientras el diálogo está abierto: cada apertura
-            parte de valores limpios, sin necesidad de reset manual */}
-        <CustomerForm
-          key={customer?.id ?? "new"}
-          customer={customer}
-          onDone={() => onOpenChange(false)}
-        />
+        {customer ? (
+          <CustomerUpdateForm key={customer.id} customer={customer} onDone={() => onOpenChange(false)} />
+        ) : (
+          <CustomerCreateForm key="new" onDone={() => onOpenChange(false)} />
+        )}
       </DialogContent>
     </Dialog>
   )
