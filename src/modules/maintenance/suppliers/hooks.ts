@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { PageParams } from "@/shared/lib/api/types"
 import { supplierService } from "./service"
-import type { SupplierInput } from "./schema"
+import type { Supplier, SupplierCreateInput, SupplierUpdateInput } from "./schema"
 
 export const supplierKeys = {
   all: ["suppliers"] as const,
@@ -42,7 +42,7 @@ function useInvalidateSuppliers() {
 export function useCreateSupplier() {
   const invalidate = useInvalidateSuppliers()
   return useMutation({
-    mutationFn: (input: SupplierInput) => supplierService.create(input),
+    mutationFn: (input: SupplierCreateInput) => supplierService.create(input),
     onSuccess: invalidate,
   })
 }
@@ -50,8 +50,17 @@ export function useCreateSupplier() {
 export function useUpdateSupplier() {
   const invalidate = useInvalidateSuppliers()
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: SupplierInput }) =>
+    mutationFn: ({ id, input }: { id: string; input: SupplierUpdateInput }) =>
       supplierService.update(id, input),
+    onSuccess: invalidate,
+  })
+}
+
+export function usePatchSupplier() {
+  const invalidate = useInvalidateSuppliers()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Partial<Supplier> }) =>
+      supplierService.patch(id, input),
     onSuccess: invalidate,
   })
 }

@@ -20,15 +20,18 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select"
 import { getErrorMessage, isApiError } from "@/shared/lib/api/errors"
+import type { FieldError } from "@/shared/lib/api/types"
 import { useCreateSupplier, useUpdateSupplier } from "../hooks"
 import {
   DOCUMENT_TYPES,
   EMPTY_SUPPLIER,
   STATUS_LABELS,
   SUPPLIER_STATUSES,
-  supplierInputSchema,
+  supplierCreateSchema,
+  supplierUpdateSchema,
   type Supplier,
-  type SupplierInput,
+  type SupplierCreateInput,
+  type SupplierUpdateInput,
 } from "../schema"
 
 interface SupplierFormDialogProps {
@@ -38,22 +41,8 @@ interface SupplierFormDialogProps {
   supplier: Supplier | null
 }
 
-function toFormValues(supplier: Supplier): SupplierInput {
-  return {
-    document_type: supplier.document_type,
-    document_number: supplier.document_number,
-    name: supplier.name,
-    email: supplier.email,
-    phone: supplier.phone,
-    credit_days: supplier.credit_days,
-    status: supplier.status,
-  }
-}
-
-function SupplierForm({ supplier, onDone }: { supplier: Supplier | null; onDone: () => void }) {
+function SupplierCreateForm({ onDone }: { onDone: () => void }) {
   const createSupplier = useCreateSupplier()
-  const updateSupplier = useUpdateSupplier()
-  const isPending = createSupplier.isPending || updateSupplier.isPending
   const [serverError, setServerError] = useState<string | null>(null)
 
   const {
@@ -62,28 +51,46 @@ function SupplierForm({ supplier, onDone }: { supplier: Supplier | null; onDone:
     handleSubmit,
     setError,
     formState: { errors },
-  } = useForm<SupplierInput>({
-    resolver: zodResolver(supplierInputSchema),
-    defaultValues: supplier ? toFormValues(supplier) : EMPTY_SUPPLIER,
+  } = useForm<SupplierCreateInput>({
+    resolver: zodResolver(supplierCreateSchema),
+    defaultValues: EMPTY_SUPPLIER,
   })
 
   const handleError = (error: unknown) => {
-    if (isApiError(error)) {
-      for (const item of error.fieldErrors) {
-        setError(item.field as keyof SupplierInput, { message: item.message })
-      }
+    const status = isApiError(error)
+      ? error.status
+      : (error as { status?: number; response?: { status?: number } })?.status ??
+        (error as { response?: { status?: number } })?.response?.status
+
+    if (status === 409) {
+      const fieldErrors = isApiError(error)
+        ? error.fieldErrors
+        : (error as { fieldErrors?: FieldError[] })?.fieldErrors
+      const docMessage =
+        fieldErrors?.find((f) => f.field === "document_number")?.message ||
+        "Ya existe un proveedor con este número de documento"
+      setError("document_number", { message: docMessage })
+      return
     }
+
+    if (isApiError(error) && error.fieldErrors && error.fieldErrors.length > 0) {
+      for (const item of error.fieldErrors) {
+        if (item.field) {
+          setError(item.field as keyof SupplierCreateInput, { message: item.message })
+        }
+      }
+      return
+    }
+
     setServerError(getErrorMessage(error))
   }
 
-  const onSubmit = (values: SupplierInput) => {
+  const onSubmit = (values: SupplierCreateInput) => {
     setServerError(null)
-    const options = { onSuccess: onDone, onError: handleError }
-    if (supplier) {
-      updateSupplier.mutate({ id: supplier.id, input: values }, options)
-    } else {
-      createSupplier.mutate(values, options)
-    }
+    createSupplier.mutate(values, {
+      onSuccess: onDone,
+      onError: handleError,
+    })
   }
 
   return (
@@ -193,11 +200,160 @@ function SupplierForm({ supplier, onDone }: { supplier: Supplier | null; onDone:
       )}
 
       <DialogFooter>
-        <Button type="button" variant="outline" disabled={isPending} onClick={onDone}>
+        <Button type="button" variant="outline" disabled={createSupplier.isPending} onClick={onDone}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Guardando..." : supplier ? "Guardar cambios" : "Crear proveedor"}
+        <Button type="submit" disabled={createSupplier.isPending}>
+          {createSupplier.isPending ? "Guardando..." : "Crear proveedor"}
+        </Button>
+      </DialogFooter>
+    </form>
+  )
+}
+
+function SupplierUpdateForm({ supplier, onDone }: { supplier: Supplier; onDone: () => void }) {
+  const updateSupplier = useUpdateSupplier()
+  const [serverError, setServerError] = useState<string | null>(null)
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm<SupplierUpdateInput>({
+    resolver: zodResolver(supplierUpdateSchema),
+    defaultValues: {
+      name: supplier.name,
+      email: supplier.email ?? "",
+      phone: supplier.phone ?? "",
+      credit_days: supplier.credit_days,
+      status: supplier.status,
+    },
+  })
+
+  const handleError = (error: unknown) => {
+    if (isApiError(error) && error.fieldErrors && error.fieldErrors.length > 0) {
+      for (const item of error.fieldErrors) {
+        if (item.field) {
+          setError(item.field as keyof SupplierUpdateInput, { message: item.message })
+        }
+      }
+      return
+    }
+    setServerError(getErrorMessage(error))
+  }
+
+  const onSubmit = (values: SupplierUpdateInput) => {
+    setServerError(null)
+    updateSupplier.mutate(
+      { id: supplier.id, input: values },
+      {
+        onSuccess: onDone,
+        onError: handleError,
+      }
+    )
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} noValidate className="grid gap-4">
+      <div className="grid grid-cols-[8rem_1fr] gap-3">
+        <Field id="document_type-disabled" label="Tipo (Inmutable)">
+          <Input
+            id="document_type-disabled"
+            value={supplier.document_type}
+            disabled
+            className="bg-muted opacity-70"
+          />
+        </Field>
+        <Field id="document_number-disabled" label="N.º de documento (Inmutable)">
+          <Input
+            id="document_number-disabled"
+            value={supplier.document_number}
+            disabled
+            className="bg-muted opacity-70"
+          />
+        </Field>
+      </div>
+
+      <Field id="name" label="Nombre o razón social" error={errors.name?.message}>
+        <Input
+          id="name"
+          autoComplete="off"
+          aria-invalid={!!errors.name}
+          aria-describedby={errors.name ? "name-error" : undefined}
+          {...register("name")}
+        />
+      </Field>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field id="email" label="Correo" error={errors.email?.message}>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="off"
+            aria-invalid={!!errors.email}
+            aria-describedby={errors.email ? "email-error" : undefined}
+            {...register("email")}
+          />
+        </Field>
+        <Field id="phone" label="Teléfono" error={errors.phone?.message}>
+          <Input
+            id="phone"
+            autoComplete="off"
+            aria-invalid={!!errors.phone}
+            aria-describedby={errors.phone ? "phone-error" : undefined}
+            {...register("phone")}
+          />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field id="credit_days" label="Días de crédito" error={errors.credit_days?.message}>
+          <Input
+            id="credit_days"
+            type="number"
+            inputMode="numeric"
+            autoComplete="off"
+            aria-invalid={!!errors.credit_days}
+            aria-describedby={errors.credit_days ? "credit_days-error" : undefined}
+            {...register("credit_days", { valueAsNumber: true })}
+          />
+        </Field>
+        <Field id="status" label="Estado">
+          <Controller
+            control={control}
+            name="status"
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger id="status" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUPPLIER_STATUSES.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {STATUS_LABELS[status]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+        </Field>
+      </div>
+
+      {serverError && (
+        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-text">
+          {serverError}
+        </p>
+      )}
+
+      <DialogFooter>
+        <Button type="button" variant="outline" disabled={updateSupplier.isPending} onClick={onDone}>
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={updateSupplier.isPending}>
+          {updateSupplier.isPending ? "Guardando..." : "Guardar cambios"}
         </Button>
       </DialogFooter>
     </form>
@@ -211,14 +367,16 @@ export function SupplierFormDialog({ open, onOpenChange, supplier }: SupplierFor
         <DialogHeader>
           <DialogTitle>{supplier ? "Editar proveedor" : "Nuevo proveedor"}</DialogTitle>
           <DialogDescription>
-            {supplier ? "Modifica los datos del proveedor." : "Completa los datos del nuevo proveedor."}
+            {supplier
+              ? "Modifica los datos del proveedor. El documento es inmutable."
+              : "Completa los datos del nuevo proveedor."}
           </DialogDescription>
         </DialogHeader>
-        <SupplierForm
-          key={supplier?.id ?? "new"}
-          supplier={supplier}
-          onDone={() => onOpenChange(false)}
-        />
+        {supplier ? (
+          <SupplierUpdateForm key={supplier.id} supplier={supplier} onDone={() => onOpenChange(false)} />
+        ) : (
+          <SupplierCreateForm key="new" onDone={() => onOpenChange(false)} />
+        )}
       </DialogContent>
     </Dialog>
   )
