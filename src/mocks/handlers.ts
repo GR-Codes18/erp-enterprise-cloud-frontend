@@ -11,6 +11,10 @@ import { supplierHandlers } from "@/modules/maintenance/suppliers/mocks"
 import { categoryHandlers } from "@/modules/maintenance/categories/mocks"
 import { warehouseHandlers } from "@/modules/maintenance/warehouses/mocks"
 import { productHandlers } from "@/modules/maintenance/products/mocks"
+import { stockHandlers } from "@/modules/inventory/stock/mocks"
+import { kardexHandlers } from "@/modules/inventory/kardex/mocks"
+import { transferHandlers } from "@/modules/inventory/transfers/mocks"
+import { adjustmentHandlers } from "@/modules/inventory/adjustments/mocks"
 
 /** Aquí se agregan los handlers de cada módulo (modules/<módulo>/.../mocks). */
 export const handlers: RequestHandler[] = [
@@ -26,4 +30,8 @@ export const handlers: RequestHandler[] = [
   ...permissionHandlers,
   ...documentHandlers,
   ...authHandlers,
+  ...stockHandlers,
+  ...kardexHandlers,
+  ...transferHandlers,
+  ...adjustmentHandlers,
 ]
