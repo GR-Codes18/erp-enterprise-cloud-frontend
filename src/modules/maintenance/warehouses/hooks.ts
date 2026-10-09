@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { PageParams } from "@/shared/lib/api/types"
 import { warehouseService } from "./service"
-import type { WarehouseInput } from "./schema"
+import type { Warehouse, WarehouseCreateInput, WarehouseUpdateInput } from "./schema"
 
 export const warehouseKeys = {
   all: ["warehouses"] as const,
@@ -40,7 +40,7 @@ function useInvalidateWarehouses() {
 export function useCreateWarehouse() {
   const invalidate = useInvalidateWarehouses()
   return useMutation({
-    mutationFn: (input: WarehouseInput) => warehouseService.create(input),
+    mutationFn: (input: WarehouseCreateInput) => warehouseService.create(input),
     onSuccess: invalidate,
   })
 }
@@ -48,8 +48,17 @@ export function useCreateWarehouse() {
 export function useUpdateWarehouse() {
   const invalidate = useInvalidateWarehouses()
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: WarehouseInput }) =>
+    mutationFn: ({ id, input }: { id: string; input: WarehouseUpdateInput }) =>
       warehouseService.update(id, input),
+    onSuccess: invalidate,
+  })
+}
+
+export function usePatchWarehouse() {
+  const invalidate = useInvalidateWarehouses()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Partial<Warehouse> }) =>
+      warehouseService.patch(id, input),
     onSuccess: invalidate,
   })
 }

@@ -8,36 +8,60 @@ export const STATUS_LABELS: Record<WarehouseStatus, string> = {
   inactive: "Inactivo",
 }
 
-const warehouseFields = z.object({
-  code: z
-    .string()
-    .trim()
-    .min(2, "Ingresa el código del almacén")
-    .max(20, "Máximo 20 caracteres"),
-  name: z
-    .string()
-    .trim()
-    .min(2, "Ingresa el nombre del almacén")
-    .max(80, "Máximo 80 caracteres"),
-  address: z
-    .string()
-    .trim()
-    .max(150, "Máximo 150 caracteres")
-    .optional()
-    .or(z.literal("")),
-  status: z.enum(WAREHOUSE_STATUSES),
+const codeSchema = z
+  .string()
+  .trim()
+  .min(2, "Ingresa el código del almacén")
+  .max(20, "Máximo 20 caracteres")
+
+const nameSchema = z
+  .string()
+  .trim()
+  .min(2, "Ingresa el nombre del almacén")
+  .max(80, "Máximo 80 caracteres")
+
+const addressSchema = z
+  .string()
+  .trim()
+  .max(150, "Máximo 150 caracteres")
+  .optional()
+  .or(z.literal(""))
+
+const statusSchema = z.enum(WAREHOUSE_STATUSES)
+
+/** Esquema para crear almacén (código editable). */
+export const warehouseCreateSchema = z.object({
+  code: codeSchema,
+  name: nameSchema,
+  address: addressSchema,
+  status: statusSchema,
 })
 
-/** Lo que envía el formulario (sin id: lo asigna el servidor). */
-export const warehouseInputSchema = warehouseFields
+/** Alias de compatibilidad para pruebas unitarias. */
+export const warehouseInputSchema = warehouseCreateSchema
+
+/** Esquema para actualizar almacén (código inmutable). */
+export const warehouseUpdateSchema = z.object({
+  name: nameSchema,
+  address: addressSchema,
+  status: statusSchema,
+})
 
 /** Lo que devuelve la API. */
-export const warehouseSchema = warehouseFields.extend({ id: z.string() })
+export const warehouseSchema = z.object({
+  id: z.string(),
+  code: codeSchema,
+  name: nameSchema,
+  address: addressSchema.nullable().optional(),
+  status: statusSchema,
+})
 
-export type WarehouseInput = z.infer<typeof warehouseInputSchema>
+export type WarehouseCreateInput = z.infer<typeof warehouseCreateSchema>
+export type WarehouseUpdateInput = z.infer<typeof warehouseUpdateSchema>
+export type WarehouseInput = WarehouseCreateInput
 export type Warehouse = z.infer<typeof warehouseSchema>
 
-export const EMPTY_WAREHOUSE: WarehouseInput = {
+export const EMPTY_WAREHOUSE: WarehouseCreateInput = {
   code: "",
   name: "",
   address: "",
