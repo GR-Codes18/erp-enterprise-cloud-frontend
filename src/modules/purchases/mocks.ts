@@ -10,6 +10,7 @@ import {
   warehouseRef,
 } from "@/mocks/refs"
 import { createDocumentHandlers, nextNumber, totalsOf } from "@/mocks/utils/documents"
+import { applyInventoryMovement } from "@/modules/inventory/state"
 import { fromCents, toCents } from "@/shared/lib/money"
 import { supplierInvoiceInputSchema, type SupplierInvoice, type SupplierInvoiceInput } from "./invoices/schema"
 import { pendingQuantity, purchaseOrderInputSchema, type PurchaseOrder, type PurchaseOrderInput } from "./orders/schema"
@@ -284,8 +285,18 @@ const receptions = createDocumentHandlers<Reception, ReceptionInput, Reception["
       from: ["draft"],
       to: "confirmed",
       check: (reception) => checkReception(reception),
-      // Dentro de Compras: la orden registra lo recibido y avanza. El stock lo sube el backend
+      // Dentro de Compras: la orden registra lo recibido y el inventario suma el material recibido.
       respond: (reception) => {
+        reception.items.forEach((item) => {
+          applyInventoryMovement({
+            product_id: item.product_id,
+            warehouse_id: reception.warehouse_id,
+            quantity: item.quantity,
+            direction: "in",
+            type: "purchase",
+            reference: reception.number,
+          })
+        })
         const order = orders.store.find(reception.order_id)
         if (order) {
           const items = order.items.map((item) => {
@@ -389,9 +400,19 @@ const purchaseReturns = createDocumentHandlers<PurchaseReturn, PurchaseReturnInp
       from: ["draft"],
       to: "confirmed",
       check: (purchaseReturn) => checkReturn(purchaseReturn),
-      // Dentro de Compras: la recepción registra lo devuelto. Stock y deuda: backend
+      // Dentro de Compras: la recepción registra lo devuelto y el stock vuelve a bajar.
       respond: (purchaseReturn) => {
         const reception = receptions.store.find(purchaseReturn.reception_id)
+        purchaseReturn.items.forEach((item) => {
+          applyInventoryMovement({
+            product_id: item.product_id,
+            warehouse_id: reception?.warehouse_id,
+            quantity: item.quantity,
+            direction: "out",
+            type: "return",
+            reference: purchaseReturn.number,
+          })
+        })
         if (reception) {
           receptions.store.update(reception.id, {
             items: reception.items.map((item) => {
