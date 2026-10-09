@@ -185,7 +185,7 @@ function ProductCreateForm({ onDone }: { onDone: () => void }) {
 
 function ProductUpdateForm({ product, onDone }: { product: Product; onDone: () => void }) {
   const updateProduct = useUpdateProduct()
-  const categoriesQuery = useCategoryOptions()
+  const categoriesQuery = useCategoryOptions({ includeId: product.category_id })
   const [serverError, setServerError] = useState<string | null>(null)
 
   const {
