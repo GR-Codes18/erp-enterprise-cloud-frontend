@@ -1,5 +1,5 @@
-import { http, HttpResponse } from "msw"
-import type { Product, ProductCreateInput, ProductStatus, ProductUpdateInput } from "./schema"
+import { createCrudHandlers } from "@/mocks/createCrudHandlers"
+import type { Product, ProductStatus } from "./schema"
 
 /** UUIDs de productos con prefijo 8004 */
 const uuid = (n: number) => `00000000-0000-4000-8004-${String(n).padStart(12, "0")}`
@@ -59,129 +59,39 @@ const products: Product[] = [
 /** IDs semilla simularán estar "en uso" en ventas/compras para probar el error 409 */
 const IN_USE_IDS = [uuid(1), uuid(2)]
 
-export const productHandlers = [
-  // LISTAR
-  http.get("*/products", ({ request }) => {
-    const url = new URL(request.url)
-    const search = url.searchParams.get("search")?.toLowerCase().trim() || ""
-    const status = url.searchParams.get("status")
-    const page = Number(url.searchParams.get("page") || "1")
-    const size = Number(url.searchParams.get("size") || "10")
-
-    let filtered = products
-
-    if (search) {
-      filtered = filtered.filter(
-        (p) => p.code.toLowerCase().includes(search) || p.name.toLowerCase().includes(search)
-      )
-    }
-
-    if (status) {
-      filtered = filtered.filter((p) => p.status === status)
-    }
-
-    const total = filtered.length
-    const pages = Math.ceil(total / size) || 1
-    const start = (page - 1) * size
-    const items = filtered.slice(start, start + size)
-
-    return HttpResponse.json({ items, total, page, size, pages })
-  }),
-
-  // CREAR (Nace con stock 0; verifica duplicidad de código)
-  http.post("*/products", async ({ request }) => {
-    const body = (await request.json()) as ProductCreateInput
-    const codeNormalized = body.code.trim().toUpperCase()
-
-    const exists = products.some((p) => p.code.toUpperCase() === codeNormalized)
-    if (exists) {
-      return HttpResponse.json(
-        {
-          message: "Ya existe un producto con este código",
-          fieldErrors: [{ field: "code", message: "Ya existe un producto con este código" }],
-        },
-        { status: 409 }
-      )
-    }
-
-    const newId = `00000000-0000-4000-8004-${String(products.length + 1).padStart(12, "0")}`
+export const productHandlers = createCrudHandlers<Product>({
+  endpoint: "*/products",
+  items: products,
+  searchFields: ["code", "name"],
+  filterFields: ["status"],
+  uniqueFields: [
+    {
+      field: "code",
+      label: "código",
+      normalize: (val: any) => String(val ?? "").trim().toUpperCase(),
+    },
+  ],
+  immutableFields: ["code", "stock"],
+  inUseIds: IN_USE_IDS,
+  inUseMessage:
+    "Este producto tiene movimientos y no se puede eliminar. Puedes desactivarlo para que deje de usarse en nuevas operaciones.",
+  onBeforeCreate: (body: any, currentItems: Product[]) => {
+    const newId = uuid(currentItems.length + 1)
+    const codeNormalized = String(body.code ?? "").trim().toUpperCase()
     const categoryName = CATEGORIES_MAP[body.category_id] || "General"
-
-    const newProduct: Product = {
+    return {
       id: newId,
       code: codeNormalized,
-      name: body.name.trim(),
-      category_id: body.category_id,
+      name: String(body.name ?? "").trim(),
       category_name: categoryName,
-      unit_price: body.unit_price,
       stock: 0,
-      status: body.status,
     }
-
-    products.unshift(newProduct)
-    return HttpResponse.json(newProduct, { status: 201 })
-  }),
-
-  // ACTUALIZAR (PUT - Inmutable: conserva el código original y el stock)
-  http.put("*/products/:id", async ({ request, params }) => {
-    const { id } = params
-    const body = (await request.json()) as ProductUpdateInput
-
-    const index = products.findIndex((p) => p.id === id)
-    if (index === -1) {
-      return HttpResponse.json({ message: "Producto no encontrado" }, { status: 404 })
-    }
-
-    const current = products[index]
+  },
+  onBeforeUpdate: (current: Product, body: any) => {
     const categoryName = CATEGORIES_MAP[body.category_id] || current.category_name || "General"
-
-    const updated: Product = {
-      ...current,
-      name: body.name.trim(),
-      category_id: body.category_id,
+    return {
+      name: String(body.name ?? "").trim(),
       category_name: categoryName,
-      unit_price: body.unit_price,
-      status: body.status,
     }
-
-    products[index] = updated
-    return HttpResponse.json(updated)
-  }),
-
-  // ACTUALIZACIÓN PARCIAL (PATCH - para desactivar/activar)
-  http.patch("*/products/:id", async ({ request, params }) => {
-    const { id } = params
-    const body = (await request.json()) as Partial<Product>
-
-    const index = products.findIndex((p) => p.id === id)
-    if (index === -1) {
-      return HttpResponse.json({ message: "Producto no encontrado" }, { status: 404 })
-    }
-
-    products[index] = { ...products[index], ...body }
-    return HttpResponse.json(products[index])
-  }),
-
-  // ELIMINAR (DELETE - 409 si el producto está en uso)
-  http.delete("*/products/:id", ({ params }) => {
-    const { id } = params
-
-    if (IN_USE_IDS.includes(String(id))) {
-      return HttpResponse.json(
-        {
-          message:
-            "Este producto tiene movimientos y no se puede eliminar. Puedes desactivarlo para que deje de usarse en nuevas operaciones.",
-        },
-        { status: 409 }
-      )
-    }
-
-    const index = products.findIndex((p) => p.id === id)
-    if (index === -1) {
-      return HttpResponse.json({ message: "Producto no encontrado" }, { status: 404 })
-    }
-
-    products.splice(index, 1)
-    return new HttpResponse(null, { status: 204 })
-  }),
-]
+  },
+})
