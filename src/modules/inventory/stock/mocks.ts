@@ -22,16 +22,17 @@ const row = (
 ): StockRow => ({
   id: uuid(n),
   product_id: productRef(product.n),
-  product_code: product.code,
+  product_sku: product.sku,
   product_name: product.name,
   category_id: categoryRef(product.category),
   category_name: product.categoryName,
   warehouse_id: warehouseRef(warehouse.n),
   warehouse_name: warehouse.name,
-  unit: "UND",
+  unit: product.unit,
   quantity,
   min_stock: product.minStock,
   status: seedStatus(quantity, product.minStock),
+  below_min: quantity <= product.minStock,
 })
 
 // 18 registros (2 páginas con size=10). Por cada producto, la suma de sus almacenes
@@ -60,6 +61,6 @@ const seed: StockRow[] = [
 export const stockHandlers = createCrudHandlers<StockRow>({
   resource: "inventory/stock",
   seed,
-  searchFields: ["product_name", "product_code"],
-  filterFields: ["status", "warehouse_id", "category_id", "product_id"],
+  searchFields: ["product_name", "product_sku"],
+  filterFields: ["status", "warehouse_id", "category_id", "product_id", "below_min"],
 })

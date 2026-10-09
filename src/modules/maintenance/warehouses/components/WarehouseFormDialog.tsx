@@ -184,7 +184,7 @@ function WarehouseUpdateForm({ warehouse, onDone }: { warehouse: Warehouse; onDo
     resolver: zodResolver(warehouseUpdateSchema),
     defaultValues: {
       name: warehouse.name,
-      address: warehouse.address ?? "",
+      address: warehouse.address,
       status: warehouse.status,
     },
   })

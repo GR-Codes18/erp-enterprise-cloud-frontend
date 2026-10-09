@@ -1,8 +1,11 @@
 import { useState } from "react"
 import { Link, useNavigate, useParams } from "react-router"
+import { DocumentsPanel } from "@/modules/documents"
+import { useHasPermission } from "@/modules/auth"
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
 import { ErrorState } from "@/shared/components/ErrorState"
 import { PageHeader } from "@/shared/components/PageHeader"
+import ReasonDialog from "@/shared/components/ReasonDialog"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { getErrorMessage } from "@/shared/lib/api/errors"
@@ -21,7 +24,11 @@ export default function TransferDetailPage() {
   const receive = useReceiveTransfer()
   const cancel = useCancelTransfer()
   const remove = useDeleteTransfer()
-  const [confirmAction, setConfirmAction] = useState<"cancel" | "delete" | null>(null)
+  const canAttach = useHasPermission("documents.files:create")
+  // Enviar y recibir mueven el documento (editar); cancelar y borrar lo anulan
+  const canEdit = useHasPermission("inventory.transfers:edit")
+  const canVoid = useHasPermission("inventory.transfers:void")
+  const [confirmAction, setConfirmAction] = useState<"send" | "receive" | "cancel" | "delete" | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const isPending = send.isPending || receive.isPending || cancel.isPending || remove.isPending
 
@@ -32,37 +39,45 @@ export default function TransferDetailPage() {
   if (!transfer.data) return <ErrorState message="No se encontró la transferencia." />
 
   const document = transfer.data
-  const runAction = (action: "send" | "receive" | "cancel") => {
+  // Solo un borrador se edita o se borra (regla 5); cancelar lo decide el mapa de transiciones
+  const isDraft = document.status === "draft"
+  const runAction = (action: "send" | "receive" | "cancel", reason = "") => {
     setActionError(null)
     const options = {
-      onError: (error: unknown) => setActionError(getErrorMessage(error)),
+      // Se cierra el diálogo en ambos casos: el error se muestra en la página
+      onError: (error: unknown) => {
+        setConfirmAction(null)
+        setActionError(getErrorMessage(error))
+      },
       onSuccess: () => setConfirmAction(null),
     }
     if (action === "send") send.mutate(document.id, options)
     if (action === "receive") receive.mutate(document.id, options)
-    if (action === "cancel") cancel.mutate(document.id, options)
+    if (action === "cancel") cancel.mutate({ id: document.id, reason }, options)
   }
 
   const actions = (
     <>
-      {canTransitionTransfer(document.status, "in_transit") && (
-        <Button disabled={isPending} onClick={() => runAction("send")}>Enviar</Button>
+      {canEdit && canTransitionTransfer(document.status, "in_transit") && (
+        <Button disabled={isPending} onClick={() => setConfirmAction("send")}>Enviar</Button>
       )}
-      {canTransitionTransfer(document.status, "received") && (
-        <Button disabled={isPending} onClick={() => runAction("receive")}>Recibir</Button>
+      {canEdit && canTransitionTransfer(document.status, "received") && (
+        <Button disabled={isPending} onClick={() => setConfirmAction("receive")}>Recibir</Button>
       )}
-      {document.status === "draft" && (
-        <>
-          <Button variant="outline" asChild>
-            <Link to={`/inventory/transfers/${document.id}/edit`}>Editar borrador</Link>
-          </Button>
-          <Button variant="destructive" disabled={isPending} onClick={() => setConfirmAction("cancel")}>
-            Cancelar transferencia
-          </Button>
-          <Button variant="ghost" disabled={isPending} onClick={() => setConfirmAction("delete")}>
-            Eliminar borrador
-          </Button>
-        </>
+      {canEdit && isDraft && (
+        <Button variant="outline" asChild>
+          <Link to={`/inventory/transfers/${document.id}/edit`}>Editar borrador</Link>
+        </Button>
+      )}
+      {canVoid && canTransitionTransfer(document.status, "cancelled") && (
+        <Button variant="destructive" disabled={isPending} onClick={() => setConfirmAction("cancel")}>
+          Cancelar transferencia
+        </Button>
+      )}
+      {canVoid && isDraft && (
+        <Button variant="ghost" disabled={isPending} onClick={() => setConfirmAction("delete")}>
+          Eliminar borrador
+        </Button>
       )}
       <Button variant="outline" asChild>
         <Link to="/inventory/transfers">Volver al listado</Link>
@@ -73,7 +88,7 @@ export default function TransferDetailPage() {
   return (
     <>
       <PageHeader
-        title="Detalle de transferencia"
+        title={`Transferencia ${document.number}`}
         description={`Creada ${formatDateTimeLima(document.created_at)}`}
         actions={actions}
       />
@@ -95,6 +110,12 @@ export default function TransferDetailPage() {
         </div>
       </section>
 
+      {document.status === "cancelled" && document.cancel_reason && (
+        <p className="mb-4 rounded-md border px-3 py-2 text-sm">
+          <span className="font-medium">Motivo de la cancelación:</span> {document.cancel_reason}
+        </p>
+      )}
+
       <section className="space-y-3">
         <h2 className="text-base font-medium">Productos</h2>
         <div className="divide-y rounded-md border">
@@ -107,14 +128,41 @@ export default function TransferDetailPage() {
         </div>
       </section>
 
+      <div className="mt-6">
+        <DocumentsPanel
+          entity={{ type: "transfer", id: document.id, label: `la transferencia ${document.number}` }}
+          canUpload={canAttach}
+        />
+      </div>
+
       <ConfirmDialog
+        open={confirmAction === "send"}
+        onOpenChange={(open) => setConfirmAction(open ? "send" : null)}
+        title="Enviar transferencia"
+        description={`Se descontará el stock de ${document.origin_warehouse_name}. Después de enviarla ya no se puede editar ni cancelar.`}
+        confirmText="Enviar"
+        confirmVariant="default"
+        isLoading={isPending}
+        onConfirm={() => runAction("send")}
+      />
+      <ConfirmDialog
+        open={confirmAction === "receive"}
+        onOpenChange={(open) => setConfirmAction(open ? "receive" : null)}
+        title="Recibir transferencia"
+        description={`Se sumará el stock en ${document.destination_warehouse_name}. La recepción es definitiva.`}
+        confirmText="Recibir"
+        confirmVariant="default"
+        isLoading={isPending}
+        onConfirm={() => runAction("receive")}
+      />
+      <ReasonDialog
         open={confirmAction === "cancel"}
         onOpenChange={(open) => setConfirmAction(open ? "cancel" : null)}
         title="Cancelar transferencia"
-        description="La transferencia en borrador quedará cancelada y no se podrá reactivar."
-        confirmText="Cancelar transferencia"
-        isLoading={isPending}
-        onConfirm={() => runAction("cancel")}
+        description="La transferencia en borrador quedará cancelada y no se podrá reactivar. Indica el motivo."
+        confirmLabel="Cancelar transferencia"
+        isPending={isPending}
+        onConfirm={(reason) => runAction("cancel", reason)}
       />
       <ConfirmDialog
         open={confirmAction === "delete"}

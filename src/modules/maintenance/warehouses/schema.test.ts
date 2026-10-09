@@ -54,4 +54,28 @@ describe("warehouseInputSchema", () => {
     const result = warehouseInputSchema.safeParse(invalidWarehouse)
     expect(result.success).toBe(false)
   })
+
+  const valid = { ...EMPTY_WAREHOUSE, code: "ALM-001", name: "Almacén Central" }
+
+  it("normaliza el código: sin espacios y en mayúsculas", () => {
+    expect(warehouseInputSchema.parse({ ...valid, code: "  alm-01 " }).code).toBe("ALM-01")
+  })
+
+  it("rechaza un código con espacios o caracteres no permitidos", () => {
+    expect(warehouseInputSchema.safeParse({ ...valid, code: "ALM 01" }).success).toBe(false)
+    expect(warehouseInputSchema.safeParse({ ...valid, code: "ALM#01" }).success).toBe(false)
+  })
+
+  it("rechaza un código de más de 20 caracteres", () => {
+    expect(warehouseInputSchema.safeParse({ ...valid, code: "A".repeat(21) }).success).toBe(false)
+  })
+
+  it('acepta la dirección vacía como "" y rechaza null', () => {
+    expect(warehouseInputSchema.parse(valid).address).toBe("")
+    expect(warehouseInputSchema.safeParse({ ...valid, address: null }).success).toBe(false)
+  })
+
+  it("rechaza una dirección de más de 150 caracteres", () => {
+    expect(warehouseInputSchema.safeParse({ ...valid, address: "x".repeat(151) }).success).toBe(false)
+  })
 })

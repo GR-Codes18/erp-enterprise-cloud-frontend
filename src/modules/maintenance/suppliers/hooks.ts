@@ -6,7 +6,7 @@ import type { Supplier, SupplierCreateInput, SupplierUpdateInput } from "./schem
 export const supplierKeys = {
   all: ["suppliers"] as const,
   list: (params: PageParams) => [...supplierKeys.all, "list", params] as const,
-  options: () => [...supplierKeys.all, "options"] as const,
+  options: (includeInactive: boolean) => [...supplierKeys.all, "options", { includeInactive }] as const,
 }
 
 export function useSuppliers(params: PageParams) {
@@ -17,18 +17,30 @@ export function useSuppliers(params: PageParams) {
   })
 }
 
-/** Hook de consulta rápida de opciones para selectores en otros módulos (Regla 0.5). */
-export function useSupplierOptions() {
-  const params: PageParams = { page: 1, size: 100, filters: { status: "active" } }
+export interface SupplierOption {
+  id: string
+  name: string
+  document_number: string
+  credit_days: number
+  status: Supplier["status"]
+}
+
+/**
+ * Proveedores para selectores de otros módulos (regla 0.5). Por defecto solo activos;
+ * includeInactive para vistas de consulta o documentos antiguos.
+ */
+export function useSupplierOptions({ includeInactive = false }: { includeInactive?: boolean } = {}) {
+  const params: PageParams = { page: 1, size: 100, filters: includeInactive ? {} : { status: "active" } }
   return useQuery({
-    queryKey: supplierKeys.options(),
+    queryKey: supplierKeys.options(includeInactive),
     queryFn: ({ signal }) => supplierService.list(params, signal),
-    select: (data) =>
+    select: (data): SupplierOption[] =>
       data.items.map((s) => ({
         id: s.id,
-        name: s.name,
+        name: s.status === "active" ? s.name : `${s.name} (inactivo)`,
         document_number: s.document_number,
         credit_days: s.credit_days,
+        status: s.status,
       })),
   })
 }

@@ -1,25 +1,22 @@
 import { useState } from "react"
 import { Link } from "react-router"
+import { useHasPermission } from "@/modules/auth"
+import { useWarehouseOptions } from "@/modules/maintenance"
 import { DataTable, type Column } from "@/shared/components/DataTable"
+import { DateRangeFilter } from "@/shared/components/DateRangeFilter"
 import { EmptyState } from "@/shared/components/EmptyState"
 import { ErrorState } from "@/shared/components/ErrorState"
+import { FilterSelect } from "@/shared/components/FilterSelect"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select"
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import type { PageParams } from "@/shared/lib/api/types"
 import { formatDateTimeLima } from "@/shared/lib/dates"
-import { FILTER_ALL } from "../stock/schema"
+import { FILTER_ALL, dateRangeParams, pickFilters } from "@/shared/lib/filters"
 import { useTransfers } from "../transfers/hooks"
 import {
   TRANSFER_STATUSES,
@@ -31,19 +28,52 @@ const PAGE_SIZE = 10
 
 export default function TransfersPage() {
   const [page, setPage] = useState(1)
+  const canCreate = useHasPermission("inventory.transfers:create")
   const [searchInput, setSearchInput] = useState("")
   const search = useDebouncedValue(searchInput.trim(), 300)
   const [status, setStatus] = useState(FILTER_ALL)
+  const [originId, setOriginId] = useState(FILTER_ALL)
+  const [destinationId, setDestinationId] = useState(FILTER_ALL)
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
+
+  // Es un listado histórico: también se filtra por almacenes hoy inactivos
+  const warehouses = useWarehouseOptions({ includeInactive: true })
+  const warehouseOptions = (warehouses.data ?? []).map((w) => ({ value: w.id, label: w.name }))
+
+  const filters = pickFilters({
+    status,
+    origin_warehouse_id: originId,
+    destination_warehouse_id: destinationId,
+  })
   const params: PageParams = {
     page,
     size: PAGE_SIZE,
     search,
-    filters: status === FILTER_ALL ? {} : { status },
+    filters,
+    ...dateRangeParams(dateFrom, dateTo),
   }
   const transfers = useTransfers(params)
-  const hasFilters = search !== "" || status !== FILTER_ALL
+  const hasFilters = search !== "" || Object.keys(filters).length > 0 || dateFrom !== "" || dateTo !== ""
+
+  // Cada cambio de filtro vuelve a la página 1
+  const withReset = (setter: (value: string) => void) => (value: string) => {
+    setter(value)
+    setPage(1)
+  }
+
+  const clearFilters = () => {
+    setSearchInput("")
+    setStatus(FILTER_ALL)
+    setOriginId(FILTER_ALL)
+    setDestinationId(FILTER_ALL)
+    setDateFrom("")
+    setDateTo("")
+    setPage(1)
+  }
 
   const columns: Column<Transfer>[] = [
+    { key: "number", header: "Número", cell: (row) => <span className="font-mono text-sm">{row.number}</span> },
     {
       key: "created_at",
       header: "Fecha",
@@ -75,7 +105,7 @@ export default function TransfersPage() {
     },
   ]
 
-  const newTransferButton = (
+  const newTransferButton = canCreate && (
     <Button asChild>
       <Link to="/inventory/transfers/new">Nueva transferencia</Link>
     </Button>
@@ -89,35 +119,49 @@ export default function TransfersPage() {
         actions={newTransferButton}
       />
 
-      <div className="mb-4 flex flex-wrap gap-3">
+      <div className="mb-4 flex flex-wrap items-end gap-3">
         <Input
           type="search"
           className="max-w-sm"
-          placeholder="Buscar por almacén"
+          placeholder="Buscar por número o almacén"
           aria-label="Buscar transferencias"
           value={searchInput}
-          onChange={(event) => {
-            setSearchInput(event.target.value)
-            setPage(1)
-          }}
+          onChange={(event) => withReset(setSearchInput)(event.target.value)}
         />
-        <Select
+        <FilterSelect
+          label="Filtrar por estado"
           value={status}
-          onValueChange={(value) => {
-            setStatus(value)
-            setPage(1)
-          }}
-        >
-          <SelectTrigger className="w-48" aria-label="Filtrar por estado">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={FILTER_ALL}>Todos los estados</SelectItem>
-            {TRANSFER_STATUSES.map((value) => (
-              <SelectItem key={value} value={value}>{TRANSFER_STATUS_LABELS[value]}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onChange={withReset(setStatus)}
+          allLabel="Todos los estados"
+          options={TRANSFER_STATUSES.map((value) => ({ value, label: TRANSFER_STATUS_LABELS[value] }))}
+        />
+        <FilterSelect
+          label="Filtrar por almacén de origen"
+          value={originId}
+          onChange={withReset(setOriginId)}
+          allLabel="Todos los orígenes"
+          options={warehouseOptions}
+          className="w-56"
+        />
+        <FilterSelect
+          label="Filtrar por almacén de destino"
+          value={destinationId}
+          onChange={withReset(setDestinationId)}
+          allLabel="Todos los destinos"
+          options={warehouseOptions}
+          className="w-56"
+        />
+        <DateRangeFilter
+          from={dateFrom}
+          to={dateTo}
+          onFromChange={withReset(setDateFrom)}
+          onToChange={withReset(setDateTo)}
+        />
+        {hasFilters && (
+          <Button variant="outline" onClick={clearFilters}>
+            Limpiar filtros
+          </Button>
+        )}
       </div>
 
       {transfers.isError ? (

@@ -9,7 +9,7 @@ export default function ForbiddenPage() {
         No tienes los permisos necesarios para acceder a este recurso.
       </p>
       <Button asChild variant="default">
-        <Link to="/dashboard">Volver al inicio</Link>
+        <Link to="/">Volver al inicio</Link>
       </Button>
     </div>
   );

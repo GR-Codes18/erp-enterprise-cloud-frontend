@@ -14,6 +14,8 @@ export interface ConfirmDialogProps {
   title: string
   description: string
   confirmText?: string
+  /** "destructive" (rojo) para borrar o anular; "default" para confirmar una acción normal */
+  confirmVariant?: "destructive" | "default"
   isLoading?: boolean
   onConfirm: () => void
 }
@@ -24,6 +26,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmText = "Eliminar",
+  confirmVariant = "destructive",
   isLoading = false,
   onConfirm,
 }: ConfirmDialogProps) {
@@ -45,7 +48,7 @@ export function ConfirmDialog({
           </Button>
           <Button
             type="button"
-            variant="destructive"
+            variant={confirmVariant}
             disabled={isLoading}
             onClick={onConfirm}
           >

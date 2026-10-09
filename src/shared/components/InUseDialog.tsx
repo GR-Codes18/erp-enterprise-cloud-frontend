@@ -12,6 +12,8 @@ interface InUseDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   resourceName: string
+  /** Motivo que explica el backend (409); si no llega, se usa un texto genérico */
+  message?: string
   isPending?: boolean
   onDeactivate: () => void | Promise<void>
 }
@@ -20,6 +22,7 @@ export default function InUseDialog({
   open,
   onOpenChange,
   resourceName,
+  message,
   isPending = false,
   onDeactivate,
 }: InUseDialogProps) {
@@ -29,9 +32,8 @@ export default function InUseDialog({
         <DialogHeader>
           <DialogTitle>{resourceName} en uso</DialogTitle>
           <DialogDescription>
-            Este {resourceName.toLowerCase()} no se puede eliminar porque tiene registros o
-            movimientos asociados. ¿Deseas desactivarlo para que no se utilice en nuevas
-            operaciones?
+            {message ||
+              "No se puede eliminar porque tiene registros o movimientos asociados. Puedes desactivarlo para que no se use en nuevas operaciones."}
           </DialogDescription>
         </DialogHeader>
 

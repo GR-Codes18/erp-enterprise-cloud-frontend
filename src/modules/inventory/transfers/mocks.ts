@@ -1,4 +1,4 @@
-import { createInventoryDocumentHandlers } from "../documentMocks"
+import { createDocumentHandlers, nextNumber } from "@/mocks/utils/documents"
 import { PRODUCTS, WAREHOUSES, productRef, warehouseRef } from "../mockRefs"
 import type { Transfer, TransferInput } from "./schema"
 import { transferInputSchema } from "./schema"
@@ -12,60 +12,77 @@ const warehouseName = (id: string) =>
 const seed: Transfer[] = [
   {
     id: uuid(1),
+    number: "TR-000003",
     origin_warehouse_id: warehouseRef(2),
     origin_warehouse_name: WAREHOUSES.rawMaterial.name,
     destination_warehouse_id: warehouseRef(1),
     destination_warehouse_name: WAREHOUSES.central.name,
     items: [{ product_id: productRef(3), product_name: PRODUCTS.cement.name, quantity: 10 }],
     status: "draft",
+    cancel_reason: "",
     created_at: "2026-10-06T15:00:00Z",
   },
   {
     id: uuid(2),
+    number: "TR-000002",
     origin_warehouse_id: warehouseRef(1),
     origin_warehouse_name: WAREHOUSES.central.name,
     destination_warehouse_id: warehouseRef(3),
     destination_warehouse_name: WAREHOUSES.finished.name,
     items: [{ product_id: productRef(1), product_name: PRODUCTS.hammer.name, quantity: 5 }],
     status: "in_transit",
+    cancel_reason: "",
     created_at: "2026-10-05T15:00:00Z",
   },
   {
     id: uuid(3),
+    number: "TR-000001",
     origin_warehouse_id: warehouseRef(3),
     origin_warehouse_name: WAREHOUSES.finished.name,
     destination_warehouse_id: warehouseRef(1),
     destination_warehouse_name: WAREHOUSES.central.name,
     items: [{ product_id: productRef(7), product_name: PRODUCTS.paint.name, quantity: 3 }],
     status: "received",
+    cancel_reason: "",
     created_at: "2026-10-01T15:00:00Z",
   },
 ]
 
-function makeTransfer(input: TransferInput, id: string, created_at: string): Transfer {
+function makeTransfer(input: TransferInput, id: string, created_at: string, number: string): Transfer {
   return {
     ...input,
     id,
+    number,
     origin_warehouse_name: warehouseName(input.origin_warehouse_id),
     destination_warehouse_name: warehouseName(input.destination_warehouse_id),
     items: input.items.map((item) => ({ ...item, product_name: productName(item.product_id) })),
     status: "draft",
+    cancel_reason: "",
     created_at,
   }
 }
 
-export const transferHandlers = createInventoryDocumentHandlers<Transfer, TransferInput, Transfer["status"]>({
+let transferCounter = seed.length
+
+export const { handlers: transferHandlers } = createDocumentHandlers<Transfer, TransferInput, Transfer["status"]>({
   resource: "inventory/transfers",
   seed,
-  searchFields: ["origin_warehouse_name", "destination_warehouse_name"],
+  searchFields: ["number", "origin_warehouse_name", "destination_warehouse_name"],
   filterFields: ["status", "origin_warehouse_id", "destination_warehouse_id"],
   dateField: "created_at",
   inputSchema: transferInputSchema,
   actions: [
-    { action: "send", from: "draft", to: "in_transit" },
-    { action: "receive", from: "in_transit", to: "received" },
-    { action: "cancel", from: "draft", to: "cancelled" },
+    { action: "send", from: ["draft"], to: "in_transit" },
+    { action: "receive", from: ["in_transit"], to: "received" },
+    {
+      action: "cancel",
+      from: ["draft"],
+      to: "cancelled",
+      requiresReason: true,
+      apply: (_transfer, body) => ({ cancel_reason: String(body.reason).trim() }),
+    },
   ],
-  createRecord: makeTransfer,
-  updateRecord: (current, input) => makeTransfer(input, current.id, current.created_at),
+  // Contador propio: borrar un borrador no reutiliza su número
+  createRecord: (input, id, createdAt) => makeTransfer(input, id, createdAt, nextNumber("TR", ++transferCounter)),
+  updateRecord: (current, input) => makeTransfer(input, current.id, current.created_at, current.number),
 })

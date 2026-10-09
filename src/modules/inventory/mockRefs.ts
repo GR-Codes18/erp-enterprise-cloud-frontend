@@ -7,20 +7,20 @@ export const productRef = (n: number) => `00000000-0000-4000-8004-${String(n).pa
 export const warehouseRef = (n: number) => `00000000-0000-4000-8003-${String(n).padStart(12, "0")}`
 export const categoryRef = (n: number) => `00000000-0000-4000-8002-${String(n).padStart(12, "0")}`
 
-/** El stock mínimo no existe aún en los productos de Mantenimiento: lo define el backend de Inventario */
+/** Copia de los productos de Mantenimiento: SKU, unidad y stock mínimo iguales a su ficha */
 export const PRODUCTS = {
-  hammer: { n: 1, code: "PROD-001", name: "Martillo de Peña 16oz", category: 1, categoryName: "Herramientas Manuales", minStock: 10 },
-  screwdrivers: { n: 2, code: "PROD-002", name: "Juego de Destornilladores 6pcs", category: 1, categoryName: "Herramientas Manuales", minStock: 15 },
-  cement: { n: 3, code: "PROD-003", name: "Cemento Portland Tipo I 42.5kg", category: 2, categoryName: "Materiales de Construcción", minStock: 60 },
-  brick: { n: 4, code: "PROD-004", name: "Ladrillo Klinker 18 Huecos", category: 2, categoryName: "Materiales de Construcción", minStock: 300 },
-  helmet: { n: 5, code: "PROD-005", name: "Casco de Seguridad Dielectrico Blanco", category: 3, categoryName: "Equipos de Protección Personal", minStock: 20 },
-  gloves: { n: 6, code: "PROD-006", name: "Guantes de Nitrilo Industrial L", category: 3, categoryName: "Equipos de Protección Personal", minStock: 50 },
-  paint: { n: 7, code: "PROD-007", name: "Pintura Látex Super Lavable 4L", category: 4, categoryName: "Pinturas y Recubrimientos", minStock: 40 },
-  pvc: { n: 8, code: "PROD-008", name: "Tubo PVC Presión 1/2 pulg x 5m", category: 5, categoryName: "Tuberías y Conexiones", minStock: 25 },
-  cable: { n: 9, code: "PROD-009", name: "Cable Mellizo 2x16 AWG 100m", category: 6, categoryName: "Cables y Electricidad", minStock: 20 },
-  padlock: { n: 10, code: "PROD-010", name: "Candado de Latón 50mm Anticorte", category: 7, categoryName: "Cerrajería y Bisagras", minStock: 10 },
-  led: { n: 11, code: "PROD-011", name: "Reflector LED Industrial 100W", category: 8, categoryName: "Iluminación Industrial", minStock: 10 },
-  silicone: { n: 12, code: "PROD-012", name: "Silicona Multiuso Transparente 300ml", category: 9, categoryName: "Adhesivos y Selladores", minStock: 5 },
+  hammer: { n: 1, sku: "PROD-001", name: "Martillo de Peña 16oz", category: 1, categoryName: "Herramientas Manuales", minStock: 10, unit: "UND" },
+  screwdrivers: { n: 2, sku: "PROD-002", name: "Juego de Destornilladores 6pcs", category: 1, categoryName: "Herramientas Manuales", minStock: 15, unit: "UND" },
+  cement: { n: 3, sku: "PROD-003", name: "Cemento Portland Tipo I 42.5kg", category: 2, categoryName: "Materiales de Construcción", minStock: 60, unit: "BOLSA" },
+  brick: { n: 4, sku: "PROD-004", name: "Ladrillo Klinker 18 Huecos", category: 2, categoryName: "Materiales de Construcción", minStock: 300, unit: "UND" },
+  helmet: { n: 5, sku: "PROD-005", name: "Casco de Seguridad Dielectrico Blanco", category: 3, categoryName: "Equipos de Protección Personal", minStock: 20, unit: "UND" },
+  gloves: { n: 6, sku: "PROD-006", name: "Guantes de Nitrilo Industrial L", category: 3, categoryName: "Equipos de Protección Personal", minStock: 50, unit: "PAQ" },
+  paint: { n: 7, sku: "PROD-007", name: "Pintura Látex Super Lavable 4L", category: 4, categoryName: "Pinturas y Recubrimientos", minStock: 40, unit: "UND" },
+  pvc: { n: 8, sku: "PROD-008", name: "Tubo PVC Presión 1/2 pulg x 5m", category: 5, categoryName: "Tuberías y Conexiones", minStock: 25, unit: "UND" },
+  cable: { n: 9, sku: "PROD-009", name: "Cable Mellizo 2x16 AWG 100m", category: 6, categoryName: "Cables y Electricidad", minStock: 20, unit: "UND" },
+  padlock: { n: 10, sku: "PROD-010", name: "Candado de Latón 50mm Anticorte", category: 7, categoryName: "Cerrajería y Bisagras", minStock: 10, unit: "UND" },
+  led: { n: 11, sku: "PROD-011", name: "Reflector LED Industrial 100W", category: 8, categoryName: "Iluminación Industrial", minStock: 10, unit: "UND" },
+  silicone: { n: 12, sku: "PROD-012", name: "Silicona Multiuso Transparente 300ml", category: 9, categoryName: "Adhesivos y Selladores", minStock: 5, unit: "UND" },
 }
 
 export const WAREHOUSES = {

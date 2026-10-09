@@ -18,8 +18,7 @@ export function useSettings() {
 export function useUpdateSettings() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: SettingsInput }) =>
-      settingsService.update(id, input),
+    mutationFn: (input: SettingsInput) => settingsService.update(input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: settingsKeys.all }),
   })
 }

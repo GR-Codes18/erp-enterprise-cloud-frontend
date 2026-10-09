@@ -25,6 +25,7 @@ import {
   ALLOWED_TYPES_LABEL,
   MAX_FILE_SIZE_LABEL,
   formatFileSize,
+  resolveMimeType,
   validateFile,
 } from "../fileRules"
 import { useUploadDocument } from "../hooks"
@@ -34,16 +35,27 @@ import {
   EMPTY_UPLOAD_FORM,
   documentInputSchema,
   uploadFormSchema,
+  type EntityType,
   type UploadFormValues,
 } from "../schema"
 import { StorageUploadError } from "../service"
 
+/** Operación a la que pertenece el documento (una venta, una compra...) */
+export interface DocumentEntity {
+  type: EntityType
+  id: string
+  /** Texto para el usuario, ej. "Factura F001-00000123" */
+  label: string
+}
+
 interface UploadDocumentDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Sin entidad, el documento queda suelto en el repositorio */
+  entity?: DocumentEntity
 }
 
-function UploadForm({ onDone }: { onDone: () => void }) {
+function UploadForm({ entity, onDone }: { entity?: DocumentEntity; onDone: () => void }) {
   const uploadDocument = useUploadDocument()
   const [file, setFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
@@ -103,13 +115,13 @@ function UploadForm({ onDone }: { onDone: () => void }) {
       setFileError(fileProblem)
       return
     }
-    // La relación con otros registros la fija el DocumentsPanel de cada módulo: aquí va sin relación
+    // La relación con otra operación la fija el DocumentsPanel; desde el repositorio va sin relación
     const input = documentInputSchema.safeParse({
       name: values.name,
       category: values.category,
-      entity_type: "",
-      entity_id: "",
-      mime_type: file.type,
+      entity_type: entity?.type ?? "",
+      entity_id: entity?.id ?? "",
+      mime_type: resolveMimeType(file),
       size: file.size,
     })
     if (!input.success) {
@@ -194,19 +206,20 @@ function UploadForm({ onDone }: { onDone: () => void }) {
   )
 }
 
-export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialogProps) {
+export function UploadDocumentDialog({ open, onOpenChange, entity }: UploadDocumentDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Subir documento</DialogTitle>
           <DialogDescription>
+            {entity ? `Se adjuntará a ${entity.label}. ` : ""}
             El archivo se guarda de forma segura y solo se descarga con un enlace temporal.
           </DialogDescription>
         </DialogHeader>
         {/* El formulario solo existe mientras el diálogo está abierto: cada apertura
             parte de valores limpios, sin necesidad de reset manual */}
-        {open && <UploadForm onDone={() => onOpenChange(false)} />}
+        {open && <UploadForm entity={entity} onDone={() => onOpenChange(false)} />}
       </DialogContent>
     </Dialog>
   )

@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useState } from "react"
 import { useForm } from "react-hook-form"
-import { useLocation, useNavigate } from "react-router"
+import { Navigate, useLocation, useNavigate } from "react-router"
 import { APP_NAME } from "@/config/app"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
@@ -11,12 +11,14 @@ import { loginSchema, type LoginCredentials } from "../schema"
 import { useAuth } from "../useAuth"
 
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { login, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/dashboard"
+  // Vuelve a donde iba (con sus parámetros); sin destino, "/" lleva a la primera pantalla permitida
+  const origin = (location.state as { from?: { pathname: string; search?: string } } | null)?.from
+  const from = origin ? `${origin.pathname}${origin.search ?? ""}` : "/"
 
   const {
     register,
@@ -43,6 +45,9 @@ export default function LoginPage() {
       }
     }
   }
+
+  // Con sesión activa (por ejemplo, tras F5 en /login) no tiene sentido volver a pedir credenciales
+  if (isAuthenticated) return <Navigate to={from} replace />
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center bg-muted/40 p-4">

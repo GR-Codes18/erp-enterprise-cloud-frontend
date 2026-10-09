@@ -71,3 +71,31 @@ export function getBreadcrumb(
   // Fallback si no coincide con ninguna subruta conocida
   return { moduleLabel: activeModule.label, itemLabel: item.label }
 }
+/**
+ * Menú según los permisos de la persona: quita las pantallas que no puede ver, las secciones
+ * que quedan vacías y los módulos sin ninguna pantalla. `can` responde si tiene un permiso.
+ */
+export function filterModulesByPermission(
+  modules: AppModule[],
+  can: (permission: string) => boolean,
+): AppModule[] {
+  const allowed = (permission?: string) => permission === undefined || can(permission)
+
+  return modules.flatMap((module) => {
+    if (!module.sections) return allowed(module.permission) ? [module] : []
+
+    const sections = module.sections
+      .map((section) => ({ ...section, items: section.items.filter((item) => allowed(item.permission)) }))
+      .filter((section) => section.items.length > 0)
+
+    return sections.length > 0 ? [{ ...module, sections }] : []
+  })
+}
+
+/** Ruta de la primera pantalla del menú (ya filtrado), ej. "/inventory/stock". undefined si no hay ninguna */
+export function firstPath(modules: AppModule[]): string | undefined {
+  const [first] = modules
+  if (!first) return undefined
+  const item = first.sections?.flatMap((section) => section.items)[0]
+  return item ? `/${first.basePath}/${item.path}` : `/${first.basePath}`
+}

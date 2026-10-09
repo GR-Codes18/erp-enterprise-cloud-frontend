@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useAuth } from "@/modules/auth"
 import { Field } from "@/shared/components/Field"
 import { Button } from "@/shared/components/ui/button"
 import {
@@ -43,6 +44,8 @@ function UserForm({ user, onDone }: { user: User | null; onDone: () => void }) {
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
   const roles = useRoleOptions()
+  const { user: sessionUser } = useAuth()
+  const isSelf = user !== null && user.id === sessionUser?.id
   const isPending = createUser.isPending || updateUser.isPending
   const [serverError, setServerError] = useState<string | null>(null)
 
@@ -138,8 +141,12 @@ function UserForm({ user, onDone }: { user: User | null; onDone: () => void }) {
             control={control}
             name="status"
             render={({ field }) => (
-              <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger id="status" className="w-full">
+              <Select value={field.value} onValueChange={field.onChange} disabled={isSelf}>
+                <SelectTrigger
+                  id="status"
+                  className="w-full"
+                  aria-describedby={isSelf ? "status-self-hint" : undefined}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -152,6 +159,11 @@ function UserForm({ user, onDone }: { user: User | null; onDone: () => void }) {
               </Select>
             )}
           />
+          {isSelf && (
+            <p id="status-self-hint" className="text-xs text-muted-foreground">
+              No puedes desactivar tu propio usuario.
+            </p>
+          )}
         </Field>
       </div>
 

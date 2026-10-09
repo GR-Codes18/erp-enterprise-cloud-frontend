@@ -6,8 +6,17 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
+
+  // Mientras se recupera la sesión (F5) no se decide nada: evita mandar al login a quien ya entró
+  if (isLoading) {
+    return (
+      <div role="status" className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">
+        Cargando sesión…
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;

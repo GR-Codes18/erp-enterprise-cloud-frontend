@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { Pencil, Plus, UserCheck, UserX } from "lucide-react"
+import { useAuth, useHasPermission } from "@/modules/auth"
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
 import { DataTable, type Column } from "@/shared/components/DataTable"
 import { EmptyState } from "@/shared/components/EmptyState"
@@ -35,6 +36,8 @@ const ALL = "all"
 
 export default function UsersPage() {
   const [page, setPage] = useState(1)
+  const canCreate = useHasPermission("administration.users:create")
+  const canEdit = useHasPermission("administration.users:edit")
   const [searchInput, setSearchInput] = useState("")
   const search = useDebouncedValue(searchInput.trim(), 300)
   const [status, setStatus] = useState<string>(ALL)
@@ -56,6 +59,7 @@ export default function UsersPage() {
   const users = useUsers({ page, size: PAGE_SIZE, search, filters })
   const updateUser = useUpdateUser()
   const roles = useRoleOptions()
+  const { user: sessionUser } = useAuth()
 
   // El nombre del rol se resuelve en el cliente a partir de role_id
   const roleNames = useMemo(
@@ -110,15 +114,18 @@ export default function UsersPage() {
       className: "w-24",
       cell: (row) => (
         <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Editar ${row.name}`}
-            onClick={() => setDialog({ open: true, user: row })}
-          >
-            <Pencil aria-hidden="true" />
-          </Button>
-          {row.status === "active" ? (
+          {canEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Editar ${row.name}`}
+              onClick={() => setDialog({ open: true, user: row })}
+            >
+              <Pencil aria-hidden="true" />
+            </Button>
+          )}
+          {/* Nadie se desactiva a sí mismo: el botón no existe en su propia fila */}
+          {canEdit && row.status === "active" && row.id !== sessionUser?.id && (
             <Button
               variant="ghost"
               size="icon"
@@ -128,7 +135,8 @@ export default function UsersPage() {
             >
               <UserX aria-hidden="true" />
             </Button>
-          ) : (
+          )}
+          {canEdit && row.status === "inactive" && (
             <Button
               variant="ghost"
               size="icon"
@@ -144,7 +152,7 @@ export default function UsersPage() {
     },
   ]
 
-  const newUserButton = (
+  const newUserButton = canCreate && (
     <Button onClick={() => setDialog({ open: true, user: null })}>
       <Plus aria-hidden="true" />
       Nuevo usuario

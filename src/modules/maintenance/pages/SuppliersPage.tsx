@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useHasPermission } from "@/modules/auth"
 import { Pencil, Plus, Trash2 } from "lucide-react"
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
 import { DataTable, type Column } from "@/shared/components/DataTable"
@@ -10,18 +11,25 @@ import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
+import { FilterSelect } from "@/shared/components/FilterSelect"
+import { FILTER_ALL, pickFilters } from "@/shared/lib/filters"
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
 import { useDeleteOrDeactivate } from "@/shared/hooks/useDeleteOrDeactivate"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import { SupplierFormDialog } from "../suppliers/components/SupplierFormDialog"
 import { useDeleteSupplier, usePatchSupplier, useSuppliers } from "../suppliers/hooks"
-import { STATUS_LABELS, type Supplier } from "../suppliers/schema"
+import { SUPPLIER_STATUSES, STATUS_LABELS, type Supplier } from "../suppliers/schema"
 
 const PAGE_SIZE = 10
 
 export default function SuppliersPage() {
   const [page, setPage] = useState(1)
+  // Regla 1: el frontend oculta lo que no se permite (el backend vuelve a validar)
+  const canCreate = useHasPermission("maintenance.suppliers:create")
+  const canEdit = useHasPermission("maintenance.suppliers:edit")
+  const canVoid = useHasPermission("maintenance.suppliers:void")
   const [searchInput, setSearchInput] = useState("")
+  const [status, setStatus] = useState(FILTER_ALL)
   const search = useDebouncedValue(searchInput.trim(), 300)
 
   const [dialog, setDialog] = useState<{ open: boolean; supplier: Supplier | null }>({
@@ -31,12 +39,13 @@ export default function SuppliersPage() {
   const [toDelete, setToDelete] = useState<Supplier | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const suppliers = useSuppliers({ page, size: PAGE_SIZE, search })
+  const suppliers = useSuppliers({ page, size: PAGE_SIZE, search, filters: pickFilters({ status }) })
   const deleteSupplier = useDeleteSupplier()
   const patchSupplier = usePatchSupplier()
 
   const {
     isInUseDialogOpen,
+    inUseMessage,
     setIsInUseDialogOpen,
     isDeleting,
     isDeactivating,
@@ -99,28 +108,32 @@ export default function SuppliersPage() {
       className: "w-24",
       cell: (row) => (
         <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Editar ${row.name}`}
-            onClick={() => setDialog({ open: true, supplier: row })}
-          >
-            <Pencil aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Eliminar ${row.name}`}
-            onClick={() => setToDelete(row)}
-          >
-            <Trash2 aria-hidden="true" />
-          </Button>
+          {canEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Editar ${row.name}`}
+              onClick={() => setDialog({ open: true, supplier: row })}
+            >
+              <Pencil aria-hidden="true" />
+            </Button>
+          )}
+          {canVoid && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Eliminar ${row.name}`}
+              onClick={() => setToDelete(row)}
+            >
+              <Trash2 aria-hidden="true" />
+            </Button>
+          )}
         </div>
       ),
     },
   ]
 
-  const newSupplierButton = (
+  const newSupplierButton = canCreate && (
     <Button onClick={() => setDialog({ open: true, supplier: null })}>
       <Plus aria-hidden="true" />
       Nuevo proveedor
@@ -135,16 +148,28 @@ export default function SuppliersPage() {
         actions={newSupplierButton}
       />
 
-      <div className="mb-4 max-w-sm">
-        <Input
-          type="search"
-          placeholder="Buscar por nombre, documento o correo"
-          aria-label="Buscar proveedores"
-          value={searchInput}
-          onChange={(event) => {
-            setSearchInput(event.target.value)
+      <div className="mb-4 flex flex-wrap gap-3">
+        <div className="w-full max-w-sm">
+          <Input
+            type="search"
+            placeholder="Buscar por nombre, documento o correo"
+            aria-label="Buscar proveedores"
+            value={searchInput}
+            onChange={(event) => {
+              setSearchInput(event.target.value)
+              setPage(1)
+            }}
+          />
+        </div>
+        <FilterSelect
+          label="Filtrar por estado"
+          value={status}
+          onChange={(value) => {
+            setStatus(value)
             setPage(1)
           }}
+          allLabel="Todos los estados"
+          options={SUPPLIER_STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))}
         />
       </div>
 
@@ -167,10 +192,10 @@ export default function SuppliersPage() {
             getRowKey={(row) => row.id}
             isLoading={suppliers.isPending}
             empty={
-              search ? (
+              search || status !== FILTER_ALL ? (
                 <EmptyState
                   title="Sin resultados"
-                  description="Ningún proveedor coincide con tu búsqueda."
+                  description="Ningún proveedor coincide con tu búsqueda o filtro."
                 />
               ) : (
                 <EmptyState
@@ -210,6 +235,7 @@ export default function SuppliersPage() {
 
       <InUseDialog
         open={isInUseDialogOpen}
+        message={inUseMessage}
         onOpenChange={setIsInUseDialogOpen}
         resourceName="Proveedor"
         isPending={isDeactivating}

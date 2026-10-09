@@ -1,4 +1,4 @@
-import { createCrudHandlers } from "@/mocks/createCrudHandlers"
+import { createCrudHandlers } from "@/mocks/utils/crud"
 import type { Category, CategoryStatus } from "./schema"
 
 /** UUID fijos y legibles (válidos v4): 00000000-0000-4000-8002-000000000001, ...002, etc. */
@@ -30,8 +30,10 @@ const seed: Category[] = [
 const IN_USE_IDS = Array.from({ length: 9 }, (_, i) => uuid(i + 1))
 
 export const categoryHandlers = createCrudHandlers<Category>({
-  endpoint: "*/categories",
-  items: seed,
+  resource: "categories",
+  seed,
+  // Un registro nuevo aparece primero en el listado
+  insertAt: "start",
   searchFields: ["name"],
   filterFields: ["status"],
   uniqueFields: [
@@ -41,15 +43,14 @@ export const categoryHandlers = createCrudHandlers<Category>({
       normalize: (val: unknown) => String(val ?? "").trim().toLowerCase(),
     },
   ],
-  inUseIds: IN_USE_IDS,
+  isInUse: (item) => IN_USE_IDS.includes(item.id),
   inUseMessage:
     "Esta categoría tiene productos asociados y no se puede eliminar. Puedes desactivarla para que no se use en nuevos productos.",
-  onBeforeCreate: (body: Record<string, unknown>, currentItems: Category[]) => ({
-    id: uuid(currentItems.length + 1),
+  prepareCreate: (body) => ({
     name: String(body.name ?? "").trim(),
     status: (body.status as CategoryStatus) || "active",
   }),
-  onBeforeUpdate: (_current: Category, body: Record<string, unknown>) => ({
+  prepareUpdate: (_current, body) => ({
     name: String(body.name ?? "").trim(),
   }),
 })

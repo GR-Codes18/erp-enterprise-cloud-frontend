@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select"
 import { getErrorMessage } from "@/shared/lib/api/errors"
+import { activeOrSelected, withDocumentProducts } from "@/shared/lib/options"
 import { InventoryLineItems } from "../components/InventoryLineItems"
 import { useStockAvailability } from "../stock/hooks"
 import { useAdjustment, useCreateAdjustment, useUpdateAdjustment } from "../adjustments/hooks"
@@ -24,6 +25,7 @@ import {
   ADJUSTMENT_REASONS,
   EMPTY_ADJUSTMENT,
   adjustmentInputSchema,
+  type AdjustmentFormValues,
   type AdjustmentInput,
 } from "../adjustments/schema"
 
@@ -43,8 +45,11 @@ function AdjustmentForm({ adjustment }: { adjustment?: NonNullable<ReturnType<ty
   const navigate = useNavigate()
   const createAdjustment = useCreateAdjustment()
   const updateAdjustment = useUpdateAdjustment()
+  // Regla 4: un borrador antiguo sigue mostrando el producto o almacén que hoy está inactivo
   const products = useProductOptions()
-  const warehouses = useWarehouseOptions()
+  const warehouses = useWarehouseOptions({ includeInactive: true })
+  const productOptions = withDocumentProducts(products.data ?? [], adjustment?.items ?? [])
+  const warehouseOptions = activeOrSelected(warehouses.data ?? [], adjustment ? [adjustment.warehouse_id] : [])
   const [serverError, setServerError] = useState<string | null>(null)
 
   const {
@@ -54,17 +59,17 @@ function AdjustmentForm({ adjustment }: { adjustment?: NonNullable<ReturnType<ty
     setValue,
     register,
     formState: { errors },
-  } = useForm<AdjustmentInput>({
+  } = useForm<AdjustmentFormValues, unknown, AdjustmentInput>({
     resolver: zodResolver(adjustmentInputSchema),
     defaultValues: adjustment
       ? {
           warehouse_id: adjustment.warehouse_id,
-        items: adjustment.items.map(({ product_id, direction, quantity }) => ({
-          product_id,
-          direction,
-          quantity,
-        })),
-        reason: adjustment.reason,
+          items: adjustment.items.map(({ product_id, direction, quantity }) => ({
+            product_id,
+            direction,
+            quantity,
+          })),
+          reason: adjustment.reason,
           notes: adjustment.notes,
         }
       : { ...EMPTY_ADJUSTMENT, items: EMPTY_ADJUSTMENT.items.map((item) => ({ ...item })) },
@@ -143,7 +148,7 @@ function AdjustmentForm({ adjustment }: { adjustment?: NonNullable<ReturnType<ty
                 <SelectValue placeholder="Selecciona un almacén" />
               </SelectTrigger>
               <SelectContent>
-                {(warehouses.data ?? []).map((warehouse) => (
+                {warehouseOptions.map((warehouse) => (
                   <SelectItem key={warehouse.id} value={warehouse.id}>{warehouse.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -151,7 +156,7 @@ function AdjustmentForm({ adjustment }: { adjustment?: NonNullable<ReturnType<ty
           </Field>
           <Field id="reason" label="Motivo" error={errors.reason?.message}>
             <Select
-              value={reason}
+              value={reason || undefined}
               onValueChange={(value) => {
                 if (ADJUSTMENT_REASONS.includes(value as (typeof ADJUSTMENT_REASONS)[number])) {
                   setValue("reason", value as AdjustmentInput["reason"], { shouldValidate: true })
@@ -159,8 +164,13 @@ function AdjustmentForm({ adjustment }: { adjustment?: NonNullable<ReturnType<ty
               }}
               disabled={isPending}
             >
-              <SelectTrigger id="reason" className="w-full" aria-invalid={!!errors.reason}>
-                <SelectValue />
+              <SelectTrigger
+                id="reason"
+                className="w-full"
+                aria-invalid={!!errors.reason}
+                aria-describedby={errors.reason ? "reason-error" : undefined}
+              >
+                <SelectValue placeholder="Selecciona un motivo" />
               </SelectTrigger>
               <SelectContent>
                 {ADJUSTMENT_REASONS.map((reason) => (
@@ -173,8 +183,10 @@ function AdjustmentForm({ adjustment }: { adjustment?: NonNullable<ReturnType<ty
 
         <InventoryLineItems
           lines={items}
-          products={products.data ?? []}
+          products={productOptions}
           availability={availability.quantities}
+          availabilityFailed={availability.failed}
+          warehouseSelected={warehouseId !== ""}
           mode="adjustment"
           itemErrors={itemErrors}
           listError={itemListError}

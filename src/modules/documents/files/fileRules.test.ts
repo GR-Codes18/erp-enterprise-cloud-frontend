@@ -4,6 +4,7 @@ import {
   MAX_FILE_SIZE_BYTES,
   MAX_FILE_SIZE_LABEL,
   formatFileSize,
+  resolveMimeType,
   validateFile,
 } from "./fileRules"
 
@@ -74,5 +75,23 @@ describe("constantes derivadas", () => {
 
   it("la etiqueta del máximo coincide con el límite", () => {
     expect(MAX_FILE_SIZE_LABEL).toBe("10 MB")
+  })
+})
+
+describe("resolveMimeType", () => {
+  const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+  it("usa el tipo que informa el sistema", () => {
+    expect(resolveMimeType(pdf)).toBe("application/pdf")
+  })
+
+  it("si el sistema no informa el tipo, lo deduce de la extensión permitida", () => {
+    expect(resolveMimeType({ name: "informe.DOCX", type: "" })).toBe(DOCX)
+    expect(validateFile({ name: "informe.docx", size: 1000, type: "" })).toBeNull()
+  })
+
+  it("una extensión no permitida sin tipo sigue rechazándose", () => {
+    expect(resolveMimeType({ name: "script.exe", type: "" })).toBe("")
+    expect(validateFile({ name: "script.exe", size: 1000, type: "" })).toContain("no permitido")
   })
 })

@@ -44,10 +44,14 @@ export const transferInputSchema = transferFields
 
 export const transferSchema = transferFields.extend({
   id: z.string(),
+  /** Número correlativo que asigna el backend, ej. "TR-000004" */
+  number: z.string(),
   origin_warehouse_name: z.string(),
   destination_warehouse_name: z.string(),
   items: z.array(transferItemSchema.extend({ product_name: z.string().optional() })),
   status: z.enum(TRANSFER_STATUSES),
+  /** Motivo al cancelar ("" si no está cancelada) */
+  cancel_reason: z.string(),
   created_at: z.string(),
 })
 

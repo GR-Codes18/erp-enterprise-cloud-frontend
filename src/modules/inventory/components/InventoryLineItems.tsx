@@ -9,9 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select"
-import type { useProductOptions } from "@/modules/maintenance"
+import type { ProductChoice } from "@/shared/lib/options"
 
-type ProductOption = NonNullable<ReturnType<typeof useProductOptions>["data"]>[number]
 type AdjustmentDirection = "increase" | "decrease"
 
 export interface InventoryLine {
@@ -22,8 +21,12 @@ export interface InventoryLine {
 
 interface InventoryLineItemsProps {
   lines: InventoryLine[]
-  products: ProductOption[]
+  products: ProductChoice[]
   availability: Record<string, number>
+  /** Productos cuyo disponible no se pudo consultar */
+  availabilityFailed?: string[]
+  /** Sin almacén elegido no hay disponible que mostrar */
+  warehouseSelected: boolean
   mode: "transfer" | "adjustment"
   itemErrors: Array<{ product_id?: string; quantity?: string; direction?: string }>
   listError?: string
@@ -39,6 +42,8 @@ export function InventoryLineItems({
   lines,
   products,
   availability,
+  availabilityFailed = [],
+  warehouseSelected,
   mode,
   itemErrors,
   listError,
@@ -66,7 +71,14 @@ export function InventoryLineItems({
         const errors = itemErrors[index]
         const available = availability[line.product_id]
         return (
-          <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-[minmax(12rem,2fr)_minmax(8rem,1fr)_minmax(8rem,1fr)_auto]">
+          <div
+            key={index}
+            className={`grid gap-3 rounded-md border p-3 ${
+              isAdjustment
+                ? "md:grid-cols-[minmax(12rem,2fr)_minmax(8rem,1fr)_minmax(8rem,1fr)_auto]"
+                : "md:grid-cols-[minmax(12rem,2fr)_minmax(8rem,1fr)_auto]"
+            }`}
+          >
             <Field id={`item-${index}-product`} label="Producto" error={errors?.product_id}>
               <Select
                 value={line.product_id || undefined}
@@ -79,7 +91,7 @@ export function InventoryLineItems({
                 <SelectContent>
                   {products.map((product) => (
                     <SelectItem key={product.id} value={product.id}>
-                      {product.code} · {product.name}
+                      {product.sku} · {product.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -125,7 +137,11 @@ export function InventoryLineItems({
             <div className="flex items-end gap-3">
               {line.product_id && (
                 <p className="pb-2 text-xs text-muted-foreground">
-                  Disponible: {available === undefined ? "cargando…" : available}
+                  {!warehouseSelected
+                    ? "Elige un almacén para ver el disponible"
+                    : availabilityFailed.includes(line.product_id)
+                      ? "Disponible: no se pudo consultar"
+                      : `Disponible: ${available === undefined ? "cargando…" : available}`}
                 </p>
               )}
               <Button

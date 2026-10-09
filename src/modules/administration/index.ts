@@ -14,16 +14,15 @@ export const administrationModule: AppModule = {
     {
       label: "Seguridad",
       items: [
-        { label: "Usuarios", path: "users", page: () => import("./pages/UsersPage") },
-        { label: "Roles", path: "roles", page: () => import("./pages/RolesPage") },
-        { label: "Permisos", path: "permissions", page: () => import("./pages/PermissionsPage") },
-        { label: "Auditoría", path: "audit", page: () => import("./pages/AuditPage") },
-        { label: "Parámetros", path: "settings", page: () => import("./pages/SettingsPage") },
+        { label: "Usuarios", path: "users", permission: "administration.users:view", page: () => import("./pages/UsersPage") },
+        { label: "Roles", path: "roles", permission: "administration.roles:view", page: () => import("./pages/RolesPage") },
+        { label: "Permisos", path: "permissions", permission: "administration.roles:view", page: () => import("./pages/PermissionsPage") },
+        { label: "Auditoría", path: "audit", permission: "administration.audit:view", page: () => import("./pages/AuditPage") },
       ],
     },
     {
       label: "Configuración",
-      items: [{ label: "Parámetros", path: "settings" }],
+      items: [{ label: "Parámetros", path: "settings", permission: "administration.settings:view", page: () => import("./pages/SettingsPage") }],
     },
   ],
 }

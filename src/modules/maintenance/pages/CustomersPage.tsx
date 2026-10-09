@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useHasPermission } from "@/modules/auth"
 import { Pencil, Plus, Trash2 } from "lucide-react"
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
 import { DataTable, type Column } from "@/shared/components/DataTable"
@@ -10,19 +11,26 @@ import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
+import { FilterSelect } from "@/shared/components/FilterSelect"
+import { FILTER_ALL, pickFilters } from "@/shared/lib/filters"
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
 import { useDeleteOrDeactivate } from "@/shared/hooks/useDeleteOrDeactivate"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import { formatMoney } from "@/shared/lib/money"
 import { CustomerFormDialog } from "../customers/components/CustomerFormDialog"
 import { useCustomers, useDeleteCustomer, usePatchCustomer } from "../customers/hooks"
-import { STATUS_LABELS, type Customer } from "../customers/schema"
+import { CUSTOMER_STATUSES, STATUS_LABELS, type Customer } from "../customers/schema"
 
 const PAGE_SIZE = 10
 
 export default function CustomersPage() {
   const [page, setPage] = useState(1)
+  // Regla 1: el frontend oculta lo que no se permite (el backend vuelve a validar)
+  const canCreate = useHasPermission("maintenance.customers:create")
+  const canEdit = useHasPermission("maintenance.customers:edit")
+  const canVoid = useHasPermission("maintenance.customers:void")
   const [searchInput, setSearchInput] = useState("")
+  const [status, setStatus] = useState(FILTER_ALL)
   const search = useDebouncedValue(searchInput.trim(), 300)
 
   const [dialog, setDialog] = useState<{ open: boolean; customer: Customer | null }>({
@@ -32,12 +40,13 @@ export default function CustomersPage() {
   const [toDelete, setToDelete] = useState<Customer | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const customers = useCustomers({ page, size: PAGE_SIZE, search })
+  const customers = useCustomers({ page, size: PAGE_SIZE, search, filters: pickFilters({ status }) })
   const deleteCustomer = useDeleteCustomer()
   const patchCustomer = usePatchCustomer()
 
   const {
     isInUseDialogOpen,
+    inUseMessage,
     setIsInUseDialogOpen,
     isDeleting,
     isDeactivating,
@@ -100,28 +109,32 @@ export default function CustomersPage() {
       className: "w-24",
       cell: (row) => (
         <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Editar ${row.name}`}
-            onClick={() => setDialog({ open: true, customer: row })}
-          >
-            <Pencil aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Eliminar ${row.name}`}
-            onClick={() => setToDelete(row)}
-          >
-            <Trash2 aria-hidden="true" />
-          </Button>
+          {canEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Editar ${row.name}`}
+              onClick={() => setDialog({ open: true, customer: row })}
+            >
+              <Pencil aria-hidden="true" />
+            </Button>
+          )}
+          {canVoid && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Eliminar ${row.name}`}
+              onClick={() => setToDelete(row)}
+            >
+              <Trash2 aria-hidden="true" />
+            </Button>
+          )}
         </div>
       ),
     },
   ]
 
-  const newCustomerButton = (
+  const newCustomerButton = canCreate && (
     <Button onClick={() => setDialog({ open: true, customer: null })}>
       <Plus aria-hidden="true" />
       Nuevo cliente
@@ -136,16 +149,28 @@ export default function CustomersPage() {
         actions={newCustomerButton}
       />
 
-      <div className="mb-4 max-w-sm">
-        <Input
-          type="search"
-          placeholder="Buscar por nombre, documento o correo"
-          aria-label="Buscar clientes"
-          value={searchInput}
-          onChange={(event) => {
-            setSearchInput(event.target.value)
+      <div className="mb-4 flex flex-wrap gap-3">
+        <div className="w-full max-w-sm">
+          <Input
+            type="search"
+            placeholder="Buscar por nombre, documento o correo"
+            aria-label="Buscar clientes"
+            value={searchInput}
+            onChange={(event) => {
+              setSearchInput(event.target.value)
+              setPage(1)
+            }}
+          />
+        </div>
+        <FilterSelect
+          label="Filtrar por estado"
+          value={status}
+          onChange={(value) => {
+            setStatus(value)
             setPage(1)
           }}
+          allLabel="Todos los estados"
+          options={CUSTOMER_STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))}
         />
       </div>
 
@@ -168,10 +193,10 @@ export default function CustomersPage() {
             getRowKey={(row) => row.id}
             isLoading={customers.isPending}
             empty={
-              search ? (
+              search || status !== FILTER_ALL ? (
                 <EmptyState
                   title="Sin resultados"
-                  description="Ningún cliente coincide con tu búsqueda."
+                  description="Ningún cliente coincide con tu búsqueda o filtro."
                 />
               ) : (
                 <EmptyState
@@ -211,6 +236,7 @@ export default function CustomersPage() {
 
       <InUseDialog
         open={isInUseDialogOpen}
+        message={inUseMessage}
         onOpenChange={setIsInUseDialogOpen}
         resourceName="Cliente"
         isPending={isDeactivating}

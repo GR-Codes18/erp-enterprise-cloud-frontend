@@ -7,7 +7,7 @@ const uuid = (n: number) => `00000000-0000-4000-8012-${String(n).padStart(12, "0
 
 // [número de usuario en users/mocks.ts, nombre]
 type Actor = readonly [number, string]
-const ADMIN: Actor = [1, "Administrador General"]
+const ADMIN: Actor = [1, "Gabriel Romero"]
 const RICARDO: Actor = [3, "Ricardo Salas Mendoza"]
 const CARLA: Actor = [5, "Carla Mendoza Ruiz"]
 const PEDRO: Actor = [8, "Pedro Campos Rivas"]

@@ -66,3 +66,13 @@ export function formatMoney(amount: string, currency: CurrencyCode = DEFAULT_CUR
     return PLACEHOLDER
   }
 }
+/** Monto abreviado para ejes de gráficos: 125000 -> "S/ 1.3 mil". No usar en totales */
+export function formatCompactCents(cents: number, currency: CurrencyCode = DEFAULT_CURRENCY): string {
+  assertSafeCents(cents)
+  return new Intl.NumberFormat(LOCALE, {
+    style: "currency",
+    currency,
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(cents / 100)
+}

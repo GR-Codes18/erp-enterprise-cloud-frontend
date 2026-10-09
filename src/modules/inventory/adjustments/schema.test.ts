@@ -5,6 +5,7 @@ import {
   ADJUSTMENT_TRANSITIONS,
   adjustmentInputSchema,
   canTransitionAdjustment,
+  EMPTY_ADJUSTMENT,
 } from "./schema"
 
 const valid = {
@@ -23,6 +24,17 @@ describe("adjustmentInputSchema", () => {
     expect(adjustmentInputSchema.safeParse({ ...valid, warehouse_id: "" }).success).toBe(false)
     expect(adjustmentInputSchema.safeParse({ ...valid, reason: "unknown" }).success).toBe(false)
     expect(adjustmentInputSchema.safeParse({ ...valid, items: [] }).success).toBe(false)
+  })
+
+  it('un ajuste nuevo parte sin motivo y "" pide elegirlo', () => {
+    expect(EMPTY_ADJUSTMENT.reason).toBe("")
+    const result = adjustmentInputSchema.safeParse({ ...valid, reason: "" })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.find((issue) => issue.path[0] === "reason")?.message).toBe(
+        "Selecciona un motivo",
+      )
+    }
   })
 
   it("acepta cantidades enteras positivas y rechaza las demás", () => {

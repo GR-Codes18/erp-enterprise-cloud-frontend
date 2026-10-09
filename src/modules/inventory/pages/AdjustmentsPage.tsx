@@ -1,25 +1,22 @@
 import { useState } from "react"
 import { Link } from "react-router"
+import { useHasPermission } from "@/modules/auth"
+import { useWarehouseOptions } from "@/modules/maintenance"
 import { DataTable, type Column } from "@/shared/components/DataTable"
+import { DateRangeFilter } from "@/shared/components/DateRangeFilter"
 import { EmptyState } from "@/shared/components/EmptyState"
 import { ErrorState } from "@/shared/components/ErrorState"
+import { FilterSelect } from "@/shared/components/FilterSelect"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select"
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import type { PageParams } from "@/shared/lib/api/types"
 import { formatDateTimeLima } from "@/shared/lib/dates"
-import { FILTER_ALL } from "../stock/schema"
+import { FILTER_ALL, dateRangeParams, pickFilters } from "@/shared/lib/filters"
 import { useAdjustments } from "../adjustments/hooks"
 import {
   ADJUSTMENT_REASON_LABELS,
@@ -33,18 +30,47 @@ const PAGE_SIZE = 10
 
 export default function AdjustmentsPage() {
   const [page, setPage] = useState(1)
+  const canCreate = useHasPermission("inventory.adjustments:create")
   const [searchInput, setSearchInput] = useState("")
   const search = useDebouncedValue(searchInput.trim(), 300)
   const [status, setStatus] = useState(FILTER_ALL)
   const [reason, setReason] = useState(FILTER_ALL)
-  const filters: Record<string, string> = {}
-  if (status !== FILTER_ALL) filters.status = status
-  if (reason !== FILTER_ALL) filters.reason = reason
-  const params: PageParams = { page, size: PAGE_SIZE, search, filters }
+  const [warehouseId, setWarehouseId] = useState(FILTER_ALL)
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
+
+  // Es un listado histórico: también se filtra por almacenes hoy inactivos
+  const warehouses = useWarehouseOptions({ includeInactive: true })
+
+  const filters = pickFilters({ status, reason, warehouse_id: warehouseId })
+  const params: PageParams = {
+    page,
+    size: PAGE_SIZE,
+    search,
+    filters,
+    ...dateRangeParams(dateFrom, dateTo),
+  }
   const adjustments = useAdjustments(params)
-  const hasFilters = search !== "" || Object.keys(filters).length > 0
+  const hasFilters = search !== "" || Object.keys(filters).length > 0 || dateFrom !== "" || dateTo !== ""
+
+  // Cada cambio de filtro vuelve a la página 1
+  const withReset = (setter: (value: string) => void) => (value: string) => {
+    setter(value)
+    setPage(1)
+  }
+
+  const clearFilters = () => {
+    setSearchInput("")
+    setStatus(FILTER_ALL)
+    setReason(FILTER_ALL)
+    setWarehouseId(FILTER_ALL)
+    setDateFrom("")
+    setDateTo("")
+    setPage(1)
+  }
 
   const columns: Column<Adjustment>[] = [
+    { key: "number", header: "Número", cell: (row) => <span className="font-mono text-sm">{row.number}</span> },
     { key: "date", header: "Fecha", cell: (row) => formatDateTimeLima(row.created_at) },
     { key: "warehouse", header: "Almacén", cell: (row) => <span className="font-medium">{row.warehouse_name}</span> },
     { key: "reason", header: "Motivo", cell: (row) => ADJUSTMENT_REASON_LABELS[row.reason] },
@@ -65,7 +91,7 @@ export default function AdjustmentsPage() {
     },
   ]
 
-  const newAdjustmentButton = (
+  const newAdjustmentButton = canCreate && (
     <Button asChild>
       <Link to="/inventory/adjustments/new">Nuevo ajuste</Link>
     </Button>
@@ -79,52 +105,48 @@ export default function AdjustmentsPage() {
         actions={newAdjustmentButton}
       />
 
-      <div className="mb-4 flex flex-wrap gap-3">
+      <div className="mb-4 flex flex-wrap items-end gap-3">
         <Input
           type="search"
           className="max-w-sm"
-          placeholder="Buscar por almacén"
+          placeholder="Buscar por número o almacén"
           aria-label="Buscar ajustes"
           value={searchInput}
-          onChange={(event) => {
-            setSearchInput(event.target.value)
-            setPage(1)
-          }}
+          onChange={(event) => withReset(setSearchInput)(event.target.value)}
         />
-        <Select
+        <FilterSelect
+          label="Filtrar por estado"
           value={status}
-          onValueChange={(value) => {
-            setStatus(value)
-            setPage(1)
-          }}
-        >
-          <SelectTrigger className="w-48" aria-label="Filtrar por estado">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={FILTER_ALL}>Todos los estados</SelectItem>
-            {ADJUSTMENT_STATUSES.map((value) => (
-              <SelectItem key={value} value={value}>{ADJUSTMENT_STATUS_LABELS[value]}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
+          onChange={withReset(setStatus)}
+          allLabel="Todos los estados"
+          options={ADJUSTMENT_STATUSES.map((value) => ({ value, label: ADJUSTMENT_STATUS_LABELS[value] }))}
+        />
+        <FilterSelect
+          label="Filtrar por almacén"
+          value={warehouseId}
+          onChange={withReset(setWarehouseId)}
+          allLabel="Todos los almacenes"
+          options={(warehouses.data ?? []).map((w) => ({ value: w.id, label: w.name }))}
+          className="w-56"
+        />
+        <FilterSelect
+          label="Filtrar por motivo"
           value={reason}
-          onValueChange={(value) => {
-            setReason(value)
-            setPage(1)
-          }}
-        >
-          <SelectTrigger className="w-48" aria-label="Filtrar por motivo">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={FILTER_ALL}>Todos los motivos</SelectItem>
-            {ADJUSTMENT_REASONS.map((value) => (
-              <SelectItem key={value} value={value}>{ADJUSTMENT_REASON_LABELS[value]}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onChange={withReset(setReason)}
+          allLabel="Todos los motivos"
+          options={ADJUSTMENT_REASONS.map((value) => ({ value, label: ADJUSTMENT_REASON_LABELS[value] }))}
+        />
+        <DateRangeFilter
+          from={dateFrom}
+          to={dateTo}
+          onFromChange={withReset(setDateFrom)}
+          onToChange={withReset(setDateTo)}
+        />
+        {hasFilters && (
+          <Button variant="outline" onClick={clearFilters}>
+            Limpiar filtros
+          </Button>
+        )}
       </div>
 
       {adjustments.isError ? (

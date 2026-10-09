@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useHasPermission } from "@/modules/auth"
 import { Pencil, Plus, Trash2 } from "lucide-react"
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
 import { DataTable, type Column } from "@/shared/components/DataTable"
@@ -10,18 +11,25 @@ import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
+import { FilterSelect } from "@/shared/components/FilterSelect"
+import { FILTER_ALL, pickFilters } from "@/shared/lib/filters"
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
 import { useDeleteOrDeactivate } from "@/shared/hooks/useDeleteOrDeactivate"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import { WarehouseFormDialog } from "../warehouses/components/WarehouseFormDialog"
 import { useDeleteWarehouse, usePatchWarehouse, useWarehouses } from "../warehouses/hooks"
-import { STATUS_LABELS, type Warehouse } from "../warehouses/schema"
+import { WAREHOUSE_STATUSES, STATUS_LABELS, type Warehouse } from "../warehouses/schema"
 
 const PAGE_SIZE = 10
 
 export default function WarehousesPage() {
   const [page, setPage] = useState(1)
+  // Regla 1: el frontend oculta lo que no se permite (el backend vuelve a validar)
+  const canCreate = useHasPermission("maintenance.warehouses:create")
+  const canEdit = useHasPermission("maintenance.warehouses:edit")
+  const canVoid = useHasPermission("maintenance.warehouses:void")
   const [searchInput, setSearchInput] = useState("")
+  const [status, setStatus] = useState(FILTER_ALL)
   const search = useDebouncedValue(searchInput.trim(), 300)
 
   const [dialog, setDialog] = useState<{ open: boolean; warehouse: Warehouse | null }>({
@@ -31,12 +39,13 @@ export default function WarehousesPage() {
   const [toDelete, setToDelete] = useState<Warehouse | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const warehouses = useWarehouses({ page, size: PAGE_SIZE, search })
+  const warehouses = useWarehouses({ page, size: PAGE_SIZE, search, filters: pickFilters({ status }) })
   const deleteWarehouse = useDeleteWarehouse()
   const patchWarehouse = usePatchWarehouse()
 
   const {
     isInUseDialogOpen,
+    inUseMessage,
     setIsInUseDialogOpen,
     isDeleting,
     isDeactivating,
@@ -98,28 +107,32 @@ export default function WarehousesPage() {
       className: "w-24",
       cell: (row) => (
         <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Editar ${row.name}`}
-            onClick={() => setDialog({ open: true, warehouse: row })}
-          >
-            <Pencil aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Eliminar ${row.name}`}
-            onClick={() => setToDelete(row)}
-          >
-            <Trash2 aria-hidden="true" />
-          </Button>
+          {canEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Editar ${row.name}`}
+              onClick={() => setDialog({ open: true, warehouse: row })}
+            >
+              <Pencil aria-hidden="true" />
+            </Button>
+          )}
+          {canVoid && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Eliminar ${row.name}`}
+              onClick={() => setToDelete(row)}
+            >
+              <Trash2 aria-hidden="true" />
+            </Button>
+          )}
         </div>
       ),
     },
   ]
 
-  const newWarehouseButton = (
+  const newWarehouseButton = canCreate && (
     <Button onClick={() => setDialog({ open: true, warehouse: null })}>
       <Plus aria-hidden="true" />
       Nuevo almacén
@@ -134,16 +147,28 @@ export default function WarehousesPage() {
         actions={newWarehouseButton}
       />
 
-      <div className="mb-4 max-w-sm">
-        <Input
-          type="search"
-          placeholder="Buscar por código o nombre..."
-          aria-label="Buscar almacenes"
-          value={searchInput}
-          onChange={(event) => {
-            setSearchInput(event.target.value)
+      <div className="mb-4 flex flex-wrap gap-3">
+        <div className="w-full max-w-sm">
+          <Input
+            type="search"
+            placeholder="Buscar por código o nombre..."
+            aria-label="Buscar almacenes"
+            value={searchInput}
+            onChange={(event) => {
+              setSearchInput(event.target.value)
+              setPage(1)
+            }}
+          />
+        </div>
+        <FilterSelect
+          label="Filtrar por estado"
+          value={status}
+          onChange={(value) => {
+            setStatus(value)
             setPage(1)
           }}
+          allLabel="Todos los estados"
+          options={WAREHOUSE_STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))}
         />
       </div>
 
@@ -166,10 +191,10 @@ export default function WarehousesPage() {
             getRowKey={(row) => row.id}
             isLoading={warehouses.isPending}
             empty={
-              search ? (
+              search || status !== FILTER_ALL ? (
                 <EmptyState
                   title="Sin resultados"
-                  description="Ningún almacén coincide con tu búsqueda."
+                  description="Ningún almacén coincide con tu búsqueda o filtro."
                 />
               ) : (
                 <EmptyState
@@ -209,6 +234,7 @@ export default function WarehousesPage() {
 
       <InUseDialog
         open={isInUseDialogOpen}
+        message={inUseMessage}
         onOpenChange={setIsInUseDialogOpen}
         resourceName="Almacén"
         isPending={isDeactivating}

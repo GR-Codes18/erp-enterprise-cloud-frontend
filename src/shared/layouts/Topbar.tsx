@@ -1,6 +1,6 @@
 import { LogOut, Menu } from "lucide-react"
 import { useLocation } from "react-router"
-import { useAuth } from "@/modules/auth/useAuth"
+import { useAuth } from "@/modules/auth"
 import { getBreadcrumb } from "@/shared/lib/navigation"
 import type { AppModule } from "@/shared/types/module"
 
@@ -15,7 +15,7 @@ export default function Topbar({ modules, onMenuClick }: TopbarProps) {
   const breadcrumb = getBreadcrumb(modules, pathname)
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-card px-4 md:px-6">
+    <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-card px-4 md:px-6 print:hidden">
       <button
         type="button"
         onClick={onMenuClick}

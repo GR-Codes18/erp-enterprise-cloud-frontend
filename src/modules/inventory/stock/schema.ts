@@ -25,7 +25,7 @@ export const STATUS_TONES: Record<StockStatus, StatusTone> = {
 export const stockRowSchema = z.object({
   id: z.string(),
   product_id: z.string(),
-  product_code: z.string(),
+  product_sku: z.string(),
   product_name: z.string(),
   category_id: z.string(),
   category_name: z.string(),
@@ -35,6 +35,8 @@ export const stockRowSchema = z.object({
   quantity: z.number().int().nonnegative(),
   min_stock: z.number().int().nonnegative(),
   status: z.enum(STOCK_STATUSES),
+  /** quantity <= min_stock (incluye "Sin stock"). Lo calcula el backend */
+  below_min: z.boolean(),
 })
 
 export type StockRow = z.infer<typeof stockRowSchema>
@@ -43,14 +45,20 @@ export type StockRow = z.infer<typeof stockRowSchema>
 export const FILTER_ALL = "all"
 
 /** Solo viajan al backend los filtros que la persona realmente eligió */
-export function buildStockFilters(values: {
+export function buildStockFilters({
+  below_min,
+  ...values
+}: {
   status: string
   warehouse_id: string
   category_id: string
+  /** "Solo bajo mínimo": productos con stock <= mínimo, incluidos los que no tienen stock */
+  below_min?: boolean
 }): Record<string, string> {
   const filters: Record<string, string> = {}
   for (const [key, value] of Object.entries(values)) {
     if (value !== FILTER_ALL && value !== "") filters[key] = value
   }
+  if (below_min) filters.below_min = "true"
   return filters
 }

@@ -20,7 +20,14 @@ cp .env.example .env     # en CMD: copy .env.example .env
 npm run dev
 ```
 
-La app queda en `http://localhost:5173`. Para ver la pantalla de referencia: `/maintenance/customers`.
+La app queda en `http://localhost:5173` y pide iniciar sesión. Con datos simulados (`VITE_ENABLE_MOCKS=true`) usa:
+
+| Correo | Contraseña |
+|---|---|
+| `admin@enterprise.com` | `admin123` |
+| `almacen@enterprise.com` | `almacen123` (almacenero: solo Inventario y recepciones, para probar permisos y la página 403) |
+
+Son credenciales de prueba que solo existen en los mocks. La pantalla de referencia está en `/maintenance/customers`.
 
 ## Variables de entorno
 
@@ -53,7 +60,7 @@ Antes de abrir un PR deben pasar `npm test`, `npm run build` y `npm run lint`.
 | Pieza | Tecnología |
 |---|---|
 | Base | Vite 8, React 19, TypeScript 6.0 |
-| Rutas | React Router 8 (`RouterProvider` desde `react-router/dom`) |
+| Rutas | React Router 8 (`RouterProvider` desde `react-router`) |
 | Datos del servidor | TanStack Query 5 |
 | Estilos | Tailwind 4 + shadcn/ui (Radix) + fuente Inter |
 | Formularios | react-hook-form + Zod 4 (`@hookform/resolvers`) |
@@ -100,7 +107,7 @@ src/
     │   └── ui/       Primitivas de shadcn
     ├── hooks/
     ├── layouts/
-    ├── lib/          api/, money.ts, utilidades
+    ├── lib/          api/, money.ts, dates.ts (hora de Lima), tax.ts (IGV), utilidades
     ├── pages/
     └── types/
 ```
@@ -108,7 +115,8 @@ src/
 Reglas de módulos:
 
 - Carpetas y rutas en inglés; etiquetas visibles en español.
-- Un módulo **no importa archivos internos de otro**; solo su `index.ts`.
+- Un módulo **no importa archivos internos de otro**; solo su `index.ts` (`@/modules/<id>`).
+- El `index.ts` publica solo **tipos y hooks de consulta** (ej. `useCustomerOptions`, `useAuth`). Nunca componentes, pantallas, servicios ni lógica de formularios. Única excepción: `DocumentsPanel` de Documentos, para adjuntar archivos en los detalles de otros módulos.
 - Cada módulo se declara con `AppModule` en `modules/<id>/index.ts`. Una pantalla se conecta con `page: () => import('./pages/X')` (la pantalla usa `export default`).
 - Módulos: Dashboard, Ventas (`sales`), Compras (`purchases`), Inventario (`inventory`), Finanzas (`finance`), Documentos, Reportes, Mantenimiento (`maintenance`) y Administración.
 - Pagos y cobros viven en Finanzas; Ventas y Compras solo los muestran en lectura.
@@ -130,6 +138,8 @@ Todo módulo nuevo debe seguir la estructura de `src/modules/maintenance/custome
 
 - **IDs:** UUID como texto opaco. Nunca se convierten a número ni se asume su formato.
 - **Dinero:** texto decimal (`"5000.00"`). Para vistas previas se usa `src/shared/lib/money.ts` (centavos enteros). Los cálculos oficiales son del backend.
+- **IGV:** nunca se escribe `0.18` en una pantalla; se usa `src/shared/lib/tax.ts`.
+- **Fechas:** se muestran en hora de Lima con `src/shared/lib/dates.ts`; nunca se formatean a mano.
 - **Campos** en `snake_case`, igual que la API.
 - **Colores:** solo variables de `src/index.css`. Ningún componente escribe hex. Los estados se comunican con texto, no solo con color.
 - **Mensajes de error:** al usuario siempre le llega `getErrorMessage(error)`, nunca un error técnico.
@@ -138,8 +148,12 @@ Todo módulo nuevo debe seguir la estructura de `src/modules/maintenance/custome
 
 - Solo funcionan en desarrollo y con `VITE_ENABLE_MOCKS=true`.
 - Viven en memoria: al recargar, los datos vuelven a los iniciales.
-- Cada módulo registra sus handlers en `src/mocks/handlers.ts`, normalmente con `createCrudHandlers`.
-- Los datos semilla usan UUID fijos y legibles (`00000000-0000-4000-8000-000000000001`, ...) para que las pruebas sean predecibles.
+- Cada módulo registra sus handlers en `src/mocks/handlers.ts`, con dos fábricas que responden con el formato del contrato:
+  - `src/mocks/utils/crud.ts`: catálogos (paginación, filtros, rango de fechas, únicos, inmutables, registros en uso, reglas propias con `validate`).
+  - `src/mocks/utils/documents.ts`: documentos con estados (borrador editable y una ruta por acción: `/confirm`, `/cancel`...).
+- `src/mocks/refs.ts` tiene los datos semilla de Mantenimiento que usan los mocks de Ventas, Compras y Finanzas, para que todos hablen de los mismos clientes, proveedores y productos.
+- Los efectos entre módulos (una venta que descuenta stock, un cobro que cambia el estado del comprobante) los hace el backend: los mocks no los simulan.
+- Los datos semilla usan UUID fijos y legibles (`00000000-0000-4000-8000-000000000001`, ...) para que las pruebas sean predecibles. Cada recurso tiene su prefijo propio en el cuarto grupo (tabla en el manual de tareas, sección 4.1).
 
 ## Problemas conocidos del entorno de desarrollo
 
@@ -147,7 +161,8 @@ Todo módulo nuevo debe seguir la estructura de `src/modules/maintenance/custome
 2. **Brave:** el ahorro de memoria puede dormir la pestaña y provocar el problema anterior. Agrega `localhost` a "Mantener siempre activos estos sitios" en `brave://settings/system`.
 3. **Aviso `FetchEvent ... Failed to fetch` en la consola al recargar (F5).** Es ruido conocido: aparece en Brave y Edge, la pantalla carga bien y no existe con el backend real. Solo se investiga si la pantalla queda en blanco.
 4. **`crypto.randomUUID()` solo existe en contextos seguros.** `http://localhost:5173` lo es; abrir la app por IP de red local (`http://192.168.x.x:5173`) rompe la creación de registros simulados.
-5. **`npm audit` muestra 7 vulnerabilidades altas.** Vienen de la herramienta shadcn y solo afectan al desarrollo; `npm audit --omit=dev` debe dar 0. **Nunca** uses `npm audit fix --force`.
+5. **Sesión al recargar (F5).** El token vive solo en memoria; la sesión se recupera con `POST /auth/refresh` y la cookie HttpOnly del backend. En los mocks esa cookie se simula con una cookie normal (`erp_mock_refresh`): si borras las cookies del sitio, vuelve a iniciar sesión.
+6. **`npm audit` muestra 7 vulnerabilidades altas.** Vienen de la herramienta shadcn y solo afectan al desarrollo; `npm audit --omit=dev` debe dar 0. **Nunca** uses `npm audit fix --force`.
 
 ## Flujo de trabajo con Git
 

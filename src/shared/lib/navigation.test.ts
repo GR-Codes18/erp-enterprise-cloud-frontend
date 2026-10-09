@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { findActiveModule, getBreadcrumb } from "./navigation"
+import { filterModulesByPermission, findActiveModule, firstPath, getBreadcrumb } from "./navigation"
 import type { AppModule } from "@/shared/types/module"
 
 const dummyIcon = () => null
@@ -89,5 +89,62 @@ describe("getBreadcrumb", () => {
 
   it("devuelve undefined para rutas desconocidas", () => {
     expect(getBreadcrumb(mockModules, "/404")).toBeUndefined()
+  })
+})
+describe("filterModulesByPermission", () => {
+  const modules: AppModule[] = [
+    { id: "dashboard", label: "Dashboard", basePath: "dashboard", icon: dummyIcon, permission: "dashboard.summary:view" },
+    {
+      id: "inventory",
+      label: "Inventario",
+      basePath: "inventory",
+      icon: dummyIcon,
+      sections: [
+        {
+          items: [
+            { path: "stock", label: "Stock", permission: "inventory.stock:view" },
+            { path: "adjustments", label: "Ajustes", permission: "inventory.adjustments:view" },
+          ],
+        },
+      ],
+    },
+    {
+      id: "sales",
+      label: "Ventas",
+      basePath: "sales",
+      icon: dummyIcon,
+      sections: [{ items: [{ path: "quotes", label: "Cotizaciones", permission: "sales.quotes:view" }] }],
+    },
+  ]
+
+  const only = (...permissions: string[]) => (permission: string) => permissions.includes(permission)
+
+  it("deja solo las pantallas permitidas y quita los módulos vacíos", () => {
+    const visible = filterModulesByPermission(modules, only("inventory.stock:view"))
+    expect(visible.map((module) => module.id)).toEqual(["inventory"])
+    expect(visible[0].sections?.[0].items.map((item) => item.path)).toEqual(["stock"])
+  })
+
+  it("un módulo de pantalla única depende de su propio permiso", () => {
+    expect(filterModulesByPermission(modules, only("dashboard.summary:view")).map((m) => m.id)).toEqual([
+      "dashboard",
+    ])
+  })
+
+  it("con todos los permisos no quita nada", () => {
+    expect(filterModulesByPermission(modules, () => true)).toEqual(modules)
+  })
+
+  it("una pantalla sin permiso declarado la ve cualquiera con sesión", () => {
+    const open: AppModule[] = [{ id: "help", label: "Ayuda", basePath: "help", icon: dummyIcon }]
+    expect(filterModulesByPermission(open, () => false)).toEqual(open)
+  })
+})
+
+describe("firstPath", () => {
+  it("lleva a la primera pantalla del primer módulo visible", () => {
+    expect(firstPath(mockModules)).toBe("/dashboard")
+    expect(firstPath(mockModules.slice(1))).toBe("/sales/quotes")
+    expect(firstPath([])).toBeUndefined()
   })
 })

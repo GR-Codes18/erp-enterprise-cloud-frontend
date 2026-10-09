@@ -6,7 +6,7 @@ import type { Warehouse, WarehouseCreateInput, WarehouseUpdateInput } from "./sc
 export const warehouseKeys = {
   all: ["warehouses"] as const,
   list: (params: PageParams) => [...warehouseKeys.all, "list", params] as const,
-  options: () => [...warehouseKeys.all, "options"] as const,
+  options: (includeInactive: boolean) => [...warehouseKeys.all, "options", { includeInactive }] as const,
 }
 
 export function useWarehouses(params: PageParams) {
@@ -17,17 +17,33 @@ export function useWarehouses(params: PageParams) {
   })
 }
 
-/** Hook de opciones rápidas para selectores en otros módulos (Regla 0.5). */
-export function useWarehouseOptions() {
-  const params: PageParams = { page: 1, size: 100, filters: { status: "active" } }
+export interface WarehouseOption {
+  id: string
+  code: string
+  /** Si el almacén está inactivo, el nombre lo indica: "(inactivo)" */
+  name: string
+  status: Warehouse["status"]
+}
+
+/**
+ * Opciones de almacenes para selectores de otros módulos (regla 0.5).
+ * Por defecto solo activos; includeInactive es para filtros de vistas de solo lectura.
+ */
+export function useWarehouseOptions({ includeInactive = false }: { includeInactive?: boolean } = {}) {
+  const params: PageParams = {
+    page: 1,
+    size: 100,
+    filters: includeInactive ? {} : { status: "active" },
+  }
   return useQuery({
-    queryKey: warehouseKeys.options(),
+    queryKey: warehouseKeys.options(includeInactive),
     queryFn: ({ signal }) => warehouseService.list(params, signal),
-    select: (data) =>
+    select: (data): WarehouseOption[] =>
       data.items.map((w) => ({
         id: w.id,
         code: w.code,
-        name: w.name,
+        name: w.status === "active" ? w.name : `${w.name} (inactivo)`,
+        status: w.status,
       })),
   })
 }

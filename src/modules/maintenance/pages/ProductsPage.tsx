@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useHasPermission } from "@/modules/auth"
 import { Pencil, Plus, Trash2 } from "lucide-react"
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
 import { DataTable, type Column } from "@/shared/components/DataTable"
@@ -10,19 +11,26 @@ import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
+import { FilterSelect } from "@/shared/components/FilterSelect"
+import { FILTER_ALL, pickFilters } from "@/shared/lib/filters"
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
 import { useDeleteOrDeactivate } from "@/shared/hooks/useDeleteOrDeactivate"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import { formatMoney } from "@/shared/lib/money"
 import { ProductFormDialog } from "@/modules/maintenance/products/components/ProductFormDialog"
 import { useDeleteProduct, usePatchProduct, useProducts } from "@/modules/maintenance/products/hooks"
-import { STATUS_LABELS, type Product } from "@/modules/maintenance/products/schema"
+import { PRODUCT_STATUSES, STATUS_LABELS, type Product } from "@/modules/maintenance/products/schema"
 
 const PAGE_SIZE = 10
 
 export default function ProductsPage() {
   const [page, setPage] = useState(1)
+  // Regla 1: el frontend oculta lo que no se permite (el backend vuelve a validar)
+  const canCreate = useHasPermission("maintenance.products:create")
+  const canEdit = useHasPermission("maintenance.products:edit")
+  const canVoid = useHasPermission("maintenance.products:void")
   const [searchInput, setSearchInput] = useState("")
+  const [status, setStatus] = useState(FILTER_ALL)
   const search = useDebouncedValue(searchInput.trim(), 300)
 
   const [dialog, setDialog] = useState<{ open: boolean; product: Product | null }>({
@@ -32,12 +40,13 @@ export default function ProductsPage() {
   const [toDelete, setToDelete] = useState<Product | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const products = useProducts({ page, size: PAGE_SIZE, search })
+  const products = useProducts({ page, size: PAGE_SIZE, search, filters: pickFilters({ status }) })
   const deleteProduct = useDeleteProduct()
   const patchProduct = usePatchProduct()
 
   const {
     isInUseDialogOpen,
+    inUseMessage,
     setIsInUseDialogOpen,
     isDeleting,
     isDeactivating,
@@ -67,10 +76,10 @@ export default function ProductsPage() {
 
   const columns: Column<Product>[] = [
     {
-      key: "code",
-      header: "Código",
+      key: "sku",
+      header: "SKU",
       className: "w-32",
-      cell: (row) => <span className="font-mono text-sm font-medium">{row.code}</span>,
+      cell: (row) => <span className="font-mono text-sm font-medium">{row.sku}</span>,
     },
     {
       key: "name",
@@ -83,20 +92,30 @@ export default function ProductsPage() {
       cell: (row) => <span className="text-muted-foreground">{row.category_name || "—"}</span>,
     },
     {
-      key: "unit_price",
-      header: "Precio",
+      key: "sale_price",
+      header: "Precio de venta",
       className: "text-right",
-      cell: (row) => <span className="font-mono">{formatMoney(String(row.unit_price))}</span>,
+      cell: (row) => <span className="font-mono">{formatMoney(row.sale_price)}</span>,
     },
     {
-      key: "stock",
-      header: "Stock",
-      className: "text-right w-24",
-      cell: (row) => (
-        <span className={`font-mono ${row.stock === 0 ? "font-bold text-danger-text" : ""}`}>
-          {row.stock}
-        </span>
-      ),
+      key: "cost_price",
+      header: "Costo",
+      className: "text-right",
+      cell: (row) => <span className="font-mono text-muted-foreground">{formatMoney(row.cost_price)}</span>,
+    },
+    {
+      key: "stock_total",
+      header: "Stock total",
+      className: "text-right w-32",
+      // Lo calcula el backend (suma de almacenes). Sin stock se dice con texto, no solo con color
+      cell: (row) =>
+        row.stock_total === 0 ? (
+          <StatusBadge tone="danger" label="Sin stock" />
+        ) : (
+          <span className="font-mono">
+            {row.stock_total} {row.unit}
+          </span>
+        ),
     },
     {
       key: "status",
@@ -115,28 +134,32 @@ export default function ProductsPage() {
       className: "w-24",
       cell: (row) => (
         <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Editar ${row.name}`}
-            onClick={() => setDialog({ open: true, product: row })}
-          >
-            <Pencil aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Eliminar ${row.name}`}
-            onClick={() => setToDelete(row)}
-          >
-            <Trash2 aria-hidden="true" />
-          </Button>
+          {canEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Editar ${row.name}`}
+              onClick={() => setDialog({ open: true, product: row })}
+            >
+              <Pencil aria-hidden="true" />
+            </Button>
+          )}
+          {canVoid && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Eliminar ${row.name}`}
+              onClick={() => setToDelete(row)}
+            >
+              <Trash2 aria-hidden="true" />
+            </Button>
+          )}
         </div>
       ),
     },
   ]
 
-  const newProductButton = (
+  const newProductButton = canCreate && (
     <Button onClick={() => setDialog({ open: true, product: null })}>
       <Plus aria-hidden="true" />
       Nuevo producto
@@ -151,16 +174,28 @@ export default function ProductsPage() {
         actions={newProductButton}
       />
 
-      <div className="mb-4 max-w-sm">
-        <Input
-          type="search"
-          placeholder="Buscar por código o nombre..."
-          aria-label="Buscar productos"
-          value={searchInput}
-          onChange={(event) => {
-            setSearchInput(event.target.value)
+      <div className="mb-4 flex flex-wrap gap-3">
+        <div className="w-full max-w-sm">
+          <Input
+            type="search"
+            placeholder="Buscar por SKU o nombre..."
+            aria-label="Buscar productos"
+            value={searchInput}
+            onChange={(event) => {
+              setSearchInput(event.target.value)
+              setPage(1)
+            }}
+          />
+        </div>
+        <FilterSelect
+          label="Filtrar por estado"
+          value={status}
+          onChange={(value) => {
+            setStatus(value)
             setPage(1)
           }}
+          allLabel="Todos los estados"
+          options={PRODUCT_STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))}
         />
       </div>
 
@@ -183,10 +218,10 @@ export default function ProductsPage() {
             getRowKey={(row) => row.id}
             isLoading={products.isPending}
             empty={
-              search ? (
+              search || status !== FILTER_ALL ? (
                 <EmptyState
                   title="Sin resultados"
-                  description="Ningún producto coincide con tu búsqueda."
+                  description="Ningún producto coincide con tu búsqueda o filtro."
                 />
               ) : (
                 <EmptyState
@@ -228,6 +263,7 @@ export default function ProductsPage() {
       {/* Modal 2: Respuesta 409 Conflict (Producto en uso) -> Desactivar */}
       <InUseDialog
         open={isInUseDialogOpen}
+        message={inUseMessage}
         onOpenChange={setIsInUseDialogOpen}
         resourceName="Producto"
         isPending={isDeactivating}

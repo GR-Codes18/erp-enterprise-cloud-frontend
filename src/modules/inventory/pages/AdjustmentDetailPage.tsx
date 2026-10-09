@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Link, useNavigate, useParams } from "react-router"
-import { useAuth } from "@/modules/auth/useAuth"
+import { DocumentsPanel } from "@/modules/documents"
+import { useHasPermission } from "@/modules/auth"
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
 import { ErrorState } from "@/shared/components/ErrorState"
 import { PageHeader } from "@/shared/components/PageHeader"
@@ -18,13 +19,14 @@ import {
 export default function AdjustmentDetailPage() {
   const { id = "" } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
   const adjustment = useAdjustment(id)
   const apply = useApplyAdjustment()
   const remove = useDeleteAdjustment()
   const [confirmAction, setConfirmAction] = useState<"apply" | "delete" | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
-  const canApprove = !!user?.permissions.includes("*") || !!user?.permissions.includes("inventory.adjustments:approve")
+  const canApprove = useHasPermission("inventory.adjustments:approve")
+  const canAttach = useHasPermission("documents.files:create")
+  const canEdit = useHasPermission("inventory.adjustments:edit")
   const isPending = apply.isPending || remove.isPending
 
   if (adjustment.isPending) return <p role="status">Cargando ajuste…</p>
@@ -49,15 +51,19 @@ export default function AdjustmentDetailPage() {
     <>
       {document.status === "draft" && (
         <>
-          <Button variant="outline" asChild>
-            <Link to={`/inventory/adjustments/${document.id}/edit`}>Editar borrador</Link>
-          </Button>
+          {canEdit && (
+            <Button variant="outline" asChild>
+              <Link to={`/inventory/adjustments/${document.id}/edit`}>Editar borrador</Link>
+            </Button>
+          )}
           {canTransitionAdjustment(document.status, "applied") && canApprove && (
             <Button disabled={isPending} onClick={() => setConfirmAction("apply")}>Aplicar ajuste</Button>
           )}
-          <Button variant="ghost" disabled={isPending} onClick={() => setConfirmAction("delete")}>
-            Eliminar borrador
-          </Button>
+          {canEdit && (
+            <Button variant="ghost" disabled={isPending} onClick={() => setConfirmAction("delete")}>
+              Eliminar borrador
+            </Button>
+          )}
         </>
       )}
       <Button variant="outline" asChild>
@@ -69,7 +75,7 @@ export default function AdjustmentDetailPage() {
   return (
     <>
       <PageHeader
-        title="Detalle de ajuste"
+        title={`Ajuste ${document.number}`}
         description={`Registrado ${formatDateTimeLima(document.created_at)}`}
         actions={actions}
       />
@@ -117,12 +123,20 @@ export default function AdjustmentDetailPage() {
         </div>
       </section>
 
+      <div className="mt-6">
+        <DocumentsPanel
+          entity={{ type: "adjustment", id: document.id, label: `el ajuste ${document.number}` }}
+          canUpload={canAttach}
+        />
+      </div>
+
       <ConfirmDialog
         open={confirmAction === "apply"}
         onOpenChange={(open) => setConfirmAction(open ? "apply" : null)}
         title="Aplicar ajuste"
         description="Al aplicarlo, el ajuste será inmutable y el backend actualizará las existencias."
         confirmText="Aplicar ajuste"
+        confirmVariant="default"
         isLoading={isPending}
         onConfirm={runApply}
       />

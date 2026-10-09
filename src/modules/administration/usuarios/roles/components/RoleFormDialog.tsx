@@ -27,9 +27,11 @@ interface RoleFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   role: Role | null
+  /** Sin permiso de edición el rol se muestra en solo lectura */
+  readOnly?: boolean
 }
 
-function RoleForm({ role, onDone }: { role: Role | null; onDone: () => void }) {
+function RoleForm({ role, readOnly: forceReadOnly = false, onDone }: { role: Role | null; readOnly?: boolean; onDone: () => void }) {
   const createRole = useCreateRole()
   const updateRole = useUpdateRole()
   const isPending = createRole.isPending || updateRole.isPending
@@ -69,7 +71,7 @@ function RoleForm({ role, onDone }: { role: Role | null; onDone: () => void }) {
     }
   }
 
-  const readOnly = role?.is_system ?? false
+  const readOnly = forceReadOnly || (role?.is_system ?? false)
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="grid gap-4">
@@ -95,7 +97,7 @@ function RoleForm({ role, onDone }: { role: Role | null; onDone: () => void }) {
         />
       </Field>
 
-      <Field id="permissions" label="Permisos">
+      <Field id="permissions" label="Permisos" error={errors.permissions?.message}>
         {permissionCatalog.isPending ? (
           <p className="text-sm text-muted-foreground">Cargando catálogo de permisos...</p>
         ) : permissionCatalog.isError ? (
@@ -145,17 +147,19 @@ function RoleForm({ role, onDone }: { role: Role | null; onDone: () => void }) {
   )
 }
 
-export function RoleFormDialog({ open, onOpenChange, role }: RoleFormDialogProps) {
+export function RoleFormDialog({ open, onOpenChange, role, readOnly = false }: RoleFormDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            {role?.is_system ? "Ver rol" : role ? "Editar rol" : "Nuevo rol"}
+            {role?.is_system || readOnly ? "Ver rol" : role ? "Editar rol" : "Nuevo rol"}
           </DialogTitle>
           <DialogDescription>
             {role?.is_system
               ? "Los roles de sistema no se pueden modificar."
+              : readOnly
+                ? "No tienes permiso para modificar roles."
               : role
                 ? "Modifica los datos del rol."
                 : "Completa los datos del nuevo rol."}
@@ -164,6 +168,7 @@ export function RoleFormDialog({ open, onOpenChange, role }: RoleFormDialogProps
         <RoleForm
           key={role?.id ?? "new"}
           role={role}
+          readOnly={readOnly}
           onDone={() => onOpenChange(false)}
         />
       </DialogContent>

@@ -15,6 +15,10 @@ import { stockHandlers } from "@/modules/inventory/stock/mocks"
 import { kardexHandlers } from "@/modules/inventory/kardex/mocks"
 import { transferHandlers } from "@/modules/inventory/transfers/mocks"
 import { adjustmentHandlers } from "@/modules/inventory/adjustments/mocks"
+import { salesHandlers } from "@/modules/sales/mocks"
+import { purchaseHandlers } from "@/modules/purchases/mocks"
+import { financeHandlers } from "@/modules/finance/mocks"
+import { reportHandlers } from "@/modules/reports/mocks"
 
 /** Aquí se agregan los handlers de cada módulo (modules/<módulo>/.../mocks). */
 export const handlers: RequestHandler[] = [
@@ -34,4 +38,8 @@ export const handlers: RequestHandler[] = [
   ...kardexHandlers,
   ...transferHandlers,
   ...adjustmentHandlers,
+  ...salesHandlers,
+  ...purchaseHandlers,
+  ...financeHandlers,
+  ...reportHandlers,
 ]

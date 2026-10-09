@@ -11,8 +11,10 @@ export const STATUS_LABELS: Record<WarehouseStatus, string> = {
 const codeSchema = z
   .string()
   .trim()
+  .toUpperCase()
   .min(2, "Ingresa el código del almacén")
   .max(20, "Máximo 20 caracteres")
+  .regex(/^[A-Z0-9_-]+$/, "El código solo puede contener letras, números, guiones y guiones bajos")
 
 const nameSchema = z
   .string()
@@ -20,12 +22,8 @@ const nameSchema = z
   .min(2, "Ingresa el nombre del almacén")
   .max(80, "Máximo 80 caracteres")
 
-const addressSchema = z
-  .string()
-  .trim()
-  .max(150, "Máximo 150 caracteres")
-  .optional()
-  .or(z.literal(""))
+/** Opcional para el usuario, pero siempre texto: vacío es "", nunca null (regla 13) */
+const addressSchema = z.string().trim().max(150, "Máximo 150 caracteres")
 
 const statusSchema = z.enum(WAREHOUSE_STATUSES)
 
@@ -52,7 +50,7 @@ export const warehouseSchema = z.object({
   id: z.string(),
   code: codeSchema,
   name: nameSchema,
-  address: addressSchema.nullable().optional(),
+  address: addressSchema,
   status: statusSchema,
 })
 

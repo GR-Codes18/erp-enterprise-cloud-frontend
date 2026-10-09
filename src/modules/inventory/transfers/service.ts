@@ -15,6 +15,7 @@ export const transferService = {
     api.put<Transfer>(`${BASE}/${encodeURIComponent(id)}`, input),
   send: (id: string) => api.post<Transfer>(`${BASE}/${encodeURIComponent(id)}/send`, {}),
   receive: (id: string) => api.post<Transfer>(`${BASE}/${encodeURIComponent(id)}/receive`, {}),
-  cancel: (id: string) => api.post<Transfer>(`${BASE}/${encodeURIComponent(id)}/cancel`, {}),
+  cancel: (id: string, reason: string) =>
+    api.post<Transfer>(`${BASE}/${encodeURIComponent(id)}/cancel`, { reason }),
   remove: (id: string) => api.delete<void>(`${BASE}/${encodeURIComponent(id)}`),
 }

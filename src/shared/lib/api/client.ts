@@ -1,6 +1,6 @@
 import { env } from "@/config/env";
-import { ApiError } from "@/shared/lib/api/errors";
-import { getAccessToken, notifyUnauthorized } from "@/shared/lib/api/token";
+import { ApiError, UNKNOWN_ERROR } from "@/shared/lib/api/errors";
+import { getAccessToken, notifyUnauthorized, refreshAccessToken } from "@/shared/lib/api/token";
 import type { ApiErrorBody, FieldError } from "@/shared/lib/api/types";
 
 type QueryValue = string | number | boolean | null | undefined;
@@ -55,14 +55,19 @@ async function toApiError(response: Response): Promise<ApiError> {
     // El cuerpo no era JSON: se cae al error genérico
   }
 
-  return new ApiError(response.status, "UNKNOWN_ERROR", "HTTP " + response.status);
+  return new ApiError(response.status, UNKNOWN_ERROR, "HTTP " + response.status);
 }
+
+/** Las rutas de sesión no disparan el refresh: un 401 ahí es la respuesta final */
+const isAuthPath = (path: string) => path.startsWith("/auth/");
 
 async function request<T>(
   method: string,
   path: string,
-  { query, body, signal }: RequestOptions = {},
+  options: RequestOptions = {},
+  isRetry = false,
 ): Promise<T> {
+  const { query, body, signal } = options;
   const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
@@ -78,13 +83,20 @@ async function request<T>(
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       signal,
+      // Envía la cookie HttpOnly del refresh token (el backend debe permitir credenciales en CORS)
+      credentials: "include",
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
     throw new ApiError(0, "NETWORK_ERROR", "Network request failed");
   }
 
-  if (response.status === 401 && path !== "/auth/login") {
+  // Token vencido: se renueva una vez con la cookie de refresh y se repite la petición.
+  // Si no se puede renovar, la sesión terminó.
+  if (response.status === 401 && !isAuthPath(path)) {
+    if (!isRetry && (await refreshAccessToken())) {
+      return request<T>(method, path, options, true);
+    }
     notifyUnauthorized();
   }
 

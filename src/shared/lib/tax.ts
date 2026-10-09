@@ -30,3 +30,8 @@ export function calculateTotals(subtotalCents: number): IgvTotals {
   const igvCents = calculateIgv(subtotalCents)
   return { subtotalCents, igvCents, totalCents: subtotalCents + igvCents }
 }
+/** Base imponible de un total con IGV (redondeo half-up, aritmética entera): 11800 -> 10000 */
+export function baseFromTotal(totalCents: number): number {
+  assertCents(totalCents)
+  return Math.floor((totalCents * 100 * 2 + (100 + IGV_PERCENT)) / (2 * (100 + IGV_PERCENT)))
+}

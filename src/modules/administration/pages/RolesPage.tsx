@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useHasPermission } from "@/modules/auth"
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react"
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
 import { DataTable, type Column } from "@/shared/components/DataTable"
@@ -19,6 +20,9 @@ const PAGE_SIZE = 10
 
 export default function RolesPage() {
   const [page, setPage] = useState(1)
+  const canCreate = useHasPermission("administration.roles:create")
+  const canEdit = useHasPermission("administration.roles:edit")
+  const canVoid = useHasPermission("administration.roles:void")
   const [searchInput, setSearchInput] = useState("")
   const search = useDebouncedValue(searchInput.trim(), 300)
 
@@ -71,26 +75,17 @@ export default function RolesPage() {
       key: "actions",
       header: "Acciones",
       className: "w-24",
-      cell: (row) =>
-        row.is_system ? (
+      cell: (row) => (
+        <div className="flex gap-1">
           <Button
             variant="ghost"
             size="icon"
-            aria-label={`Ver ${row.name}`}
+            aria-label={`${row.is_system || !canEdit ? "Ver" : "Editar"} ${row.name}`}
             onClick={() => setDialog({ open: true, role: row })}
           >
-            <Eye aria-hidden="true" />
+            {row.is_system || !canEdit ? <Eye aria-hidden="true" /> : <Pencil aria-hidden="true" />}
           </Button>
-        ) : (
-          <div className="flex gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`Editar ${row.name}`}
-              onClick={() => setDialog({ open: true, role: row })}
-            >
-              <Pencil aria-hidden="true" />
-            </Button>
+          {canVoid && !row.is_system && (
             <Button
               variant="ghost"
               size="icon"
@@ -99,12 +94,13 @@ export default function RolesPage() {
             >
               <Trash2 aria-hidden="true" />
             </Button>
-          </div>
-        ),
+          )}
+        </div>
+      ),
     },
   ]
 
-  const newRoleButton = (
+  const newRoleButton = canCreate && (
     <Button onClick={() => setDialog({ open: true, role: null })}>
       <Plus aria-hidden="true" />
       Nuevo rol
@@ -172,6 +168,7 @@ export default function RolesPage() {
       <RoleFormDialog
         open={dialog.open}
         role={dialog.role}
+        readOnly={dialog.role !== null && !canEdit}
         onOpenChange={(open) => setDialog((current) => ({ ...current, open }))}
       />
 

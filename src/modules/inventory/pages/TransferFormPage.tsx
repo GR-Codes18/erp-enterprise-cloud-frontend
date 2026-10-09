@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select"
 import { getErrorMessage } from "@/shared/lib/api/errors"
+import { activeOrSelected, withDocumentProducts } from "@/shared/lib/options"
 import { useStockAvailability } from "../stock/hooks"
 import { InventoryLineItems } from "../components/InventoryLineItems"
 import { useCreateTransfer, useTransfer, useUpdateTransfer } from "../transfers/hooks"
@@ -36,8 +37,11 @@ function TransferForm({ transfer }: { transfer?: NonNullable<ReturnType<typeof u
   const navigate = useNavigate()
   const createTransfer = useCreateTransfer()
   const updateTransfer = useUpdateTransfer()
+  // Regla 4: un borrador antiguo sigue mostrando el producto o almacén que hoy está inactivo
   const products = useProductOptions()
-  const warehouses = useWarehouseOptions()
+  const warehouses = useWarehouseOptions({ includeInactive: true })
+  const productOptions = withDocumentProducts(products.data ?? [], transfer?.items ?? [])
+  const warehouseOptions = activeOrSelected(warehouses.data ?? [], transfer ? [transfer.origin_warehouse_id, transfer.destination_warehouse_id] : [])
   const [serverError, setServerError] = useState<string | null>(null)
 
   const {
@@ -129,7 +133,7 @@ function TransferForm({ transfer }: { transfer?: NonNullable<ReturnType<typeof u
                 <SelectValue placeholder="Selecciona el origen" />
               </SelectTrigger>
               <SelectContent>
-                {(warehouses.data ?? []).map((warehouse) => (
+                {warehouseOptions.map((warehouse) => (
                   <SelectItem key={warehouse.id} value={warehouse.id}>{warehouse.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -149,7 +153,7 @@ function TransferForm({ transfer }: { transfer?: NonNullable<ReturnType<typeof u
                 <SelectValue placeholder="Selecciona el destino" />
               </SelectTrigger>
               <SelectContent>
-                {(warehouses.data ?? []).map((warehouse) => (
+                {warehouseOptions.map((warehouse) => (
                   <SelectItem key={warehouse.id} value={warehouse.id}>{warehouse.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -159,8 +163,10 @@ function TransferForm({ transfer }: { transfer?: NonNullable<ReturnType<typeof u
 
         <InventoryLineItems
           lines={items}
-          products={products.data ?? []}
+          products={productOptions}
           availability={availability.quantities}
+          availabilityFailed={availability.failed}
+          warehouseSelected={originId !== ""}
           mode="transfer"
           itemErrors={itemErrors}
           listError={itemListError}

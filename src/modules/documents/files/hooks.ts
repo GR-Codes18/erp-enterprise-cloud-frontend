@@ -29,7 +29,7 @@ export function useUploadDocument() {
   return useMutation({
     mutationFn: async ({ input, file }: { input: DocumentInput; file: File }) => {
       const ticket = await documentService.requestUpload(input)
-      await documentService.uploadToStorage(ticket.upload_url, file)
+      await documentService.uploadToStorage(ticket.upload_url, file, input.mime_type)
       return documentService.confirmUpload(ticket.id)
     },
     onSuccess: invalidate,

@@ -1,119 +1,113 @@
 import { describe, expect, it } from "vitest"
 import {
   EMPTY_PRODUCT,
+  isSoldBelowCost,
   productCreateSchema,
   productUpdateSchema,
+  toProductUpdateInput,
+  type Product,
 } from "./schema"
 
+const valid = {
+  ...EMPTY_PRODUCT,
+  sku: "PROD-100",
+  name: "Martillo de Peña 16oz",
+  category_id: "00000000-0000-4000-8002-000000000001",
+  unit: "UND" as const,
+  sale_price: "45.50",
+  cost_price: "30.00",
+  min_stock: 10,
+}
+
+const invalidFields = (input: unknown) => {
+  const result = productCreateSchema.safeParse(input)
+  return result.success ? [] : result.error.issues.map((issue) => issue.path[0])
+}
+
 describe("productCreateSchema", () => {
-  it("valida la creación de un producto correcto (sin stock)", () => {
-    const validProduct = {
-      ...EMPTY_PRODUCT,
-      code: "PROD-001",
-      name: "Martillo de Peña 16oz",
-      category_id: "00000000-0000-4000-8002-000000000001",
-      unit_price: 45.5,
-      status: "active" as const,
-    }
-
-    const result = productCreateSchema.safeParse(validProduct)
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.code).toBe("PROD-001")
-    }
+  it("acepta un producto válido", () => {
+    expect(productCreateSchema.safeParse(valid).success).toBe(true)
   })
 
-  it("normaliza el código convirtiéndolo a mayúsculas y eliminando espacios", () => {
-    const product = {
-      ...EMPTY_PRODUCT,
-      code: "  prod-002  ",
-      name: "Sierra de Mano",
-      category_id: "00000000-0000-4000-8002-000000000001",
-      unit_price: 25.0,
-    }
-
-    const result = productCreateSchema.safeParse(product)
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.code).toBe("PROD-002")
-    }
+  it("normaliza el SKU: sin espacios y en mayúsculas", () => {
+    expect(productCreateSchema.parse({ ...valid, sku: "  prod-100 " }).sku).toBe("PROD-100")
   })
 
-  it("rechaza un código demasiado corto o con caracteres inválidos", () => {
-    const invalidCode = {
-      ...EMPTY_PRODUCT,
-      code: "A",
-      name: "Martillo",
-      category_id: "cat-1",
-    }
-    expect(productCreateSchema.safeParse(invalidCode).success).toBe(false)
-
-    const invalidChar = {
-      ...EMPTY_PRODUCT,
-      code: "PROD #001",
-      name: "Martillo",
-      category_id: "cat-1",
-    }
-    expect(productCreateSchema.safeParse(invalidChar).success).toBe(false)
+  it("rechaza un SKU vacío, con espacios o caracteres no permitidos", () => {
+    expect(invalidFields({ ...valid, sku: "" })).toContain("sku")
+    expect(invalidFields({ ...valid, sku: "PROD 100" })).toContain("sku")
+    expect(invalidFields({ ...valid, sku: "PROD#100" })).toContain("sku")
   })
 
-  it("valida límites de precio (0, 0.1, 0.10 son válidos; negativo y >2 decimales son rechazados)", () => {
-    const base = {
-      ...EMPTY_PRODUCT,
-      code: "PROD-001",
-      name: "Martillo",
-      category_id: "cat-1",
-    }
-
-    expect(productCreateSchema.safeParse({ ...base, unit_price: 0 }).success).toBe(true)
-    expect(productCreateSchema.safeParse({ ...base, unit_price: 0.1 }).success).toBe(true)
-    expect(productCreateSchema.safeParse({ ...base, unit_price: 0.10 }).success).toBe(true)
-    expect(productCreateSchema.safeParse({ ...base, unit_price: 123.45 }).success).toBe(true)
-
-    // Rechaza precio negativo
-    expect(productCreateSchema.safeParse({ ...base, unit_price: -10 }).success).toBe(false)
-
-    // Rechaza más de 2 decimales
-    expect(productCreateSchema.safeParse({ ...base, unit_price: 123.456 }).success).toBe(false)
+  it("exige nombre, categoría y una unidad conocida", () => {
+    expect(invalidFields({ ...valid, name: "A" })).toContain("name")
+    expect(invalidFields({ ...valid, category_id: "" })).toContain("category_id")
+    expect(invalidFields({ ...valid, unit: "TONELADA" })).toContain("unit")
   })
 
-  it("rechaza si no se selecciona una categoría", () => {
-    const invalidProduct = {
-      ...EMPTY_PRODUCT,
-      code: "PROD-001",
-      name: "Martillo de Peña",
-      category_id: "",
+  it("los precios son texto decimal >= 0 con máximo 2 decimales", () => {
+    for (const price of ["0", "0.00", "45", "45.5", "45.50"]) {
+      expect(invalidFields({ ...valid, sale_price: price, cost_price: price })).toEqual([])
     }
+    expect(invalidFields({ ...valid, sale_price: "" })).toContain("sale_price")
+    expect(invalidFields({ ...valid, sale_price: "-1.00" })).toContain("sale_price")
+    expect(invalidFields({ ...valid, cost_price: "10.999" })).toContain("cost_price")
+    expect(invalidFields({ ...valid, cost_price: "10,50" })).toContain("cost_price")
+  })
 
-    expect(productCreateSchema.safeParse(invalidProduct).success).toBe(false)
+  it("el stock mínimo es un entero >= 0", () => {
+    expect(invalidFields({ ...valid, min_stock: 0 })).toEqual([])
+    expect(invalidFields({ ...valid, min_stock: -1 })).toContain("min_stock")
+    expect(invalidFields({ ...valid, min_stock: 2.5 })).toContain("min_stock")
+    expect(invalidFields({ ...valid, min_stock: Number.NaN })).toContain("min_stock")
+  })
+
+  it("permite vender por debajo del costo (solo se advierte)", () => {
+    expect(productCreateSchema.safeParse({ ...valid, sale_price: "20.00", cost_price: "30.00" }).success).toBe(true)
   })
 })
 
 describe("productUpdateSchema", () => {
-  it("valida la actualización de un producto sin código ni stock", () => {
-    const updateData = {
-      name: "Martillo de Peña 20oz Actualizado",
-      category_id: "00000000-0000-4000-8002-000000000002",
-      unit_price: 52.0,
-      status: "active" as const,
-    }
+  it("no incluye el SKU: es inmutable", () => {
+    const parsed = productUpdateSchema.parse({ ...valid, sku: "OTRO" })
+    expect("sku" in parsed).toBe(false)
+  })
+})
 
-    expect(productUpdateSchema.safeParse(updateData).success).toBe(true)
+describe("isSoldBelowCost", () => {
+  it("advierte solo cuando la venta es menor que el costo", () => {
+    expect(isSoldBelowCost("20.00", "30.00")).toBe(true)
+    expect(isSoldBelowCost("30.00", "30.00")).toBe(false)
+    expect(isSoldBelowCost("45.50", "30")).toBe(false)
   })
 
-  it("ignora el código si se envía en la actualización (no forma parte del schema de update)", () => {
-    const updateDataWithCode = {
-      code: "PROD-CAMBIADO",
-      name: "Martillo de Peña",
-      category_id: "cat-1",
-      unit_price: 45.0,
-      status: "active" as const,
-    }
+  it("compara en centavos, sin errores de coma flotante", () => {
+    expect(isSoldBelowCost("0.29", "0.3")).toBe(true)
+  })
 
-    const result = productUpdateSchema.safeParse(updateDataWithCode)
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data).not.toHaveProperty("code")
+  it("con montos incompletos o inválidos no advierte", () => {
+    expect(isSoldBelowCost("", "30.00")).toBe(false)
+    expect(isSoldBelowCost("abc", "30.00")).toBe(false)
+  })
+})
+
+describe("toProductUpdateInput", () => {
+  it("toma solo los campos editables del producto", () => {
+    const product: Product = {
+      ...valid,
+      id: "00000000-0000-4000-8004-000000000001",
+      sku: "PROD-001",
+      category_name: "Herramientas Manuales",
+      stock_total: 25,
     }
+    expect(toProductUpdateInput(product)).toEqual({
+      name: valid.name,
+      category_id: valid.category_id,
+      unit: "UND",
+      sale_price: "45.50",
+      cost_price: "30.00",
+      min_stock: 10,
+      status: "active",
+    })
   })
 })

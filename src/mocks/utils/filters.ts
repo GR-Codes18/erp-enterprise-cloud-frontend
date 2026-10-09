@@ -1,3 +1,5 @@
+import { limaDayOf } from "@/shared/lib/dates"
+
 export interface ListFilterOptions<T> {
   /** Campos de texto donde busca ?search= */
   searchFields: (keyof T)[]
@@ -58,8 +60,8 @@ export function applyListFilters<T>(
 
   if (dateField && (from || to)) {
     result = result.filter((item) => {
-      // Se compara el texto AAAA-MM-DD: las fechas ISO ordenan igual como texto
-      const day = String(item[dateField]).slice(0, 10)
+      // El día se toma en hora de Lima (contrato) y se compara como texto AAAA-MM-DD
+      const day = limaDayOf(String(item[dateField]))
       return (!from || day >= from) && (!to || day <= to)
     })
   }

@@ -11,7 +11,7 @@ import {
 const valid = {
   id: "00000000-0000-4000-8030-000000000001",
   product_id: "00000000-0000-4000-8004-000000000003",
-  product_code: "PROD-003",
+  product_sku: "PROD-003",
   product_name: "Cemento Portland Tipo I 42.5kg",
   category_id: "00000000-0000-4000-8002-000000000002",
   category_name: "Materiales de Construcción",
@@ -21,6 +21,7 @@ const valid = {
   quantity: 100,
   min_stock: 60,
   status: "normal",
+  below_min: false,
 }
 
 describe("stockRowSchema", () => {
@@ -82,5 +83,17 @@ describe("buildStockFilters", () => {
       warehouse_id: "abc",
       category_id: "xyz",
     })
+  })
+
+  it('"solo bajo mínimo" viaja como below_min=true y desmarcado no se envía', () => {
+    expect(buildStockFilters({ ...all, below_min: true })).toEqual({ below_min: "true" })
+    expect(buildStockFilters({ ...all, below_min: false })).toEqual({})
+  })
+})
+
+describe("below_min", () => {
+  it("es obligatorio en cada fila (lo calcula el backend)", () => {
+    const withoutBelowMin = { ...valid, below_min: undefined }
+    expect(stockRowSchema.safeParse(withoutBelowMin).success).toBe(false)
   })
 })

@@ -75,3 +75,30 @@ export function todayInLima(now: Date = new Date()): string {
   const p = getLimaParts(now)
   return `${p.year}-${p.month}-${p.day}`
 }
+/**
+ * Día de calendario en Lima ("YYYY-MM-DD") de una fecha o fecha-hora.
+ * Es como se interpretan los filtros date_from / date_to sobre campos fecha-hora:
+ * "2026-10-08T03:00:00Z" es todavía el 7 de octubre en Lima.
+ */
+export function limaDayOf(value: string): string {
+  if (DATE_ONLY_RE.test(value)) return value
+  if (!DATE_TIME_RE.test(value)) return value.slice(0, 10)
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10)
+  return todayInLima(date)
+}
+
+/** ¿Es una fecha de negocio válida "YYYY-MM-DD" (existe en el calendario)? */
+export function isBusinessDate(value: string): boolean {
+  const match = DATE_ONLY_RE.exec(value)
+  if (!match) return false
+  return isRealCalendarDate(Number(match[1]), Number(match[2]), Number(match[3]))
+}
+
+/** Suma días a una fecha de negocio: ("2026-10-28", 7) -> "2026-11-04". Sin zona horaria */
+export function addDays(value: string, days: number): string {
+  const match = DATE_ONLY_RE.exec(value)
+  if (!match) return value
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + days))
+  return date.toISOString().slice(0, 10)
+}

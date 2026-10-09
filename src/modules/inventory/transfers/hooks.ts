@@ -60,7 +60,10 @@ export function useReceiveTransfer() {
 
 export function useCancelTransfer() {
   const invalidate = useInvalidateTransfers()
-  return useMutation({ mutationFn: (id: string) => transferService.cancel(id), onSuccess: invalidate })
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => transferService.cancel(id, reason),
+    onSuccess: invalidate,
+  })
 }
 
 export function useDeleteTransfer() {

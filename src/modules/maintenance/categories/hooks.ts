@@ -6,7 +6,8 @@ import type { Category, CategoryInput } from "./schema"
 export const categoryKeys = {
   all: ["categories"] as const,
   list: (params: PageParams) => [...categoryKeys.all, "list", params] as const,
-  options: (includeId?: string) => [...categoryKeys.all, "options", includeId] as const,
+  options: (includeId?: string, includeInactive = false) =>
+    [...categoryKeys.all, "options", { includeId, includeInactive }] as const,
 }
 
 export function useCategories(params: PageParams) {
@@ -18,15 +19,24 @@ export function useCategories(params: PageParams) {
 }
 
 interface UseCategoryOptionsProps {
+  /** Categoría inactiva que igual debe aparecer (la del producto que se edita) */
   includeId?: string
+  /** Todas, activas o no: para filtros de vistas de solo lectura */
+  includeInactive?: boolean
+}
+
+export interface CategoryOption {
+  id: string
+  name: string
+  status: Category["status"]
 }
 
 /** Hook de consulta rápida de opciones para selectores en otros módulos (Regla 0.5 + D5). */
-export function useCategoryOptions({ includeId }: UseCategoryOptionsProps = {}) {
+export function useCategoryOptions({ includeId, includeInactive = false }: UseCategoryOptionsProps = {}) {
   const params: PageParams = { page: 1, size: 100 }
 
   return useQuery({
-    queryKey: categoryKeys.options(includeId),
+    queryKey: categoryKeys.options(includeId, includeInactive),
     queryFn: async ({ signal }) => {
       const data = await categoryService.list(params, signal)
       let items = data.items
@@ -44,8 +54,8 @@ export function useCategoryOptions({ includeId }: UseCategoryOptionsProps = {}) 
       }
 
       return items
-        .filter((c) => c.status === "active" || c.id === includeId)
-        .map((c) => ({
+        .filter((c) => includeInactive || c.status === "active" || c.id === includeId)
+        .map((c): CategoryOption => ({
           id: c.id,
           name: c.status === "active" ? c.name : `${c.name} (inactiva)`,
           status: c.status,

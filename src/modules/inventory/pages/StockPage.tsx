@@ -37,15 +37,17 @@ export default function StockPage() {
   const [status, setStatus] = useState(FILTER_ALL)
   const [warehouseId, setWarehouseId] = useState(FILTER_ALL)
   const [categoryId, setCategoryId] = useState(FILTER_ALL)
+  const [belowMin, setBelowMin] = useState(false)
 
-  // Opciones publicadas por Mantenimiento (regla 0.5)
-  const warehouses = useWarehouseOptions()
-  const categories = useCategoryOptions()
+  // Opciones publicadas por Mantenimiento (regla 0.5). Es una consulta: también inactivos
+  const warehouses = useWarehouseOptions({ includeInactive: true })
+  const categories = useCategoryOptions({ includeInactive: true })
 
   const filters = buildStockFilters({
     status,
     warehouse_id: warehouseId,
     category_id: categoryId,
+    below_min: belowMin,
   })
   const params: PageParams = { page, size: PAGE_SIZE, search, filters }
   const stock = useStock(params)
@@ -63,11 +65,12 @@ export default function StockPage() {
     setStatus(FILTER_ALL)
     setWarehouseId(FILTER_ALL)
     setCategoryId(FILTER_ALL)
+    setBelowMin(false)
     setPage(1)
   }
 
   const columns: Column<StockRow>[] = [
-    { key: "code", header: "Código", cell: (row) => row.product_code },
+    { key: "sku", header: "SKU", cell: (row) => row.product_sku },
     { key: "product", header: "Producto", cell: (row) => <span className="font-medium">{row.product_name}</span> },
     { key: "category", header: "Categoría", cell: (row) => row.category_name },
     { key: "warehouse", header: "Almacén", cell: (row) => row.warehouse_name },
@@ -96,7 +99,7 @@ export default function StockPage() {
         <div className="w-full max-w-sm">
           <Input
             type="search"
-            placeholder="Buscar por producto o código"
+            placeholder="Buscar por producto o SKU"
             aria-label="Buscar en el stock"
             value={searchInput}
             onChange={(event) => withReset(setSearchInput)(event.target.value)}
@@ -144,6 +147,19 @@ export default function StockPage() {
             ))}
           </SelectContent>
         </Select>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="size-4 accent-primary"
+            checked={belowMin}
+            onChange={(event) => {
+              setBelowMin(event.target.checked)
+              setPage(1)
+            }}
+          />
+          Solo bajo mínimo
+        </label>
 
         {hasFilters && (
           <Button variant="outline" onClick={clearFilters}>

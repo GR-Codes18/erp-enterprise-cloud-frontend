@@ -32,10 +32,15 @@ export function useStockAvailability(warehouseId: string, productIds: string[]) 
   })
 
   return {
+    // Solo productos ya consultados: lo que aún carga queda fuera (undefined), no como 0
     quantities: Object.fromEntries(
-      queries.map((query, index) => [uniqueProducts[index], query.data?.items[0]?.quantity ?? 0]),
+      queries.flatMap((query, index) =>
+        query.isSuccess ? [[uniqueProducts[index], query.data.items[0]?.quantity ?? 0]] : [],
+      ),
     ) as Record<string, number>,
     isPending: warehouseId !== "" && queries.some((query) => query.isPending),
+    /** Productos cuya consulta falló: la línea dice "no se pudo consultar" en vez de "cargando…" */
+    failed: uniqueProducts.filter((_, index) => queries[index]?.isError),
     error: queries.find((query) => query.isError)?.error,
   }
 }

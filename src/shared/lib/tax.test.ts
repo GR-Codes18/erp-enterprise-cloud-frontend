@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { IGV_PERCENT, calculateIgv, calculateTotals } from './tax'
+import { IGV_PERCENT, baseFromTotal, calculateIgv, calculateTotals } from './tax'
 
 describe('IGV_PERCENT', () => {
   it('es 18', () => {
@@ -32,5 +32,17 @@ describe('calculateTotals', () => {
       igvCents: 1800,
       totalCents: 11800,
     })
+  })
+})
+describe('baseFromTotal', () => {
+  it('quita el IGV de un total', () => {
+    expect(baseFromTotal(11800)).toBe(10000)
+    expect(baseFromTotal(121894)).toBe(103300)
+  })
+
+  it('es la inversa de calculateTotals con redondeo half-up', () => {
+    for (const base of [1, 99, 12345, 100000]) {
+      expect(baseFromTotal(calculateTotals(base).totalCents)).toBe(base)
+    }
   })
 })

@@ -1,4 +1,4 @@
-import { createCrudHandlers } from "@/mocks/createCrudHandlers"
+import { createCrudHandlers } from "@/mocks/utils/crud"
 import type { Warehouse, WarehouseStatus } from "./schema"
 
 /** UUID fijos con prefijo 8003: 00000000-0000-4000-8003-000000000001, ...002, etc. */
@@ -38,8 +38,10 @@ const seed: Warehouse[] = [
 const IN_USE_IDS = [uuid(1), uuid(2)]
 
 export const warehouseHandlers = createCrudHandlers<Warehouse>({
-  endpoint: "*/warehouses",
-  items: seed,
+  resource: "warehouses",
+  seed,
+  // Un registro nuevo aparece primero en el listado
+  insertAt: "start",
   searchFields: ["code", "name"],
   filterFields: ["status"],
   uniqueFields: [
@@ -50,17 +52,16 @@ export const warehouseHandlers = createCrudHandlers<Warehouse>({
     },
   ],
   immutableFields: ["code"],
-  inUseIds: IN_USE_IDS,
+  isInUse: (item) => IN_USE_IDS.includes(item.id),
   inUseMessage:
     "Este almacén tiene existencias o movimientos registrados y no se puede eliminar. Puedes desactivarlo para evitar nuevos movimientos.",
-  onBeforeCreate: (body: Record<string, unknown>, currentItems: Warehouse[]) => ({
-    id: uuid(currentItems.length + 1),
+  prepareCreate: (body) => ({
     code: String(body.code ?? "").trim().toUpperCase(),
     name: String(body.name ?? "").trim(),
     address: String(body.address ?? "").trim(),
     status: (body.status as WarehouseStatus) || "active",
   }),
-  onBeforeUpdate: (_current: Warehouse, body: Record<string, unknown>) => ({
+  prepareUpdate: (_current, body) => ({
     name: String(body.name ?? "").trim(),
     address: String(body.address ?? "").trim(),
   }),

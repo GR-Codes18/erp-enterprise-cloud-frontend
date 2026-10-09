@@ -6,4 +6,6 @@ export const dashboardModule: AppModule = {
   label: "Dashboard",
   icon: LayoutDashboard,
   basePath: "dashboard",
+  permission: "dashboard.summary:view",
+  page: () => import("./pages/DashboardPage"),
 }

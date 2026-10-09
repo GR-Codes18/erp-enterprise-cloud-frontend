@@ -1,4 +1,6 @@
-import { http, HttpResponse } from "msw"
+import { delay, http, HttpResponse } from "msw"
+import { applyListFilters } from "@/mocks/utils/filters"
+import { reasonSchema } from "@/shared/lib/reasonSchema"
 import { documentInputSchema, type DocumentRecord } from "./schema"
 
 /** UUID fijos con el prefijo de documentos (8020) */
@@ -6,8 +8,8 @@ const uuid = (n: number) => `00000000-0000-4000-8020-${String(n).padStart(12, "0
 /** Referencias de ejemplo a registros de otros módulos (aún no existen en sus mocks) */
 const ref = (n: number) => `00000000-0000-4000-8099-${String(n).padStart(12, "0")}`
 
-// Mismo usuario que "Administrador General" en los mocks de Usuarios (se copia el valor, no se importa)
-const ADMIN = { id: "00000000-0000-4000-8010-000000000001", name: "Administrador General" }
+// Mismo usuario que "Gabriel Romero" (usuario 1) en los mocks de Usuarios (se copia el valor, no se importa)
+const ADMIN = { id: "00000000-0000-4000-8010-000000000001", name: "Gabriel Romero" }
 const PEDRO = { id: "00000000-0000-4000-8010-000000000008", name: "Pedro Campos Rivas" }
 const FIORELLA = { id: "00000000-0000-4000-8010-000000000012", name: "Fiorella Gómez Ríos" }
 const CARLA = { id: "00000000-0000-4000-8010-000000000005", name: "Carla Mendoza Ruiz" }
@@ -70,27 +72,28 @@ const errorResponse = (status: number, code: string, message: string) =>
 
 const notFound = () => errorResponse(404, "NOT_FOUND", "No se encontró el documento.")
 
+/** Cuerpo JSON de la petición; uno inválido se trata como vacío y lo rechaza la validación (422) */
+async function readJson(request: Request): Promise<unknown> {
+  try {
+    return await request.json()
+  } catch {
+    return {}
+  }
+}
+
 export const documentHandlers = [
   // Listado con búsqueda, filtros exactos, rango de fechas y paginación (formato del contrato)
-  http.get("*/documents", ({ request }) => {
+  http.get("*/documents", async ({ request }) => {
+    await delay(300)
     const params = new URL(request.url).searchParams
-    const search = (params.get("search") ?? "").trim().toLowerCase()
-    const dateFrom = params.get("date_from")
-    const dateTo = params.get("date_to")
-
-    let items = store.filter((item) => {
-      if (search && !item.name.toLowerCase().includes(search)) return false
-      for (const field of ["category", "entity_type", "entity_id"] as const) {
-        const value = params.get(field)
-        if (value && item[field] !== value) return false
-      }
-      // Compara contra la fecha UTC: un archivo subido cerca de la medianoche de Lima puede caer en el día siguiente
-      const day = item.uploaded_at.slice(0, 10)
-      if (dateFrom && day < dateFrom) return false
-      if (dateTo && day > dateTo) return false
-      return true
+    // Búsqueda, filtros exactos y rango de fechas como el resto de mocks (día en hora de Lima; 400/422)
+    const result = applyListFilters(store, params, {
+      searchFields: ["name"],
+      filterFields: ["category", "entity_type", "entity_id"],
+      dateField: "uploaded_at",
     })
-    items = [...items].sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at))
+    if (!result.ok) return errorResponse(result.status, result.code, result.message)
+    const items = [...result.items].sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at))
 
     const page = Math.max(1, Number.parseInt(params.get("page") ?? "1", 10) || 1)
     const size = Math.min(100, Math.max(1, Number.parseInt(params.get("size") ?? "20", 10) || 20))
@@ -106,7 +109,7 @@ export const documentHandlers = [
 
   // Paso 1: metadatos. El documento queda pendiente (no se lista) hasta confirmar la subida
   http.post("*/documents", async ({ request }) => {
-    const parsed = documentInputSchema.safeParse(await request.json())
+    const parsed = documentInputSchema.safeParse(await readJson(request))
     if (!parsed.success) {
       return HttpResponse.json(
         {
@@ -153,13 +156,14 @@ export const documentHandlers = [
   // Eliminación lógica con motivo obligatorio
   http.post("*/documents/:id/void", async ({ params, request }) => {
     const id = String(params.id)
-    const body = (await request.json()) as { reason?: string }
-    if (!body.reason || body.reason.trim() === "") {
+    // Motivo con las mismas reglas que el resto de anulaciones (5 a 255 caracteres)
+    const reason = reasonSchema.safeParse(await readJson(request))
+    if (!reason.success) {
       return HttpResponse.json(
         {
           code: "VALIDATION_ERROR",
           message: "Revisa los datos ingresados.",
-          errors: [{ field: "reason", message: "Ingresa el motivo" }],
+          errors: reason.error.issues.map((issue) => ({ field: "reason", message: issue.message })),
         },
         { status: 422 },
       )

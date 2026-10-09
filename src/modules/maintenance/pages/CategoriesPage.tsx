@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useHasPermission } from "@/modules/auth"
 import { Pencil, Plus, Trash2 } from "lucide-react"
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
 import { DataTable, type Column } from "@/shared/components/DataTable"
@@ -10,18 +11,25 @@ import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
+import { FilterSelect } from "@/shared/components/FilterSelect"
+import { FILTER_ALL, pickFilters } from "@/shared/lib/filters"
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
 import { useDeleteOrDeactivate } from "@/shared/hooks/useDeleteOrDeactivate"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import { CategoryFormDialog } from "@/modules/maintenance/categories/components/CategoryFormDialog"
 import { useCategories, useDeleteCategory, usePatchCategory } from "@/modules/maintenance/categories/hooks"
-import { STATUS_LABELS, type Category } from "@/modules/maintenance/categories/schema"
+import { CATEGORY_STATUSES, STATUS_LABELS, type Category } from "@/modules/maintenance/categories/schema"
 
 const PAGE_SIZE = 10
 
 export default function CategoriesPage() {
   const [page, setPage] = useState(1)
+  // Regla 1: el frontend oculta lo que no se permite (el backend vuelve a validar)
+  const canCreate = useHasPermission("maintenance.categories:create")
+  const canEdit = useHasPermission("maintenance.categories:edit")
+  const canVoid = useHasPermission("maintenance.categories:void")
   const [searchInput, setSearchInput] = useState("")
+  const [status, setStatus] = useState(FILTER_ALL)
   const search = useDebouncedValue(searchInput.trim(), 300)
 
   const [dialog, setDialog] = useState<{ open: boolean; category: Category | null }>({
@@ -31,12 +39,13 @@ export default function CategoriesPage() {
   const [toDelete, setToDelete] = useState<Category | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const categories = useCategories({ page, size: PAGE_SIZE, search })
+  const categories = useCategories({ page, size: PAGE_SIZE, search, filters: pickFilters({ status }) })
   const deleteCategory = useDeleteCategory()
   const patchCategory = usePatchCategory()
 
   const {
     isInUseDialogOpen,
+    inUseMessage,
     setIsInUseDialogOpen,
     isDeleting,
     isDeactivating,
@@ -86,28 +95,32 @@ export default function CategoriesPage() {
       className: "w-24",
       cell: (row) => (
         <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Editar ${row.name}`}
-            onClick={() => setDialog({ open: true, category: row })}
-          >
-            <Pencil aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Eliminar ${row.name}`}
-            onClick={() => setToDelete(row)}
-          >
-            <Trash2 aria-hidden="true" />
-          </Button>
+          {canEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Editar ${row.name}`}
+              onClick={() => setDialog({ open: true, category: row })}
+            >
+              <Pencil aria-hidden="true" />
+            </Button>
+          )}
+          {canVoid && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Eliminar ${row.name}`}
+              onClick={() => setToDelete(row)}
+            >
+              <Trash2 aria-hidden="true" />
+            </Button>
+          )}
         </div>
       ),
     },
   ]
 
-  const newCategoryButton = (
+  const newCategoryButton = canCreate && (
     <Button onClick={() => setDialog({ open: true, category: null })}>
       <Plus aria-hidden="true" />
       Nueva categoría
@@ -122,16 +135,28 @@ export default function CategoriesPage() {
         actions={newCategoryButton}
       />
 
-      <div className="mb-4 max-w-sm">
-        <Input
-          type="search"
-          placeholder="Buscar por nombre de categoría"
-          aria-label="Buscar categorías"
-          value={searchInput}
-          onChange={(event) => {
-            setSearchInput(event.target.value)
+      <div className="mb-4 flex flex-wrap gap-3">
+        <div className="w-full max-w-sm">
+          <Input
+            type="search"
+            placeholder="Buscar por nombre de categoría"
+            aria-label="Buscar categorías"
+            value={searchInput}
+            onChange={(event) => {
+              setSearchInput(event.target.value)
+              setPage(1)
+            }}
+          />
+        </div>
+        <FilterSelect
+          label="Filtrar por estado"
+          value={status}
+          onChange={(value) => {
+            setStatus(value)
             setPage(1)
           }}
+          allLabel="Todas los estados"
+          options={CATEGORY_STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))}
         />
       </div>
 
@@ -154,10 +179,10 @@ export default function CategoriesPage() {
             getRowKey={(row) => row.id}
             isLoading={categories.isPending}
             empty={
-              search ? (
+              search || status !== FILTER_ALL ? (
                 <EmptyState
                   title="Sin resultados"
-                  description="Ninguna categoría coincide con tu búsqueda."
+                  description="Ninguna categoría coincide con tu búsqueda o filtro."
                 />
               ) : (
                 <EmptyState
@@ -197,6 +222,7 @@ export default function CategoriesPage() {
 
       <InUseDialog
         open={isInUseDialogOpen}
+        message={inUseMessage}
         onOpenChange={setIsInUseDialogOpen}
         resourceName="Categoría"
         isPending={isDeactivating}

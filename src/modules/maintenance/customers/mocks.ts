@@ -1,4 +1,4 @@
-import { createCrudHandlers } from "@/mocks/createCrudHandlers"
+import { createCrudHandlers } from "@/mocks/utils/crud"
 import type { Customer, CustomerStatus, DocumentType } from "./schema"
 
 /** UUID fijos y legibles (válidos v4): 00000000-0000-4000-8000-000000000001, ...002, etc. */
@@ -44,23 +44,31 @@ const seed: Customer[] = [
 const IN_USE_IDS = [uuid(1), uuid(2)]
 
 export const customerHandlers = createCrudHandlers<Customer>({
-  endpoint: "*/customers",
-  items: seed,
+  resource: "customers",
+  seed,
+  // Un registro nuevo aparece primero en el listado
+  insertAt: "start",
   searchFields: ["name", "document_number", "email"],
   filterFields: ["status", "document_type"],
-  uniqueFields: [
-    {
-      field: "document_number",
-      label: "número de documento",
-      normalize: (val: unknown) => String(val ?? "").trim(),
-    },
-  ],
+  // El documento es único por tipo + número (contrato): un DNI y un CE pueden compartir número
+  validate: ({ next, items }) => {
+    if (!next) return undefined
+    const number = next.document_number.trim()
+    const duplicate = items.some(
+      (item) =>
+        item.id !== next.id &&
+        item.document_type === next.document_type &&
+        item.document_number.trim() === number,
+    )
+    if (!duplicate) return undefined
+    const message = "Ya existe un cliente con este tipo y número de documento"
+    return { status: 409, code: "DUPLICATE", message, errors: [{ field: "document_number", message }] }
+  },
   immutableFields: ["document_type", "document_number"],
-  inUseIds: IN_USE_IDS,
+  isInUse: (item) => IN_USE_IDS.includes(item.id),
   inUseMessage:
     "Este cliente tiene ventas, cotizaciones o comprobantes registrados y no se puede eliminar. Puedes desactivarlo para evitar nuevas operaciones.",
-  onBeforeCreate: (body: Record<string, unknown>, currentItems: Customer[]) => ({
-    id: uuid(currentItems.length + 1),
+  prepareCreate: (body) => ({
     document_type: (body.document_type as DocumentType) || "DNI",
     document_number: String(body.document_number ?? "").trim(),
     name: String(body.name ?? "").trim(),
@@ -69,7 +77,7 @@ export const customerHandlers = createCrudHandlers<Customer>({
     credit_limit: String(body.credit_limit ?? "0.00").trim(),
     status: (body.status as CustomerStatus) || "active",
   }),
-  onBeforeUpdate: (_current: Customer, body: Record<string, unknown>) => ({
+  prepareUpdate: (_current, body) => ({
     name: String(body.name ?? "").trim(),
     email: String(body.email ?? "").trim(),
     phone: String(body.phone ?? "").trim(),

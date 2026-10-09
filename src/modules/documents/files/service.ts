@@ -14,7 +14,7 @@ export class StorageUploadError extends Error {
 }
 
 /**
- * Flujo de subida propuesto (aún no está en el contrato):
+ * Flujo de subida (contrato, sección 12):
  *   1. POST /documents                  -> metadatos; el backend responde { id, upload_url }
  *   2. PUT <upload_url> (directo a S3)  -> el archivo; no pasa por nuestra API
  *   3. POST /documents/{id}/confirm     -> el backend verifica y deja el documento activo
@@ -26,12 +26,12 @@ export const documentService = {
   requestUpload: (input: DocumentInput) => api.post<UploadTicket>(BASE, input),
 
   // La URL de S3 es externa y ya viene firmada: no se usa el cliente de la API ni se envía ninguna credencial
-  uploadToStorage: async (uploadUrl: string, file: File): Promise<void> => {
+  uploadToStorage: async (uploadUrl: string, file: File, contentType: string): Promise<void> => {
     let response: Response
     try {
       response = await fetch(uploadUrl, {
         method: "PUT",
-        headers: { "Content-Type": file.type },
+        headers: { "Content-Type": contentType },
         body: file,
       })
     } catch {

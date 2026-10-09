@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { formatCents, formatMoney, fromCents, toCents } from "./money"
+import { formatCents, formatCompactCents, formatMoney, fromCents, toCents } from "./money"
 
 describe("toCents", () => {
   it.each([
@@ -66,5 +66,12 @@ describe("formatMoney y formatCents", () => {
 
   it("formatCents acepta centavos", () => {
     expect(formatCents(500000)).toContain("5,000.00")
+  })
+})
+describe("formatCompactCents", () => {
+  it("abrevia montos grandes sin perder la moneda", () => {
+    const text = formatCompactCents(12_500_000)
+    expect(text).toContain("S/")
+    expect(text.length).toBeLessThan(formatCents(12_500_000).length)
   })
 })

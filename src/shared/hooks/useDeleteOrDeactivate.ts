@@ -24,6 +24,7 @@ export function useDeleteOrDeactivate<T>({
   onError,
 }: UseDeleteOrDeactivateOptions<T>) {
   const [inUseItem, setInUseItem] = useState<T | null>(null)
+  const [inUseMessage, setInUseMessage] = useState("")
   const [isInUseDialogOpen, setIsInUseDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isDeactivating, setIsDeactivating] = useState(false)
@@ -37,6 +38,7 @@ export function useDeleteOrDeactivate<T>({
       const err = error as ErrorWithStatus
       const status = err?.status ?? err?.response?.status
       if (status === 409) {
+        setInUseMessage(getErrorMessage(error))
         setInUseItem(item)
         setIsInUseDialogOpen(true)
       } else if (status === 404) {
@@ -67,6 +69,7 @@ export function useDeleteOrDeactivate<T>({
 
   return {
     inUseItem,
+    inUseMessage,
     isInUseDialogOpen,
     setIsInUseDialogOpen,
     isDeleting,

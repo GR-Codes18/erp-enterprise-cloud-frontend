@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatBusinessDate, formatDateTimeLima, todayInLima } from './dates'
+import { addDays, formatBusinessDate, formatDateTimeLima, isBusinessDate, limaDayOf, todayInLima } from './dates'
 
 describe('formatBusinessDate', () => {
   it('muestra la fecha sin conversión de zona', () => {
@@ -46,5 +46,40 @@ describe('todayInLima', () => {
   it('usa el calendario de Lima, no el de UTC', () => {
     expect(todayInLima(new Date('2026-10-07T04:59:00Z'))).toBe('2026-10-06')
     expect(todayInLima(new Date('2026-10-07T05:00:00Z'))).toBe('2026-10-07')
+  })
+})
+describe('limaDayOf', () => {
+  it('una fecha de negocio queda igual', () => {
+    expect(limaDayOf('2026-10-07')).toBe('2026-10-07')
+  })
+
+  it('una fecha-hora UTC de madrugada cae en el día anterior en Lima', () => {
+    expect(limaDayOf('2026-10-08T03:00:00Z')).toBe('2026-10-07')
+    expect(limaDayOf('2026-10-08T05:00:00Z')).toBe('2026-10-08')
+  })
+
+  it('respeta un offset explícito', () => {
+    expect(limaDayOf('2026-10-07T23:30:00-05:00')).toBe('2026-10-07')
+  })
+})
+
+describe('isBusinessDate', () => {
+  it('acepta fechas reales AAAA-MM-DD', () => {
+    expect(isBusinessDate('2026-02-28')).toBe(true)
+    expect(isBusinessDate('2028-02-29')).toBe(true)
+  })
+
+  it('rechaza fechas imposibles o con otro formato', () => {
+    expect(isBusinessDate('2026-02-30')).toBe(false)
+    expect(isBusinessDate('07/10/2026')).toBe(false)
+    expect(isBusinessDate('')).toBe(false)
+  })
+})
+
+describe('addDays', () => {
+  it('suma días cruzando meses y años', () => {
+    expect(addDays('2026-10-28', 7)).toBe('2026-11-04')
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01')
+    expect(addDays('2026-03-01', -1)).toBe('2026-02-28')
   })
 })

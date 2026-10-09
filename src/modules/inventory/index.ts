@@ -9,11 +9,12 @@ export const inventoryModule: AppModule = {
   sections: [
     {
       items: [
-        { label: "Stock", path: "stock", page: () => import("./pages/StockPage") },
-        { label: "Kardex", path: "kardex", page: () => import("./pages/KardexPage") },
+        { label: "Stock", path: "stock", permission: "inventory.stock:view", page: () => import("./pages/StockPage") },
+        { label: "Kardex", path: "kardex", permission: "inventory.kardex:view", page: () => import("./pages/KardexPage") },
         {
           label: "Transferencias",
           path: "transfers",
+          permission: "inventory.transfers:view",
           page: () => import("./pages/TransfersPage"),
           subRoutes: [
             { label: "Nueva transferencia", path: "new", page: () => import("./pages/TransferFormPage") },
@@ -24,6 +25,7 @@ export const inventoryModule: AppModule = {
         {
           label: "Ajustes",
           path: "adjustments",
+          permission: "inventory.adjustments:view",
           page: () => import("./pages/AdjustmentsPage"),
           subRoutes: [
             { label: "Nuevo ajuste", path: "new", page: () => import("./pages/AdjustmentFormPage") },

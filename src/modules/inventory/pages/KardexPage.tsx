@@ -39,9 +39,9 @@ export default function KardexPage() {
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
 
-  // Opciones publicadas por Mantenimiento (regla 0.5): solo productos y almacenes activos
-  const products = useProductOptions()
-  const warehouses = useWarehouseOptions()
+  // Opciones publicadas por Mantenimiento (regla 0.5). El kardex es historia: también inactivos
+  const products = useProductOptions({ includeInactive: true })
+  const warehouses = useWarehouseOptions({ includeInactive: true })
 
   const rangeValid = isValidDateRange(dateFrom, dateTo)
   const ready = isKardexQueryReady({ product_id: productId, date_from: dateFrom, date_to: dateTo })
@@ -120,7 +120,7 @@ export default function KardexPage() {
             <SelectContent>
               {(products.data ?? []).map((product) => (
                 <SelectItem key={product.id} value={product.id}>
-                  {product.code} · {product.name}
+                  {product.sku} · {product.name}
                 </SelectItem>
               ))}
             </SelectContent>

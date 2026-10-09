@@ -1,5 +1,5 @@
-import { createCrudHandlers } from "@/mocks/createCrudHandlers"
-import type { Product, ProductStatus } from "./schema"
+import { createCrudHandlers } from "@/mocks/utils/crud"
+import type { Product, ProductStatus, ProductUnit } from "./schema"
 
 /** UUIDs de productos con prefijo 8004 */
 const uuid = (n: number) => `00000000-0000-4000-8004-${String(n).padStart(12, "0")}`
@@ -20,82 +20,94 @@ const CATEGORIES_MAP: Record<string, string> = {
 
 const product = (
   n: number,
-  code: string,
+  sku: string,
   name: string,
   catNum: number,
-  unitPrice: number,
-  stock: number,
-  status: ProductStatus
+  unit: ProductUnit,
+  sale_price: string,
+  cost_price: string,
+  min_stock: number,
+  stock_total: number,
+  status: ProductStatus = "active",
 ): Product => {
   const category_id = catUuid(catNum)
   return {
     id: uuid(n),
-    code,
+    sku,
     name,
     category_id,
-    category_name: CATEGORIES_MAP[category_id] || "General",
-    unit_price: unitPrice,
-    stock,
+    category_name: CATEGORIES_MAP[category_id] ?? "General",
+    unit,
+    sale_price,
+    cost_price,
+    min_stock,
+    stock_total,
     status,
   }
 }
 
-// 12 productos semilla
-const products: Product[] = [
-  product(1, "PROD-001", "Martillo de Peña 16oz", 1, 45.5, 25, "active"),
-  product(2, "PROD-002", "Juego de Destornilladores 6pcs", 1, 32.0, 40, "active"),
-  product(3, "PROD-003", "Cemento Portland Tipo I 42.5kg", 2, 28.9, 150, "active"),
-  product(4, "PROD-004", "Ladrillo Klinker 18 Huecos", 2, 1.8, 1200, "active"),
-  product(5, "PROD-005", "Casco de Seguridad Dielectrico Blanco", 3, 25.0, 80, "active"),
-  product(6, "PROD-006", "Guantes de Nitrilo Industrial L", 3, 12.5, 200, "active"),
-  product(7, "PROD-007", "Pintura Látex Super Lavable 4L", 4, 68.0, 35, "active"),
-  product(8, "PROD-008", "Tubo PVC Presión 1/2 pulg x 5m", 5, 14.2, 90, "active"),
-  product(9, "PROD-009", "Cable Mellizo 2x16 AWG 100m", 6, 115.0, 15, "active"),
-  product(10, "PROD-010", "Candado de Latón 50mm Anticorte", 7, 38.0, 50, "active"),
-  product(11, "PROD-011", "Reflector LED Industrial 100W", 8, 89.9, 20, "active"),
-  product(12, "PROD-012", "Silicona Multiuso Transparente 300ml", 9, 16.5, 0, "inactive"),
+// 12 productos semilla. stock_total coincide con la suma de sus almacenes en los mocks de Inventario.
+// El cable se vende por debajo del costo (liquidación) para ver la advertencia del formulario.
+const seed: Product[] = [
+  product(1, "PROD-001", "Martillo de Peña 16oz", 1, "UND", "45.50", "30.00", 10, 25),
+  product(2, "PROD-002", "Juego de Destornilladores 6pcs", 1, "UND", "32.00", "21.50", 15, 40),
+  product(3, "PROD-003", "Cemento Portland Tipo I 42.5kg", 2, "BOLSA", "28.90", "24.00", 60, 150),
+  product(4, "PROD-004", "Ladrillo Klinker 18 Huecos", 2, "UND", "1.80", "1.20", 300, 1200),
+  product(5, "PROD-005", "Casco de Seguridad Dielectrico Blanco", 3, "UND", "25.00", "15.00", 20, 80),
+  product(6, "PROD-006", "Guantes de Nitrilo Industrial L", 3, "PAQ", "12.50", "8.00", 50, 200),
+  product(7, "PROD-007", "Pintura Látex Super Lavable 4L", 4, "UND", "68.00", "52.00", 40, 35),
+  product(8, "PROD-008", "Tubo PVC Presión 1/2 pulg x 5m", 5, "UND", "14.20", "9.80", 25, 90),
+  product(9, "PROD-009", "Cable Mellizo 2x16 AWG 100m", 6, "UND", "115.00", "118.00", 20, 15),
+  product(10, "PROD-010", "Candado de Latón 50mm Anticorte", 7, "UND", "38.00", "22.00", 10, 50),
+  product(11, "PROD-011", "Reflector LED Industrial 100W", 8, "UND", "89.90", "60.00", 10, 20),
+  product(12, "PROD-012", "Silicona Multiuso Transparente 300ml", 9, "UND", "16.50", "10.00", 5, 0, "inactive"),
 ]
 
-/** IDs semilla simularán estar "en uso" en ventas/compras para probar el error 409 */
-const IN_USE_IDS = [uuid(1), uuid(2)]
+/** Productos 1 y 2 tienen movimientos: no se borran ni cambian de unidad (409) */
+const WITH_MOVEMENTS = [uuid(1), uuid(2)]
 
 export const productHandlers = createCrudHandlers<Product>({
-  endpoint: "*/products",
-  items: products,
-  searchFields: ["code", "name"],
-  filterFields: ["status"],
+  resource: "products",
+  seed,
+  // Un registro nuevo aparece primero en el listado
+  insertAt: "start",
+  searchFields: ["sku", "name"],
+  filterFields: ["status", "category_id"],
   uniqueFields: [
     {
-      field: "code",
-      label: "código",
-      normalize: (val: unknown) => String(val ?? "").trim().toUpperCase(),
+      field: "sku",
+      label: "SKU",
+      normalize: (value) => String(value ?? "").trim().toUpperCase(),
     },
   ],
-  immutableFields: ["code", "stock"],
-  inUseIds: IN_USE_IDS,
+  // El stock total lo calcula el servidor: nunca se edita desde el formulario
+  immutableFields: ["sku", "stock_total"],
+  createdFields: { stock_total: 0 },
+  isInUse: (item) => WITH_MOVEMENTS.includes(item.id),
   inUseMessage:
     "Este producto tiene movimientos y no se puede eliminar. Puedes desactivarlo para que deje de usarse en nuevas operaciones.",
-  onBeforeCreate: (body: Record<string, unknown>, currentItems: Product[]) => {
-    const newId = uuid(currentItems.length + 1)
-    const codeNormalized = String(body.code ?? "").trim().toUpperCase()
+  prepareCreate: (body) => {
     const categoryId = String(body.category_id ?? "")
-    const categoryName = CATEGORIES_MAP[categoryId] || "General"
     return {
-      id: newId,
-      code: codeNormalized,
+      sku: String(body.sku ?? "").trim().toUpperCase(),
       name: String(body.name ?? "").trim(),
       category_id: categoryId,
-      category_name: categoryName,
-      stock: 0,
+      category_name: CATEGORIES_MAP[categoryId] ?? "General",
     }
   },
-  onBeforeUpdate: (current: Product, body: Record<string, unknown>) => {
+  prepareUpdate: (current, body) => {
     const categoryId = String(body.category_id ?? current.category_id)
-    const categoryName = CATEGORIES_MAP[categoryId] || current.category_name || "General"
     return {
       name: String(body.name ?? "").trim(),
       category_id: categoryId,
-      category_name: categoryName,
+      category_name: CATEGORIES_MAP[categoryId] ?? current.category_name,
     }
+  },
+  validate: ({ action, current, next }) => {
+    if (action === "update" && current && next && current.unit !== next.unit && WITH_MOVEMENTS.includes(current.id)) {
+      const message = "La unidad no se puede cambiar porque el producto ya tiene movimientos"
+      return { status: 409, code: "UNIT_LOCKED", message, errors: [{ field: "unit", message }] }
+    }
+    return undefined
   },
 })

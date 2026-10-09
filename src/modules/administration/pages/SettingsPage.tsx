@@ -1,3 +1,4 @@
+import { useHasPermission } from "@/modules/auth"
 import { ErrorState } from "@/shared/components/ErrorState"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Skeleton } from "@/shared/components/ui/skeleton"
@@ -7,6 +8,7 @@ import { useSettings } from "../settings/hooks"
 
 export default function SettingsPage() {
   const settings = useSettings()
+  const canEdit = useHasPermission("administration.settings:edit")
 
   return (
     <>
@@ -27,7 +29,7 @@ export default function SettingsPage() {
           <Skeleton className="h-32 w-full" />
         </div>
       ) : (
-        <SettingsForm settings={settings.data} />
+        <SettingsForm settings={settings.data} readOnly={!canEdit} />
       )}
     </>
   )

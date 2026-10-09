@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useHasPermission } from "@/modules/auth"
 import { Download, Eye, Plus, Trash2 } from "lucide-react"
 import { DataTable, type Column } from "@/shared/components/DataTable"
 import { EmptyState } from "@/shared/components/EmptyState"
@@ -40,6 +41,8 @@ const PAGE_SIZE = 10
 
 export default function FilesPage() {
   const [page, setPage] = useState(1)
+  const canCreate = useHasPermission("documents.files:create")
+  const canVoid = useHasPermission("documents.files:void")
   const [searchInput, setSearchInput] = useState("")
   const search = useDebouncedValue(searchInput.trim(), 300)
   const [category, setCategory] = useState(FILTER_ALL)
@@ -174,20 +177,22 @@ export default function FilesPage() {
           >
             <Download aria-hidden="true" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Eliminar ${row.name}`}
-            onClick={() => setToDelete(row)}
-          >
-            <Trash2 aria-hidden="true" />
-          </Button>
+          {canVoid && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Eliminar ${row.name}`}
+              onClick={() => setToDelete(row)}
+            >
+              <Trash2 aria-hidden="true" />
+            </Button>
+          )}
         </div>
       ),
     },
   ]
 
-  const uploadButton = (
+  const uploadButton = canCreate && (
     <Button onClick={() => setUploadOpen(true)}>
       <Plus aria-hidden="true" />
       Subir documento
