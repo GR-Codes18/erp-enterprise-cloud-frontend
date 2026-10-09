@@ -1,0 +1,97 @@
+import { Link } from "react-router"
+import { useHasPermission } from "@/modules/auth"
+import { useSupplierOptions } from "@/modules/maintenance"
+import type { Column } from "@/shared/components/DataTable"
+import { DateRangeFilter } from "@/shared/components/DateRangeFilter"
+import { FilterSelect } from "@/shared/components/FilterSelect"
+import { ListPageLayout } from "@/shared/components/ListPageLayout"
+import { StatusBadge } from "@/shared/components/StatusBadge"
+import { Button } from "@/shared/components/ui/button"
+import { Input } from "@/shared/components/ui/input"
+import { useListFilters } from "@/shared/hooks/useListFilters"
+import { formatBusinessDate } from "@/shared/lib/dates"
+import { formatMoney } from "@/shared/lib/money"
+import { purchaseOrderHooks } from "../hooks"
+import {
+  PURCHASE_ORDER_STATUSES,
+  PURCHASE_ORDER_STATUS_LABELS,
+  PURCHASE_ORDER_STATUS_TONES,
+  type PurchaseOrder,
+} from "../orders/schema"
+
+export default function PurchaseOrdersPage() {
+  const list = useListFilters(["status", "supplier_id"] as const)
+  const orders = purchaseOrderHooks.useList(list.params)
+  const suppliers = useSupplierOptions({ includeInactive: true })
+  const canCreate = useHasPermission("purchases.orders:create")
+
+  const columns: Column<PurchaseOrder>[] = [
+    { key: "number", header: "Número", cell: (row) => <span className="font-mono text-sm">{row.number}</span> },
+    { key: "supplier", header: "Proveedor", cell: (row) => <span className="font-medium">{row.supplier_name}</span> },
+    { key: "expected", header: "Entrega esperada", cell: (row) => formatBusinessDate(row.expected_date) },
+    { key: "total", header: "Total", className: "text-right", cell: (row) => <span className="font-mono">{formatMoney(row.total)}</span> },
+    {
+      key: "status",
+      header: "Estado",
+      cell: (row) => <StatusBadge tone={PURCHASE_ORDER_STATUS_TONES[row.status]} label={PURCHASE_ORDER_STATUS_LABELS[row.status]} />,
+    },
+    {
+      key: "detail",
+      header: "Detalle",
+      cell: (row) => (
+        <Button variant="link" size="sm" asChild>
+          <Link to={`/purchases/orders/${row.id}`}>Ver orden</Link>
+        </Button>
+      ),
+    },
+  ]
+
+  const newButton = canCreate && (
+    <Button asChild>
+      <Link to="/purchases/orders/new">Nueva orden</Link>
+    </Button>
+  )
+
+  return (
+    <ListPageLayout
+      title="Órdenes de compra"
+      description="Lo pactado con el proveedor. Las recepciones registran lo que llega."
+      actions={newButton}
+      query={orders}
+      columns={columns}
+      getRowKey={(row) => row.id}
+      hasFilters={list.hasFilters}
+      onClearFilters={list.clear}
+      onPageChange={list.setPage}
+      empty={{ title: "Aún no hay órdenes de compra", description: "Crea una orden o parte de una solicitud aprobada.", action: newButton }}
+      toolbar={
+        <>
+          <Input
+            type="search"
+            className="max-w-xs"
+            placeholder="Buscar por número o proveedor"
+            aria-label="Buscar órdenes de compra"
+            value={list.searchInput}
+            onChange={(event) => list.setSearchInput(event.target.value)}
+          />
+          <FilterSelect
+            label="Filtrar por estado"
+            value={list.values.status}
+            onChange={list.setFilter("status")}
+            allLabel="Todos los estados"
+            options={PURCHASE_ORDER_STATUSES.map((value) => ({ value, label: PURCHASE_ORDER_STATUS_LABELS[value] }))}
+          />
+          <FilterSelect
+            label="Filtrar por proveedor"
+            value={list.values.supplier_id}
+            onChange={list.setFilter("supplier_id")}
+            allLabel="Todos los proveedores"
+            options={(suppliers.data ?? []).map((supplier) => ({ value: supplier.id, label: supplier.name }))}
+            className="w-64"
+          />
+          <DateRangeFilter from={list.dateFrom} to={list.dateTo} onFromChange={list.setDateFrom} onToChange={list.setDateTo} />
+        </>
+      }
+    />
+  )
+}

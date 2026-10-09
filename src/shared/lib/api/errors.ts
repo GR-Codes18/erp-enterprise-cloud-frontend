@@ -21,6 +21,9 @@ export class ApiError extends Error {
   }
 }
 
+/** Código para respuestas de error sin el cuerpo { code, message } del contrato */
+export const UNKNOWN_ERROR = "UNKNOWN_ERROR"
+
 export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError
 }
@@ -41,7 +44,10 @@ export function getErrorMessage(error: unknown): string {
     case 400:
     case 409:
     case 422:
-      return error.message || "Revisa los datos ingresados."
+      // Sin cuerpo del contrato (UNKNOWN_ERROR) el mensaje es técnico ("HTTP 409"): no se muestra
+      return error.code === UNKNOWN_ERROR || !error.message
+        ? "No se pudo completar la operación. Revisa los datos e inténtalo de nuevo."
+        : error.message
     case 401:
       return "Tu sesión expiró. Inicia sesión nuevamente."
     case 403:

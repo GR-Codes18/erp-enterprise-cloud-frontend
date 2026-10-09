@@ -2,7 +2,9 @@
 
 Este documento define lo que el frontend espera del backend. Lo que figura como **Por confirmar** aún no está decidido y debe acordarse entre frontend y backend antes de implementarlo.
 
-El módulo **Clientes** (`/customers`) ya funciona contra datos simulados con exactamente este formato y sirve de ejemplo de referencia.
+Todos los datos simulados del frontend (MSW: `src/mocks/utils/crud.ts` para catálogos, `src/mocks/utils/documents.ts` para documentos con estados y handlers propios en Finanzas, Documentos, Configuración y Reportes) responden con los formatos de este documento: paginación, filtros, rango de fechas y errores `{ code, message, errors }`. El módulo **Clientes** (`/customers`) es el ejemplo de referencia.
+
+Las secciones marcadas como **Propuesta del frontend** son las rutas y cuerpos que usan las pantallas y sus mocks; deben revisarse con backend antes de integrar la API real.
 
 ## 1. Reglas generales
 
@@ -14,7 +16,7 @@ El módulo **Clientes** (`/customers`) ya funciona contra datos simulados con ex
 | IDs | UUID como texto. El frontend los trata como texto opaco |
 | Montos | Texto decimal con punto, hasta 2 decimales: `"5000.00"`. Nunca como número |
 | Cálculos | Los oficiales (totales, impuestos, saldos) los hace el backend. El frontend solo muestra vistas previas |
-| Fechas | ISO 8601. **Por confirmar:** fecha (`2026-10-07`) vs fecha-hora UTC (`2026-10-07T14:30:00Z`) según cada campo |
+| Fechas | ISO 8601, dos tipos (propuesta del frontend): **fecha de negocio** solo-día `AAAA-MM-DD` (`issue_date`, `due_date`, `valid_until`, `payment_date`...) y **marca de tiempo** fecha-hora UTC con zona (`2026-10-07T14:30:00Z`) para `created_at`, `occurred_at`, `uploaded_at`... El frontend muestra las marcas de tiempo en hora de Lima (`America/Lima`) |
 | Moneda | Soles (`PEN`) por defecto. **Por confirmar:** cómo se indica otra moneda en cada documento |
 | CORS | Habilitar el origen `http://localhost:5173` en desarrollo |
 
@@ -65,7 +67,7 @@ Reglas de seguridad:
 | `page` | Entero desde 1. Si es inválido, usar 1 |
 | `size` | Entero desde 1. Valor por defecto 20, máximo 100 |
 | `search` | Texto libre. Coincidencia parcial, sin distinguir mayúsculas. Opcional |
-| `date_from`, `date_to` | Fechas `AAAA-MM-DD`, ambos extremos incluidos, ambos opcionales. Formato inválido: 400. `date_from` mayor que `date_to`: 422 |
+| `date_from`, `date_to` | Fechas `AAAA-MM-DD`, ambos extremos incluidos, ambos opcionales. Formato inválido: 400. `date_from` mayor que `date_to`: 422. Sobre un campo fecha-hora, el día se interpreta **en hora de Lima**: `2026-03-20T03:00:00Z` pertenece al 19/03 |
 | `<campo>` | Filtro exacto por cualquier campo permitido del recurso (`status`, `warehouse_id`, ...). Cada recurso documenta cuáles acepta. Un campo no permitido se ignora |
 
 Respuesta (200):
@@ -93,12 +95,32 @@ Respuesta (200):
 | Obtener | `GET /<recurso>/{id}` | — | 200 con el recurso |
 | Crear | `POST /<recurso>` | Campos sin `id` | 201 con el recurso |
 | Actualizar | `PUT /<recurso>/{id}` | Recurso completo sin `id` | 200 con el recurso |
+| Cambiar estado | `PATCH /<recurso>/{id}` | Solo los campos que cambian, p. ej. `{ "status": "inactive" }` | 200 con el recurso |
 | Eliminar | `DELETE /<recurso>/{id}` | — | 204 |
 
 - El `id` lo asigna siempre el servidor. Si el cliente envía uno en el cuerpo, se ignora.
 - `PUT` reemplaza todos los campos editables. El frontend envía siempre el recurso completo.
 - Un `id` con formato inválido debe responder 404, no 500.
-- Eliminar solo se permite para borradores y registros sin uso. Un registro referenciado por otros (por ejemplo, un cliente con ventas) no se borra: se desactiva (status = inactive), y si se intenta borrar el backend responde 409 con un mensaje claro.
+- `PATCH` lo usan los catálogos para activar o desactivar sin reenviar todo el recurso. Los campos inmutables (p. ej. `document_number`) se ignoran aunque lleguen.
+- Eliminar solo se permite para borradores y registros sin uso. Un registro referenciado por otros (por ejemplo, un cliente con ventas) no se borra: se desactiva (status = inactive), y si se intenta borrar el backend responde **409 `IN_USE`** con un mensaje claro que el frontend muestra en el diálogo "¿Deseas desactivarlo?".
+- Un valor duplicado en un campo único responde **409 `DUPLICATE`** con el campo en `errors`.
+
+### 5.1 Acciones de documento (propuesta del frontend)
+
+Los documentos con estados (cotizaciones, pedidos, comprobantes, transferencias, ajustes, órdenes, pagos...) **no cambian de estado con PUT**: cada transición es una acción.
+
+`POST /<recurso>/{id}/<acción>`
+
+| Acción | Uso | Cuerpo |
+|---|---|---|
+| `send`, `submit`, `confirm`, `issue`, `receive`, `apply`, `approve`, `accept` | Avanzar al siguiente estado | `{}` |
+| `convert` (cotización) e `invoice` (pedido) | Crear el documento siguiente; responden **ese documento** (el pedido o el comprobante) | `{}` / `{ "type": "invoice" \| "receipt" }` |
+| `cancel`, `void`, `reject` | Cancelar, anular o rechazar | `{ "reason": "texto de 5 a 255 caracteres" }` (obligatorio) |
+
+- Respuesta: **200 con el documento actualizado** (o 204 cuando el documento deja de listarse, como en Documentos).
+- Una transición no permitida desde el estado actual responde **409 `INVALID_TRANSITION`**.
+- Solo un documento en `draft` se edita con `PUT` o se elimina con `DELETE`; en cualquier otro estado, 409.
+- Los efectos (descontar stock, crear la cuenta por cobrar...) los ejecuta el backend en la acción. El frontend no los simula.
 
 ## 6. Recurso: Clientes (`/customers`)
 
@@ -137,53 +159,306 @@ Ejemplo (respuesta de `GET /customers/{id}`):
 }
 ```
 
-## 7. Autenticación y permisos — Por confirmar
+## 7. Autenticación y permisos
 
-Aún no está definido. Hay que acordar:
+Definido y con soporte simulado (MSW) en el frontend, incluido el refresh.
 
-- Mecanismo: token en cabecera `Authorization: Bearer ...` o cookie `HttpOnly`.
-- Rutas de login, cierre de sesión y renovación (`/api/v1/auth/...`).
-- Duración del token y qué hace el frontend al recibir 401.
-- Cómo el frontend conoce los permisos del usuario (en la respuesta de login o en una ruta propia) para ocultar menús y acciones.
+### 7.1 Mecanismo
+- **Token de acceso:** el cliente envía la cabecera `Authorization: Bearer <token>` en todas las peticiones a rutas protegidas. Es de vida corta.
+- **Manejo en cliente:** el token se guarda **exclusivamente en memoria**. Nunca en `localStorage` ni `sessionStorage`.
+- **Refresh token:** lo pone el backend en una cookie `HttpOnly`, `Secure`, `SameSite=Strict`, con `Path=/api/v1/auth`. El frontend nunca la lee; la envía con `credentials: "include"` en todas las peticiones.
+- **CORS:** como viaja una cookie, el backend debe responder `Access-Control-Allow-Credentials: true` y un `Access-Control-Allow-Origin` explícito (nunca `*`).
+- **Al abrir la app o recargar (F5):** el frontend llama a `POST /auth/refresh`. Con 200 recupera la sesión sin volver a pedir credenciales; con 401 muestra el login.
+- **Token vencido (401):** ante un 401 en una ruta protegida, el frontend hace **un solo** `POST /auth/refresh` (compartido aunque fallen varias peticiones a la vez) y repite la petición. Si el refresh también responde 401, limpia la sesión y la caché, y redirige a `/login`. Un 401 en `/auth/*` nunca dispara el refresh.
 
-El frontend no se apoya en esto para la seguridad: el backend debe comprobar permisos en cada ruta.
+### 7.2 Rutas de autenticación
 
-## 8. Rutas del documento maestro
+| Operación | Ruta | Respuesta |
+|---|---|---|
+| Iniciar sesión | `POST /auth/login` con `{ "email", "password" }` | 200 `{ token, user }` y pone la cookie de refresh. 401 `INVALID_CREDENTIALS` |
+| Renovar sesión | `POST /auth/refresh` (sin cuerpo; usa la cookie) | 200 `{ token, user }` (puede rotar la cookie). 401 si no hay sesión válida |
+| Cerrar sesión | `POST /auth/logout` | 204; invalida el refresh token y borra la cookie |
 
-Listadas en el documento del proyecto; **su formato aún no está definido** (cada una necesita su tabla de campos como la de Clientes):
+Respuesta de login y refresh:
 
-| Ruta | Responsabilidad |
-|---|---|
-| `/api/v1/auth` | Autenticación y sesiones |
-| `/api/v1/users` | Usuarios y administración |
-| `/api/v1/customers` | Clientes (definido arriba) |
-| `/api/v1/suppliers` | Proveedores |
-| `/api/v1/products` | Productos |
-| `/api/v1/inventory` | Inventario |
-| `/api/v1/sales` | Ventas |
-| `/api/v1/purchases` | Compras |
-| `/api/v1/payments` | Pagos |
-| `/api/v1/documents` | Documentos |
-| `/api/v1/reports` | Reportes |
+```json
+{
+  "token": "cadena-de-token-jwt",
+  "user": {
+    "id": "00000000-0000-4000-8010-000000000001",
+    "name": "Gabriel Romero",
+    "email": "admin@enterprise.com",
+    "role": "Administrador",
+    "permissions": ["*"]
+  }
+}
+```
 
-## 9. Rutas que el documento maestro no lista — Por definir
+Credenciales inválidas (401):
 
-Las pantallas existen o se planean, pero falta su ruta:
+```json
+{ "code": "INVALID_CREDENTIALS", "message": "Credenciales inválidas." }
+```
 
-- Mantenimiento: categorías, almacenes.
-- Ventas: cotizaciones, comprobantes, devoluciones.
-- Compras: solicitudes, recepciones, facturas, devoluciones.
-- Inventario: kardex, transferencias, ajustes.
-- Finanzas: cuentas por cobrar, cuentas por pagar, caja, bancos, estados de cuenta.
-- Administración: roles, permisos, auditoría, configuración.
-- Dashboard: indicadores resumidos.
+### 7.3 Permisos
+
+- Cada permiso es `<módulo>.<pantalla>:<acción>`, por ejemplo `inventory.adjustments:approve`.
+- Acciones: `view`, `create`, `edit`, `void` (anular o eliminar) y `approve`. Marcar cualquier acción implica `view`.
+- `"*"` concede todos los permisos (rol Administrador, de sistema).
+- `GET /permissions` devuelve el catálogo de pantallas y sus acciones, agrupado por módulo (`code`, `module`, `module_label`, `label`, `actions`).
+- `user.permissions` (en el login) es la lista efectiva del usuario. El frontend solo la usa para **ocultar** acciones y pantallas: el backend responde 403 aunque el frontend no las oculte.
+
+## 8. Mapa de rutas
+
+Todas bajo `/api/v1`. Las secciones 11 a 19 son **propuesta del frontend** (lo que usan las pantallas y sus mocks); el backend las revisa antes de integrar.
+
+| Ruta | Responsabilidad | Sección |
+|---|---|---|
+| `/auth` | Sesión (login, refresh, logout) | 7 |
+| `/customers`, `/suppliers`, `/categories`, `/warehouses`, `/products` | Catálogos de Mantenimiento | 6 y 13 |
+| `/users`, `/roles`, `/permissions`, `/audit`, `/settings` | Administración | 14 |
+| `/inventory/stock`, `/inventory/kardex`, `/inventory/transfers`, `/inventory/adjustments` | Inventario | 11 y 15 |
+| `/sales/quotes`, `/sales/orders`, `/sales/invoices`, `/sales/returns` | Ventas | 16 |
+| `/purchases/requests`, `/purchases/orders`, `/purchases/receptions`, `/purchases/invoices`, `/purchases/returns` | Compras | 17 |
+| `/finance/receivables`, `/finance/payables`, `/finance/payments`, `/finance/cash/...`, `/finance/bank-accounts`, `/finance/statements` | Finanzas | 18 |
+| `/documents` | Documentos (S3) | 12 |
+| `/reports/dashboard`, `/reports/...` | Dashboard y reportes | 19 |
+
+## 9. Prefijos de los UUID en los datos simulados
+
+Los mocks usan UUID fijos `00000000-0000-4000-<prefijo>-00000000000N` (tabla completa en el manual de tareas, 4.1). El backend real genera sus propios UUID; los prefijos solo hacen predecibles las pruebas del frontend.
 
 ## 10. Lista de decisiones pendientes
 
-| # | Decisión | Quién |
+| # | Decisión | Quién | Estado |
+|---|---|---|---|
+| 1 | Formato de fechas por campo | Frontend + backend | Propuesta en la sección 1 |
+| 2 | Autenticación y permisos | Frontend + backend | Bearer en memoria y refresh por cookie HttpOnly: sección 7 (falta que backend confirme la cookie) |
+| 3 | Orden por defecto y filtros de los listados | Frontend + backend | Filtros documentados por recurso; orden por confirmar |
+| 4 | Rutas y campos de los recursos | Backend revisa | Propuesta completa del frontend en las secciones 11 a 19 |
+| 5 | Cómo se indica la moneda en documentos | Frontend + backend | Por confirmar |
+| 6 | Alta y restablecimiento de contraseñas | Backend | Por definir: el frontend nunca muestra ni guarda contraseñas |
+| 7 | Nombres de las acciones de documento | Frontend + backend | Propuesta en la sección 5.1 |
+| 8 | Flujo de subida de archivos a S3 | Frontend + backend | Propuesta en la sección 12 |
+
+## 11. Propuesta del frontend: inventario
+
+Las rutas y los cuerpos de esta sección son la propuesta usada por la implementación del frontend y sus mocks. **No son un contrato acordado con el backend**; deben revisarse con el equipo de backend antes de integrar la API real.
+
+### 11.1 Transferencias (`/inventory/transfers`)
+
+| Operación | Ruta | Regla |
 |---|---|---|
-| 1 | Formato de fechas por campo | Frontend + backend |
-| 2 | Mecanismo de autenticación y permisos | Frontend + backend |
-| 3 | Orden por defecto y filtros de los listados | Frontend + backend |
-| 4 | Rutas y campos de los recursos pendientes | Backend (propuesta) y frontend (revisión) |
-| 5 | Cómo se indica la moneda en documentos | Frontend + backend |
+| Listar | `GET /inventory/transfers` | Paginado; filtros `status`, `origin_warehouse_id`, `destination_warehouse_id`; rango sobre `created_at` |
+| Obtener | `GET /inventory/transfers/{id}` | Incluye nombres de almacenes y producto para mostrar el documento |
+| Crear | `POST /inventory/transfers` | Crea en estado `draft` |
+| Editar | `PUT /inventory/transfers/{id}` | Solo en `draft`; reemplaza el documento completo |
+| Enviar | `POST /inventory/transfers/{id}/send` | Solo `draft`; cambia a `in_transit` y descuenta stock del origen |
+| Recibir | `POST /inventory/transfers/{id}/receive` | Solo `in_transit`; cambia a `received` y suma stock al destino |
+| Cancelar | `POST /inventory/transfers/{id}/cancel` | Solo `draft`; cuerpo `{ "reason" }`; cambia a `cancelled` |
+| Eliminar borrador | `DELETE /inventory/transfers/{id}` | Solo `draft` |
+
+Cuerpo de creación/edición:
+
+```json
+{
+  "origin_warehouse_id": "UUID",
+  "destination_warehouse_id": "UUID",
+  "items": [{ "product_id": "UUID", "quantity": 3 }]
+}
+```
+
+Origen y destino deben ser diferentes, cada producto aparece una sola vez y `quantity` es entero positivo que no supera la existencia disponible en origen. El backend vuelve a validar disponibilidad al enviar. El frontend no simula movimientos de stock en sus mocks.
+
+### 11.2 Ajustes (`/inventory/adjustments`)
+
+| Operación | Ruta | Regla |
+|---|---|---|
+| Listar | `GET /inventory/adjustments` | Paginado; filtros `status`, `warehouse_id`, `reason`; rango sobre `created_at` |
+| Obtener | `GET /inventory/adjustments/{id}` | Incluye nombre del almacén y nombres de producto |
+| Crear | `POST /inventory/adjustments` | Crea en estado `draft` |
+| Editar | `PUT /inventory/adjustments/{id}` | Solo en `draft`; reemplaza el documento completo |
+| Aplicar | `POST /inventory/adjustments/{id}/apply` | Requiere permiso `inventory.adjustments:approve`; cambia a `applied` |
+| Eliminar borrador | `DELETE /inventory/adjustments/{id}` | Solo `draft` |
+
+Cuerpo de creación/edición:
+
+```json
+{
+  "warehouse_id": "UUID",
+  "items": [{ "product_id": "UUID", "direction": "increase", "quantity": 3 }],
+  "reason": "physical_count",
+  "notes": ""
+}
+```
+
+`direction` acepta `increase` o `decrease`; `reason` acepta `physical_count`, `shrinkage`, `damage`, `expiration` u `other`. El motivo es obligatorio, `notes` es opcional como cadena vacía, la cantidad es entero positivo y no se repite producto. Al aplicar, el backend rechaza con 409 si una disminución deja stock negativo. Los mocks solo cambian el estado del ajuste: no modifican stock ni kardex.
+
+Las respuestas de ambos recursos incluyen `id`, `status`, `created_at` y los nombres de almacenes/productos necesarios para lectura. Se recomienda incluir `product_name` en cada línea de respuesta para preservar la etiqueta de productos inactivos en documentos históricos; ese campo no se envía al crear o editar.
+
+Las respuestas de 400, 403, 404, 409 y 422 siguen los formatos generales de las secciones 2 y 3. El backend debe aplicar las reglas de autorización y validación aunque el frontend oculte acciones.
+
+## 12. Propuesta del frontend: documentos (`/documents`)
+
+Repositorio de archivos: el **archivo** vive en S3 y los **metadatos** en la base de datos. El archivo nunca pasa por la API ni se expone con una URL pública o permanente.
+
+### 12.1 Subida en tres pasos
+
+1. `POST /documents` con los metadatos. Responde **201** `{ "id": "UUID", "upload_url": "https://..." }`. El documento queda **pendiente** y no se lista.
+2. `PUT <upload_url>` directo a S3 con el archivo y la cabecera `Content-Type` declarada. Es una URL prefirmada y de corta duración: no lleva la cabecera `Authorization` de la API.
+3. `POST /documents/{id}/confirm` (cuerpo `{}`). El backend verifica que el archivo exista y coincida en tipo y tamaño. Responde **200** con el documento, que ya se lista.
+
+Si el paso 2 o 3 falla, el documento pendiente no se muestra; el backend lo descarta pasado un tiempo.
+
+Cuerpo del paso 1:
+
+```json
+{
+  "name": "contrato-proveedor.pdf",
+  "category": "contract",
+  "entity_type": "purchase",
+  "entity_id": "UUID",
+  "mime_type": "application/pdf",
+  "size": 245760
+}
+```
+
+| Campo | Regla |
+|---|---|
+| `name` | Nombre del documento, 2 a 120 caracteres |
+| `category` | `invoice`, `contract`, `order`, `receipt` u `other` |
+| `entity_type` | `sale`, `purchase`, `transfer`, `adjustment`, `payment` o `""` si no pertenece a una operación |
+| `entity_id` | UUID de la operación, o `""` |
+| `mime_type` | PDF, PNG, JPG, XLSX o DOCX (valores en `src/modules/documents/files/fileRules.ts`) |
+| `size` | Bytes, máximo 10 MB. **Por confirmar** con backend |
+
+El backend vuelve a validar tipo y tamaño (422 con `errors`).
+
+### 12.2 Resto de operaciones
+
+| Operación | Ruta | Respuesta |
+|---|---|---|
+| Listar | `GET /documents` | Paginado; filtros `category`, `entity_type`, `entity_id`; rango sobre `uploaded_at` |
+| Descargar | `GET /documents/{id}/download-url` | 200 `{ "url": "...", "expires_in": 300 }`: enlace temporal firmado |
+| Eliminar (lógico) | `POST /documents/{id}/void` con `{ "reason": "..." }` | 204; deja de listarse y queda en auditoría |
+
+Respuesta de lectura: `id`, `name`, `category`, `entity_type`, `entity_id`, `entity_label` (texto para mostrar la operación, p. ej. "Factura F001-123"), `mime_type`, `size`, `uploaded_by`, `uploaded_by_name` y `uploaded_at`.
+
+El permiso sobre un documento sigue al del registro relacionado: quien no puede ver la venta no ve sus documentos (404).
+
+## 13. Propuesta del frontend: catálogos de Mantenimiento
+
+CRUD estándar (sección 5) con `PATCH` para activar/desactivar. Opcionales como `""`. Un catálogo con uso responde 409 `IN_USE` al borrar; un duplicado, 409 `DUPLICATE` con el campo en `errors`.
+
+| Recurso | Campos | Únicos e inmutables | Filtros |
+|---|---|---|---|
+| `/suppliers` | `document_type`, `document_number`, `name`, `email`, `phone`, `credit_days` (entero ≥ 0), `status` | `document_type` + `document_number` únicos e inmutables | `status`, `document_type` |
+| `/categories` | `name`, `status` | `name` único (sin distinguir mayúsculas) | `status` |
+| `/warehouses` | `code` (mayúsculas, ej. `ALM-001`), `name`, `address` (`""` si no hay), `status` | `code` único e inmutable | `status` |
+| `/products` | `sku` (2 a 30 caracteres `A-Z 0-9 _ -`, se guarda en mayúsculas), `name`, `category_id`, `unit` (`UND`, `KG`, `LT`, `M`, `CAJA`, `BOLSA`, `PAQ`), `sale_price`, `cost_price` (texto decimal ≥ 0), `min_stock` (entero ≥ 0), `status` | `sku` único e inmutable | `status`, `category_id` |
+
+- Respuesta de productos: además `category_name` y `stock_total` (suma de almacenes, calculada; solo lectura).
+- Cambiar `unit` de un producto con movimientos: 409 `UNIT_LOCKED` con el error en `unit`.
+- No se borra una categoría con productos ni un almacén con stock; un almacén con stock > 0 no se desactiva (409). Siempre queda al menos un almacén activo (409).
+- Un `sale_price` menor que `cost_price` se acepta (el frontend solo advierte).
+
+## 14. Propuesta del frontend: Administración
+
+| Recurso | Operaciones | Notas |
+|---|---|---|
+| `/users` | Listar (filtros `status`, `role_id`), crear, `PUT` | Sin borrado ni contraseñas. Nadie se desactiva a sí mismo (409 `SELF_DEACTIVATION`). `email` único (409 `DUPLICATE`). 409 `LAST_ADMIN` si se desactiva o se quita el rol al último administrador activo. Nadie se desactiva a sí mismo (409) |
+| `/roles` | CRUD | Campos `name` (único), `description`, `permissions[]` (formato de la sección 7.3, cada pantalla con `view`), `is_system`. Un rol nuevo nunca es de sistema. El rol de sistema no se edita ni se borra (409 `SYSTEM_ROLE`). Un rol con usuarios no se borra (409 `IN_USE`) |
+| `/permissions` | Listar (filtro `module`) | Catálogo de solo lectura |
+| `/audit` | Listar | Solo lectura. Campos `id`, `user_id`, `user_name`, `action`, `module`, `record` (registro afectado), `result` (`success` \| `failure`), `created_at`. Filtros `user_id`, `module`, `action`, `result`; rango sobre `created_at` |
+| `/settings` | `GET /settings`, `PUT /settings` (recurso único, sin id en la ruta) | Campos `id`, `company_ruc` (11 dígitos), `company_name`, `company_address`, `igv_rate` (texto, ej. `"18.00"`), `currency` (`PEN` \| `USD`), `invoice_series` y `receipt_series` (4 caracteres, distintas), `block_negative_stock`. Solo con `administration.settings:edit`. Un cambio de IGV aplica solo a documentos nuevos y queda en auditoría |
+
+## 15. Propuesta del frontend: Stock y Kardex
+
+| Ruta | Respuesta | Filtros |
+|---|---|---|
+| `GET /inventory/stock` | Filas producto × almacén: `product_id`, `product_sku`, `product_name`, `category_id`, `category_name`, `warehouse_id`, `warehouse_name`, `unit`, `quantity`, `min_stock`, `status` (`normal`, `low`, `out`) y `below_min` (`quantity <= min_stock`) calculados | `status`, `warehouse_id`, `category_id`, `product_id`, `below_min=true` |
+| `GET /inventory/kardex` | Movimientos con `occurred_at`, `type` (compra, venta, transferencia entrada/salida, ajuste, devolución), documento de origen, entrada, salida y `balance` acumulado (lo calcula el backend) | `product_id` (obligatorio), `warehouse_id`, `type`; rango sobre `occurred_at` (obligatorio) |
+
+Transferencias y ajustes (sección 11) devuelven además `number` (`TR-000004`, `AJ-000004`). Cancelar una transferencia exige `{ "reason" }` (sección 5.1).
+
+## 16. Propuesta del frontend: Ventas
+
+Las líneas de documento son `{ product_id, quantity (entero > 0), unit_price (texto decimal) }`, sin productos repetidos. Las respuestas agregan `product_name` y los totales oficiales `subtotal`, `igv` y `total`; el IGV se calcula una vez sobre el subtotal.
+
+| Recurso | Estados | Acciones | Filtros |
+|---|---|---|---|
+| `/sales/quotes` | `draft → sent → accepted \| rejected \| expired` | `send`, `accept`, `reject` (motivo), `convert` (responde el pedido creado en borrador) | `status`, `customer_id`; rango sobre `issue_date` |
+| `/sales/orders` | `draft → confirmed → invoiced \| cancelled` | `confirm`, `cancel` (motivo, antes de facturar), `invoice` con `{ "type": "invoice" \| "receipt" }` (responde el comprobante) | `status`, `customer_id`, `payment_condition`; rango sobre `created_at` |
+| `/sales/invoices` | `issued → partially_paid → paid`, `void` | `void` (motivo; solo sin cobros) | `status`, `type`, `customer_id`; rango sobre `issue_date` |
+| `/sales/returns` | `draft → confirmed` | `confirm` | `status`, `invoice_id`; rango sobre `created_at` |
+
+- **Cotización:** `customer_id`, `issue_date`, `valid_until` (≥ emisión), `items`, `notes`. Respuesta: `number` (`COT-…`), `customer_name`, `order_id` (`""` si no se convirtió), `rejection_reason`. `expired` lo marca el backend al pasar `valid_until`.
+- **Pedido:** `customer_id`, `quote_id` (`""` si no viene de cotización), `items`, `payment_condition` (`cash` con `credit_days` 0, o `credit` con 1 a 365), `notes`. Al confirmar, el backend valida cliente activo (409 `CUSTOMER_INACTIVE`), stock (409 `INSUFFICIENT_STOCK` con la lista en `message`) y límite de crédito: saldo pendiente del cliente + total del pedido ≤ `credit_limit` (409 `CREDIT_LIMIT_EXCEEDED`: "Excede el límite de crédito"). Respuesta: `number` (`PED-…`), `customer_name`, `customer_document_type`, `quote_number`, `invoice_id`, `cancel_reason`.
+- **Comprobante:** nace de `POST /sales/orders/{id}/invoice`. Incluye `payment_condition` (`cash` \| `credit`) del pedido. La factura exige cliente con RUC (422 `RUC_REQUIRED`). `series` y `number` los asigna el backend. Al emitir: descuenta stock y, si es a crédito, crea la cuenta por cobrar. Respuesta: `type`, `series`, `number`, `order_id`, `order_number`, `customer_*`, `issue_date`, `due_date` (`""` al contado), `items` con `returned_quantity`, totales, `paid`, `balance`, `status`, `void_reason`. Anular revierte el stock (409 `HAS_PAYMENTS` si tiene cobros).
+- **Devolución:** `invoice_id`, `items` `{ product_id, quantity }` y `reason` (5 a 255). Cantidad ≤ vendida − ya devuelta (422 con el error en `items.N.quantity`). Al confirmar: nota de crédito, reingreso de stock y menor deuda. Respuesta: `number` (`DEV-…`), `invoice_code`, `customer_name`, `total` (monto de la nota de crédito).
+
+## 17. Propuesta del frontend: Compras
+
+| Recurso | Estados | Acciones | Filtros |
+|---|---|---|---|
+| `/purchases/requests` | `draft → pending → approved \| rejected` | `submit`, `approve`, `reject` (motivo) | `status`; rango sobre `created_at` |
+| `/purchases/orders` | `draft → issued → partially_received → received \| cancelled` | `issue`, `cancel` (motivo; solo sin recepciones) | `status`, `supplier_id`; rango sobre `created_at` |
+| `/purchases/receptions` | `draft → confirmed` | `confirm` | `status`, `order_id`, `warehouse_id`; rango sobre `created_at` |
+| `/purchases/invoices` | `registered → paid \| void` | `void` (motivo; solo sin pagos) | `status`, `supplier_id`; rango sobre `issue_date` |
+| `/purchases/returns` | `draft → confirmed` | `confirm` | `status`, `reception_id`; rango sobre `created_at` |
+
+- **Solicitud:** `items` `{ product_id, quantity }`, `justification` (10 a 500), `needed_by`. Quien aprueba o rechaza no puede ser quien solicita (409 `SELF_APPROVAL`). Respuesta: `number` (`SOL-…`), `requested_by`, `requested_by_name`, `decided_by_name`, `rejection_reason`.
+- **Orden:** `supplier_id`, `request_id` (`""` si no viene de solicitud), `items` con `unit_price` = costo, `expected_date`, `notes`. Respuesta: `number` (`OC-…`), `supplier_name`, `request_number`, `items` con `received_quantity`, totales, `cancel_reason`.
+- **Recepción:** `order_id`, `warehouse_id`, `guide_number`, `items` `{ product_id, quantity }` con cantidad ≤ pendiente de la orden (422). Inmutable al confirmar; al confirmar sube el stock y avanza la orden. Respuesta: `number` (`REC-…`), `order_number`, `supplier_name`, `warehouse_name`, `items` con `returned_quantity`.
+- **Factura del proveedor:** `supplier_id`, `order_id` (de ese proveedor), `series` (4 caracteres), `number` (hasta 8 dígitos; se guarda con 8), `issue_date`, `due_date` (el frontend propone emisión + `credit_days`), `total` con IGV. Proveedor + serie + número únicos (409 `DUPLICATE`). No se edita: se anula y se registra de nuevo. Respuesta: `received_total` (valor de lo recibido con IGV) y `warning` (texto para el usuario si el total no coincide; `""` si cuadra), `paid`, `balance`. Genera la cuenta por pagar.
+- **Devolución al proveedor:** `reception_id`, `items`, `reason`. Cantidad ≤ recibida − ya devuelta. Al confirmar baja el stock y la deuda. Respuesta: `number` (`DVP-…`), `reception_number`, `supplier_name`, `total`.
+
+## 18. Propuesta del frontend: Finanzas
+
+| Ruta | Operación | Notas |
+|---|---|---|
+| `GET /finance/receivables` | Listar | Filtros `customer_id`, `status`; rango sobre `due_date`. Campos: `invoice_id`, `invoice_code`, `customer_*`, `issue_date`, `due_date`, `total`, `paid`, `balance`, `status` (`pending`, `partially_paid`, `paid`, `overdue`) |
+| `GET /finance/payables` | Listar | Igual, con `supplier_*` |
+| `GET /finance/payments` | Listar | Filtros `type`, `method`, `status`, `document_id`; rango sobre `payment_date` |
+| `POST /finance/payments` | Registrar cobro o pago | Cuerpo: `type` (`collection` \| `payment`), `document_type` (`sales_invoice` \| `supplier_invoice`), `document_id`, `method` (`cash` \| `transfer` \| `card`), `amount` (> 0 y ≤ saldo), `payment_date` (no futura), `bank_account_id` y `operation_number` (obligatorios con transferencia), `reference`. Efectivo sin caja abierta: 409 `CASH_CLOSED`. Actualiza el saldo y el estado del documento; el efectivo entra como movimiento de caja y la transferencia como movimiento bancario |
+| `POST /finance/payments/{id}/void` | Anular | `{ reason }`. No se edita; al anular se restituye el saldo y se registra el movimiento inverso en la caja o el banco donde entró (409 si la caja ya se cerró) |
+| `GET /finance/cash/registers` | Cajas | Paginado (formato de la sección 4). `id`, `name`, `open_session_id` (`""` si no hay) |
+| `GET /finance/cash/sessions`, `GET /finance/cash/sessions/{id}` | Sesiones | Filtros `status`, `register_id`; rango sobre `opened_at`. Incluyen `movements`, `expected_amount` (calculado), `counted_amount`, `difference`, `closing_note` |
+| `POST /finance/cash/sessions` | Abrir | `{ register_id, opening_amount }`. Una sola sesión abierta por caja (409 `SESSION_ALREADY_OPEN`) |
+| `POST /finance/cash/sessions/{id}/movements` | Ingreso o egreso | `{ type, concept (obligatorio), amount }`. Sesión cerrada: 409 |
+| `POST /finance/cash/sessions/{id}/close` | Cerrar | `{ counted_amount, note }`. La nota es obligatoria si hay diferencia. Responde la sesión con `difference` (+ sobrante, − faltante). Cerrada es solo lectura |
+| `/finance/bank-accounts` | Catálogo | `bank`, `number` (único), `currency` (`PEN` \| `USD`), `status`; respuesta con `balance` calculado. Filtros `status`, `currency`. Con movimientos no se borra. Los cobros y pagos en soles solo usan cuentas en `PEN` |
+| `GET`/`POST /finance/bank-accounts/{id}/movements` | Movimientos | Filtros `type`, `source`; rango sobre `movement_date`. Manual: `{ type, concept, amount, movement_date }`. Los de cobros y pagos por transferencia entran solos (`source: "payment"`) |
+| `PATCH /finance/bank-accounts/{id}/movements/{movementId}` | Conciliar | `{ "reconciled": true \| false }` (opcional v1) |
+| `GET /finance/statements` | Estado de cuenta | Query `party_type` (`customer` \| `supplier`), `party_id`, `date_from`, `date_to` (obligatorios). Responde `party_name`, `party_document`, `opening_balance`, `lines` (`date`, `type`, `document_code`, `debit`, `credit`, `balance` acumulado) y `closing_balance`. Los saldos los calcula el backend |
+
+## 19. Propuesta del frontend: Dashboard y Reportes
+
+Todos los agregados los calcula el backend. Rango con `date_from` y `date_to` (fechas de negocio, día de Lima).
+
+### 19.1 Definición de indicadores (`GET /reports/dashboard`)
+
+| Campo | Definición |
+|---|---|
+| `sales` | Suma de comprobantes emitidos del periodo, sin anulados, menos el valor de las devoluciones confirmadas (con IGV) |
+| `purchases` | Suma de facturas de proveedor registradas del periodo, sin anuladas |
+| `gross_profit` | Ventas netas sin IGV menos el costo de lo vendido |
+| `gross_margin` | `gross_profit` ÷ ventas netas sin IGV, en % con 1 decimal (`"25.0"`); `""` si no hubo ventas |
+| `critical_stock_count` | Cantidad de productos con stock total ≤ `min_stock` |
+| `receivables.total` / `receivables.overdue` | Saldo total por cobrar / saldo de las cuentas vencidas |
+| `payables.total` / `payables.due_soon` | Saldo total por pagar / saldo que vence en los próximos 7 días |
+| `inventory_turnover` | Costo de ventas ÷ inventario promedio del periodo, texto con 2 decimales |
+| `alerts.low_stock` | Productos bajo mínimo: `product_id`, `product_name`, `unit`, `stock`, `min_stock` |
+| `alerts.overdue_receivables` | Cuentas vencidas: `invoice_id`, `invoice_code`, `customer_name`, `balance`, `due_date` |
+
+### 19.2 Reportes
+
+| Ruta | Respuesta | Filtros |
+|---|---|---|
+| `GET /reports/sales` | Paginado de comprobantes (`code`, `type_label`, `issue_date`, `customer_name`, `total`, `status_label`) **más `sum`**: total del resultado completo sin anulados | Rango, `customer_id` |
+| `GET /reports/purchases` | Igual con facturas de proveedor (`supplier_name`) | Rango, `supplier_id` |
+| `GET /reports/low-stock` | Paginado: `sku`, `product_name`, `unit`, `stock`, `min_stock`, `shortfall`; `sum` vacío | — |
+| `GET /reports/analytics/monthly` | Lista `{ month: "2026-09", sales, purchases }`, un punto por mes del rango (también los meses en cero) | Rango |
+| `GET /reports/analytics/top-products` | Los 5 productos con más venta neta: `product_id`, `product_name`, `quantity`, `amount` (sin IGV) | Rango |
+
+Los reportes operativos se imprimen desde el navegador. Los gráficos se dibujan en el frontend (SVG propio, sin librería) y siempre tienen una vista de tabla.

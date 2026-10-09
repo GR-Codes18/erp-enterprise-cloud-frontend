@@ -9,8 +9,18 @@ export const reportsModule: AppModule = {
   sections: [
     {
       items: [
-        { label: "Operativos", path: "operational" },
-        { label: "Analíticos", path: "analytical" },
+        {
+          label: "Operativos",
+          path: "operational",
+          permission: "reports.operational:view",
+          page: () => import("./pages/OperationalReportsPage"),
+        },
+        {
+          label: "Analíticos",
+          path: "analytical",
+          permission: "reports.analytics:view",
+          page: () => import("./pages/AnalyticalReportsPage"),
+        },
       ],
     },
   ],

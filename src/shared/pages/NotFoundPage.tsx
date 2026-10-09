@@ -7,7 +7,7 @@ export default function NotFoundPage() {
       <p className="mt-1 text-sm text-muted-foreground">
         La dirección que buscas no existe.
       </p>
-      <Link to="/dashboard" className="mt-4 inline-block text-sm text-primary underline">
+      <Link to="/" className="mt-4 inline-block text-sm text-primary underline">
         Volver al Dashboard
       </Link>
     </section>

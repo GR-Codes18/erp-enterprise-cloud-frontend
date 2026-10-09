@@ -12,7 +12,7 @@ const customer = (
   email: string,
   phone: string,
   credit_limit: string,
-  status: CustomerStatus,
+  status: CustomerStatus
 ): Customer => ({
   id: uuid(n),
   document_type,
@@ -40,9 +40,47 @@ const seed: Customer[] = [
   customer(12, "CE", "002345678", "Marie Dubois", "marie.dubois@example.com", "999000012", "0.00", "inactive"),
 ]
 
+/** Clientes 1 y 2 tienen ventas o cotizaciones asociadas */
+const IN_USE_IDS = [uuid(1), uuid(2)]
+
 export const customerHandlers = createCrudHandlers<Customer>({
   resource: "customers",
   seed,
+  // Un registro nuevo aparece primero en el listado
+  insertAt: "start",
   searchFields: ["name", "document_number", "email"],
   filterFields: ["status", "document_type"],
+  // El documento es único por tipo + número (contrato): un DNI y un CE pueden compartir número
+  validate: ({ next, items }) => {
+    if (!next) return undefined
+    const number = next.document_number.trim()
+    const duplicate = items.some(
+      (item) =>
+        item.id !== next.id &&
+        item.document_type === next.document_type &&
+        item.document_number.trim() === number,
+    )
+    if (!duplicate) return undefined
+    const message = "Ya existe un cliente con este tipo y número de documento"
+    return { status: 409, code: "DUPLICATE", message, errors: [{ field: "document_number", message }] }
+  },
+  immutableFields: ["document_type", "document_number"],
+  isInUse: (item) => IN_USE_IDS.includes(item.id),
+  inUseMessage:
+    "Este cliente tiene ventas, cotizaciones o comprobantes registrados y no se puede eliminar. Puedes desactivarlo para evitar nuevas operaciones.",
+  prepareCreate: (body) => ({
+    document_type: (body.document_type as DocumentType) || "DNI",
+    document_number: String(body.document_number ?? "").trim(),
+    name: String(body.name ?? "").trim(),
+    email: String(body.email ?? "").trim(),
+    phone: String(body.phone ?? "").trim(),
+    credit_limit: String(body.credit_limit ?? "0.00").trim(),
+    status: (body.status as CustomerStatus) || "active",
+  }),
+  prepareUpdate: (_current, body) => ({
+    name: String(body.name ?? "").trim(),
+    email: String(body.email ?? "").trim(),
+    phone: String(body.phone ?? "").trim(),
+    credit_limit: String(body.credit_limit ?? "0.00").trim(),
+  }),
 })

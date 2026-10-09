@@ -1,20 +1,21 @@
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/shared/components/ui/alert-dialog"
 import { Button } from "@/shared/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog"
 
-interface ConfirmDialogProps {
+export interface ConfirmDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
   description: string
-  confirmLabel?: string
+  confirmText?: string
+  /** "destructive" (rojo) para borrar o anular; "default" para confirmar una acción normal */
+  confirmVariant?: "destructive" | "default"
   isLoading?: boolean
   onConfirm: () => void
 }
@@ -24,26 +25,37 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = "Eliminar",
+  confirmText = "Eliminar",
+  confirmVariant = "destructive",
   isLoading = false,
   onConfirm,
 }: ConfirmDialogProps) {
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={isLoading}>Cancelar</AlertDialogCancel>
-          {/* Botón normal (no AlertDialogAction): este último cierra el diálogo solo,
-              y aquí debe quedar abierto mientras la petición está en curso */}
-          <Button variant="destructive" disabled={isLoading} onClick={onConfirm}>
-            {isLoading ? "Procesando..." : confirmLabel}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isLoading}
+            onClick={() => onOpenChange(false)}
+          >
+            Cancelar
           </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          <Button
+            type="button"
+            variant={confirmVariant}
+            disabled={isLoading}
+            onClick={onConfirm}
+          >
+            {isLoading ? "Procesando..." : confirmText}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

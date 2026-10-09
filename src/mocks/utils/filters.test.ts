@@ -68,6 +68,11 @@ describe("applyListFilters", () => {
     expect(ids(run("date_from=2026-02-15&date_to=2026-03-01"))).toEqual(["2", "3"])
   })
 
+  it("interpreta el día en hora de Lima: 00:00 UTC del 20/03 es todavía el 19/03", () => {
+    expect(ids(run("date_from=2026-03-19&date_to=2026-03-19"))).toEqual(["4"])
+    expect(ids(run("date_from=2026-03-20"))).toEqual([])
+  })
+
   it("ignora las fechas si el recurso no tiene campo de fecha", () => {
     expect(ids(run("date_from=2030-01-01", { dateField: undefined }))).toEqual(["1", "2", "3", "4"])
   })
