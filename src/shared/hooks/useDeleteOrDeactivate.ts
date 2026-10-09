@@ -9,6 +9,13 @@ interface UseDeleteOrDeactivateOptions<T> {
   onError?: (message: string) => void
 }
 
+interface ErrorWithStatus {
+  status?: number
+  response?: {
+    status?: number
+  }
+}
+
 export function useDeleteOrDeactivate<T>({
   resourceName,
   onDelete,
@@ -26,8 +33,9 @@ export function useDeleteOrDeactivate<T>({
     try {
       await onDelete(item)
       onSuccess?.()
-    } catch (error: any) {
-      const status = error?.status ?? error?.response?.status
+    } catch (error: unknown) {
+      const err = error as ErrorWithStatus
+      const status = err?.status ?? err?.response?.status
       if (status === 409) {
         setInUseItem(item)
         setIsInUseDialogOpen(true)
@@ -50,7 +58,7 @@ export function useDeleteOrDeactivate<T>({
       setIsInUseDialogOpen(false)
       setInUseItem(null)
       onSuccess?.()
-    } catch (error: any) {
+    } catch (error: unknown) {
       onError?.(getErrorMessage(error))
     } finally {
       setIsDeactivating(false)

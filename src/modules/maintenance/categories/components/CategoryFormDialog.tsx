@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select"
 import { getErrorMessage, isApiError } from "@/shared/lib/api/errors"
+import type { FieldError } from "@/shared/lib/api/types"
 import { useCreateCategory, useUpdateCategory } from "../hooks"
 import {
   CATEGORY_STATUSES,
@@ -62,11 +63,34 @@ function CategoryForm({ category, onDone }: { category: Category | null; onDone:
   })
 
   const handleError = (error: unknown) => {
-    if (isApiError(error)) {
-      for (const item of error.fieldErrors) {
-        setError(item.field as keyof CategoryInput, { message: item.message })
-      }
+    const status = isApiError(error)
+      ? error.status
+      : (error as { status?: number; response?: { status?: number } })?.status ??
+        (error as { response?: { status?: number } })?.response?.status
+
+    // 1. Manejo explícito para conflicto / duplicado (409)
+    if (status === 409) {
+      const fieldErrors = isApiError(error)
+        ? error.fieldErrors
+        : (error as { fieldErrors?: FieldError[] })?.fieldErrors
+      const nameMessage =
+        fieldErrors?.find((f) => f.field === "name")?.message ||
+        "Ya existe una categoría con este nombre"
+      setError("name", { message: nameMessage })
+      return
     }
+
+    // 2. Errores de validación de campos (400, 422, etc.)
+    if (isApiError(error) && error.fieldErrors && error.fieldErrors.length > 0) {
+      for (const item of error.fieldErrors) {
+        if (item.field) {
+          setError(item.field as keyof CategoryInput, { message: item.message })
+        }
+      }
+      return
+    }
+
+    // 3. Fallback a error de servidor
     setServerError(getErrorMessage(error))
   }
 

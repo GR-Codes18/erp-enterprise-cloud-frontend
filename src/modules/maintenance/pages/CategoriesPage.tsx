@@ -4,16 +4,18 @@ import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
 import { DataTable, type Column } from "@/shared/components/DataTable"
 import { EmptyState } from "@/shared/components/EmptyState"
 import { ErrorState } from "@/shared/components/ErrorState"
+import InUseDialog from "@/shared/components/InUseDialog"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
+import { useDeleteOrDeactivate } from "@/shared/hooks/useDeleteOrDeactivate"
 import { getErrorMessage } from "@/shared/lib/api/errors"
-import { CategoryFormDialog } from "../categories/components/CategoryFormDialog"
-import { useCategories, useDeleteCategory } from "../categories/hooks"
-import { STATUS_LABELS, type Category } from "../categories/schema"
+import { CategoryFormDialog } from "@/modules/maintenance/categories/components/CategoryFormDialog"
+import { useCategories, useDeleteCategory, usePatchCategory } from "@/modules/maintenance/categories/hooks"
+import { STATUS_LABELS, type Category } from "@/modules/maintenance/categories/schema"
 
 const PAGE_SIZE = 10
 
@@ -31,19 +33,35 @@ export default function CategoriesPage() {
 
   const categories = useCategories({ page, size: PAGE_SIZE, search })
   const deleteCategory = useDeleteCategory()
+  const patchCategory = usePatchCategory()
 
-  const handleConfirmDelete = () => {
+  const {
+    isInUseDialogOpen,
+    setIsInUseDialogOpen,
+    isDeleting,
+    isDeactivating,
+    handleDelete,
+    handleConfirmDeactivate,
+  } = useDeleteOrDeactivate<Category>({
+    resourceName: "Categoría",
+    onDelete: async (item) => {
+      await deleteCategory.mutateAsync(item.id)
+      if ((categories.data?.items.length ?? 0) === 1 && page > 1) {
+        setPage(page - 1)
+      }
+    },
+    onDeactivate: async (item) => {
+      await patchCategory.mutateAsync({ id: item.id, input: { status: "inactive" } })
+    },
+    onError: (msg) => setActionError(msg),
+    onSuccess: () => setActionError(null),
+  })
+
+  const handleConfirmDelete = async () => {
     if (!toDelete) return
-    deleteCategory.mutate(toDelete.id, {
-      onSuccess: () => {
-        if ((categories.data?.items.length ?? 0) === 1 && page > 1) setPage(page - 1)
-        setToDelete(null)
-      },
-      onError: (error) => {
-        setToDelete(null)
-        setActionError(getErrorMessage(error))
-      },
-    })
+    const target = toDelete
+    setToDelete(null)
+    await handleDelete(target)
   }
 
   const columns: Column<Category>[] = [
@@ -173,8 +191,16 @@ export default function CategoriesPage() {
         }}
         title="Eliminar categoría"
         description={`¿Seguro que quieres eliminar la categoría "${toDelete?.name ?? ""}"? Esta acción no se puede deshacer.`}
-        isLoading={deleteCategory.isPending}
+        isLoading={isDeleting}
         onConfirm={handleConfirmDelete}
+      />
+
+      <InUseDialog
+        open={isInUseDialogOpen}
+        onOpenChange={setIsInUseDialogOpen}
+        resourceName="Categoría"
+        isPending={isDeactivating}
+        onDeactivate={handleConfirmDeactivate}
       />
     </>
   )

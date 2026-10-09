@@ -1,12 +1,12 @@
-import { http, HttpResponse } from "msw"
+import { http, HttpResponse, passthrough } from "msw"
 
 export interface UniqueFieldConfig<T> {
   field: keyof T
   label?: string
-  normalize?: (value: any) => string
+  normalize?: (value: unknown) => string
 }
 
-export interface CrudHandlerOptions<T extends Record<string, any>> {
+export interface CrudHandlerOptions<T extends object> {
   endpoint: string
   items: T[]
   idField?: keyof T
@@ -17,13 +17,13 @@ export interface CrudHandlerOptions<T extends Record<string, any>> {
   isInUse?: (item: T) => boolean
   inUseIds?: string[]
   inUseMessage?: string
-  onBeforeCreate?: (body: any, items: T[]) => Partial<T>
-  onBeforeUpdate?: (current: T, body: any) => Partial<T>
+  onBeforeCreate?: (body: Record<string, unknown>, items: T[]) => Partial<T>
+  onBeforeUpdate?: (current: T, body: Record<string, unknown>) => Partial<T>
 }
 
-export function createCrudHandlers<T extends Record<string, any>>(options: CrudHandlerOptions<T>) {
+export function createCrudHandlers<T extends object>(options: CrudHandlerOptions<T>) {
   const {
-    endpoint,
+    endpoint: rawEndpoint,
     items,
     idField = "id" as keyof T,
     searchFields = [],
@@ -37,12 +37,24 @@ export function createCrudHandlers<T extends Record<string, any>>(options: CrudH
     onBeforeUpdate,
   } = options
 
-  const normalizeValue = (val: any) =>
+  const endpoint = rawEndpoint.includes("/api/v1/")
+    ? rawEndpoint
+    : rawEndpoint.replace("*/", "*/api/v1/")
+
+  const normalizeValue = (val: unknown) =>
     typeof val === "string" ? val.trim().toLowerCase() : String(val ?? "").toLowerCase()
+
+  const isSourceFileRequest = (url: string, idParam?: string) => {
+    if (url.includes("/src/")) return true
+    if (idParam && /\.(ts|tsx|js|jsx|css|json)$/i.test(idParam)) return true
+    return false
+  }
 
   return [
     // GET Listar paginado
     http.get(endpoint, ({ request }) => {
+      if (isSourceFileRequest(request.url)) return passthrough()
+
       const url = new URL(request.url)
       const search = url.searchParams.get("search")?.toLowerCase().trim() || ""
       const page = Number(url.searchParams.get("page") || "1")
@@ -50,7 +62,6 @@ export function createCrudHandlers<T extends Record<string, any>>(options: CrudH
 
       let filtered = items
 
-      // Filtro de búsqueda libre
       if (search && searchFields.length > 0) {
         filtered = filtered.filter((item) =>
           searchFields.some((field) => {
@@ -60,7 +71,6 @@ export function createCrudHandlers<T extends Record<string, any>>(options: CrudH
         )
       }
 
-      // Filtros exactos
       for (const field of filterFields) {
         const paramVal = url.searchParams.get(String(field))
         if (paramVal !== null && paramVal !== "") {
@@ -77,9 +87,13 @@ export function createCrudHandlers<T extends Record<string, any>>(options: CrudH
     }),
 
     // GET Obtener por ID
-    http.get(`${endpoint}/:id`, ({ params }) => {
+    http.get(`${endpoint}/:id`, ({ request, params }) => {
       const { id } = params
-      const item = items.find((i) => String(i[idField]) === String(id))
+      const stringId = String(id)
+
+      if (isSourceFileRequest(request.url, stringId)) return passthrough()
+
+      const item = items.find((i) => String(i[idField]) === stringId)
       if (!item) {
         return HttpResponse.json({ message: "Registro no encontrado" }, { status: 404 })
       }
@@ -88,9 +102,10 @@ export function createCrudHandlers<T extends Record<string, any>>(options: CrudH
 
     // POST Crear
     http.post(endpoint, async ({ request }) => {
-      const body = (await request.json()) as any
+      if (isSourceFileRequest(request.url)) return passthrough()
 
-      // Validar campos únicos
+      const body = (await request.json()) as Record<string, unknown>
+
       for (const config of uniqueFields) {
         const fieldName = String(config.field)
         const rawValue = body[fieldName]
@@ -117,7 +132,6 @@ export function createCrudHandlers<T extends Record<string, any>>(options: CrudH
         }
       }
 
-      // Procesar datos adicionales o ID si aplica
       const customProps = onBeforeCreate ? onBeforeCreate(body, items) : {}
       const newItem = {
         ...body,
@@ -128,19 +142,21 @@ export function createCrudHandlers<T extends Record<string, any>>(options: CrudH
       return HttpResponse.json(newItem, { status: 201 })
     }),
 
-    // PUT Actualizar (Respetando inmutabilidad)
+    // PUT Actualizar
     http.put(`${endpoint}/:id`, async ({ request, params }) => {
       const { id } = params
-      const body = (await request.json()) as any
+      const stringId = String(id)
 
-      const index = items.findIndex((i) => String(i[idField]) === String(id))
+      if (isSourceFileRequest(request.url, stringId)) return passthrough()
+
+      const body = (await request.json()) as Record<string, unknown>
+      const index = items.findIndex((i) => String(i[idField]) === stringId)
       if (index === -1) {
         return HttpResponse.json({ message: "Registro no encontrado" }, { status: 404 })
       }
 
       const current = items[index]
 
-      // Validar campos únicos excluyendo el registro actual
       for (const config of uniqueFields) {
         const fieldName = String(config.field)
         const rawValue = body[fieldName]
@@ -169,9 +185,7 @@ export function createCrudHandlers<T extends Record<string, any>>(options: CrudH
       }
 
       const customProps = onBeforeUpdate ? onBeforeUpdate(current, body) : {}
-
-      // Mantener campos inmutables del registro actual
-      const preservedFields: Record<string, any> = {}
+      const preservedFields: Record<string, unknown> = {}
       for (const field of immutableFields) {
         preservedFields[String(field)] = current[field]
       }
@@ -180,7 +194,7 @@ export function createCrudHandlers<T extends Record<string, any>>(options: CrudH
         ...current,
         ...body,
         ...customProps,
-        ...preservedFields, // Aplica al final para garantizar que no se sobreescriban
+        ...preservedFields,
       } as T
 
       items[index] = updatedItem
@@ -190,9 +204,12 @@ export function createCrudHandlers<T extends Record<string, any>>(options: CrudH
     // PATCH Actualización parcial
     http.patch(`${endpoint}/:id`, async ({ request, params }) => {
       const { id } = params
-      const body = (await request.json()) as Partial<T>
+      const stringId = String(id)
 
-      const index = items.findIndex((i) => String(i[idField]) === String(id))
+      if (isSourceFileRequest(request.url, stringId)) return passthrough()
+
+      const body = (await request.json()) as Partial<T>
+      const index = items.findIndex((i) => String(i[idField]) === stringId)
       if (index === -1) {
         return HttpResponse.json({ message: "Registro no encontrado" }, { status: 404 })
       }
@@ -201,10 +218,12 @@ export function createCrudHandlers<T extends Record<string, any>>(options: CrudH
       return HttpResponse.json(items[index])
     }),
 
-    // DELETE Eliminar o advertir en uso (409)
-    http.delete(`${endpoint}/:id`, ({ params }) => {
+    // DELETE Eliminar
+    http.delete(`${endpoint}/:id`, ({ request, params }) => {
       const { id } = params
       const stringId = String(id)
+
+      if (isSourceFileRequest(request.url, stringId)) return passthrough()
 
       const item = items.find((i) => String(i[idField]) === stringId)
       if (!item) {
