@@ -4,15 +4,17 @@ import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
 import { DataTable, type Column } from "@/shared/components/DataTable"
 import { EmptyState } from "@/shared/components/EmptyState"
 import { ErrorState } from "@/shared/components/ErrorState"
+import InUseDialog from "@/shared/components/InUseDialog"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
+import { useDeleteOrDeactivate } from "@/shared/hooks/useDeleteOrDeactivate"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import { WarehouseFormDialog } from "../warehouses/components/WarehouseFormDialog"
-import { useDeleteWarehouse, useWarehouses } from "../warehouses/hooks"
+import { useDeleteWarehouse, usePatchWarehouse, useWarehouses } from "../warehouses/hooks"
 import { STATUS_LABELS, type Warehouse } from "../warehouses/schema"
 
 const PAGE_SIZE = 10
@@ -31,19 +33,35 @@ export default function WarehousesPage() {
 
   const warehouses = useWarehouses({ page, size: PAGE_SIZE, search })
   const deleteWarehouse = useDeleteWarehouse()
+  const patchWarehouse = usePatchWarehouse()
 
-  const handleConfirmDelete = () => {
+  const {
+    isInUseDialogOpen,
+    setIsInUseDialogOpen,
+    isDeleting,
+    isDeactivating,
+    handleDelete,
+    handleConfirmDeactivate,
+  } = useDeleteOrDeactivate<Warehouse>({
+    resourceName: "Almacén",
+    onDelete: async (item) => {
+      await deleteWarehouse.mutateAsync(item.id)
+      if ((warehouses.data?.items.length ?? 0) === 1 && page > 1) {
+        setPage(page - 1)
+      }
+    },
+    onDeactivate: async (item) => {
+      await patchWarehouse.mutateAsync({ id: item.id, input: { status: "inactive" } })
+    },
+    onError: (msg) => setActionError(msg),
+    onSuccess: () => setActionError(null),
+  })
+
+  const handleConfirmDelete = async () => {
     if (!toDelete) return
-    deleteWarehouse.mutate(toDelete.id, {
-      onSuccess: () => {
-        if ((warehouses.data?.items.length ?? 0) === 1 && page > 1) setPage(page - 1)
-        setToDelete(null)
-      },
-      onError: (error) => {
-        setToDelete(null)
-        setActionError(getErrorMessage(error))
-      },
-    })
+    const target = toDelete
+    setToDelete(null)
+    await handleDelete(target)
   }
 
   const columns: Column<Warehouse>[] = [
@@ -185,8 +203,16 @@ export default function WarehousesPage() {
         }}
         title="Eliminar almacén"
         description={`¿Seguro que quieres eliminar el almacén "${toDelete?.name ?? ""}"? Esta acción no se puede deshacer.`}
-        isLoading={deleteWarehouse.isPending}
+        isLoading={isDeleting}
         onConfirm={handleConfirmDelete}
+      />
+
+      <InUseDialog
+        open={isInUseDialogOpen}
+        onOpenChange={setIsInUseDialogOpen}
+        resourceName="Almacén"
+        isPending={isDeactivating}
+        onDeactivate={handleConfirmDeactivate}
       />
     </>
   )
