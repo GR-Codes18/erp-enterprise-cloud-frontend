@@ -68,29 +68,33 @@ export const productHandlers = createCrudHandlers<Product>({
     {
       field: "code",
       label: "código",
-      normalize: (val: any) => String(val ?? "").trim().toUpperCase(),
+      normalize: (val: unknown) => String(val ?? "").trim().toUpperCase(),
     },
   ],
   immutableFields: ["code", "stock"],
   inUseIds: IN_USE_IDS,
   inUseMessage:
     "Este producto tiene movimientos y no se puede eliminar. Puedes desactivarlo para que deje de usarse en nuevas operaciones.",
-  onBeforeCreate: (body: any, currentItems: Product[]) => {
+  onBeforeCreate: (body: Record<string, unknown>, currentItems: Product[]) => {
     const newId = uuid(currentItems.length + 1)
     const codeNormalized = String(body.code ?? "").trim().toUpperCase()
-    const categoryName = CATEGORIES_MAP[body.category_id] || "General"
+    const categoryId = String(body.category_id ?? "")
+    const categoryName = CATEGORIES_MAP[categoryId] || "General"
     return {
       id: newId,
       code: codeNormalized,
       name: String(body.name ?? "").trim(),
+      category_id: categoryId,
       category_name: categoryName,
       stock: 0,
     }
   },
-  onBeforeUpdate: (current: Product, body: any) => {
-    const categoryName = CATEGORIES_MAP[body.category_id] || current.category_name || "General"
+  onBeforeUpdate: (current: Product, body: Record<string, unknown>) => {
+    const categoryId = String(body.category_id ?? current.category_id)
+    const categoryName = CATEGORIES_MAP[categoryId] || current.category_name || "General"
     return {
       name: String(body.name ?? "").trim(),
+      category_id: categoryId,
       category_name: categoryName,
     }
   },
