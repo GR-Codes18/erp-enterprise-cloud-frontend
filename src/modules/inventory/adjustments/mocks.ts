@@ -1,5 +1,4 @@
 import { createDocumentHandlers, nextNumber } from "@/mocks/utils/documents"
-import { applyInventoryMovement } from "@/modules/inventory/state"
 import { PRODUCTS, WAREHOUSES, productRef, warehouseRef } from "../mockRefs"
 import type { Adjustment, AdjustmentInput } from "./schema"
 import { adjustmentInputSchema } from "./schema"
@@ -71,26 +70,7 @@ export const { handlers: adjustmentHandlers } = createDocumentHandlers<
   filterFields: ["status", "warehouse_id", "reason"],
   dateField: "created_at",
   inputSchema: adjustmentInputSchema,
-  actions: [
-    {
-      action: "apply",
-      from: ["draft"],
-      to: "applied",
-      respond: (adjustment) => {
-        adjustment.items.forEach((item) => {
-          applyInventoryMovement({
-            product_id: item.product_id,
-            warehouse_id: adjustment.warehouse_id,
-            quantity: item.quantity,
-            direction: item.direction === "increase" ? "in" : "out",
-            type: "adjustment",
-            reference: adjustment.number,
-          })
-        })
-        return adjustment
-      },
-    },
-  ],
+  actions: [{ action: "apply", from: ["draft"], to: "applied" }],
   // Contador propio: borrar un borrador no reutiliza su número
   createRecord: (input, id, createdAt) => makeAdjustment(input, id, createdAt, nextNumber("AJ", ++adjustmentCounter)),
   updateRecord: (current, input) => makeAdjustment(input, current.id, current.created_at, current.number),

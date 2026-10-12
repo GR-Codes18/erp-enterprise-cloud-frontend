@@ -21,10 +21,6 @@ export const documentLineSchema = z.object({
     .regex(UNIT_PRICE_PATTERN, "Precio no válido, ejemplo: 45.50"),
 })
 
-export const warehouseLineSchema = z.object({
-  warehouse_id: z.string().min(1, "Selecciona un almacén"),
-})
-
 export type DocumentLine = z.infer<typeof documentLineSchema>
 
 /** Una lista de líneas con al menos una y sin productos repetidos */

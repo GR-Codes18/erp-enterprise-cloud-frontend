@@ -10,9 +10,7 @@ import {
 import type { EditableLine, LineErrors } from "@/shared/components/LineItemsEditor"
 import { EMPTY_LINE, type DocumentLine } from "@/shared/lib/lines"
 
-type DocumentLineWithWarehouse = DocumentLine & { warehouse_id?: string }
-
-type LinesForm = { items: DocumentLineWithWarehouse[] }
+type LinesForm = { items: DocumentLine[] }
 
 /**
  * Conecta el LineItemsEditor con un formulario de react-hook-form que tenga `items`.
@@ -33,7 +31,6 @@ export function useLineItemsEditor<T extends FieldValues & LinesForm>(
   const lines: EditableLine[] = fields.map((field, index) => ({
     key: field.id,
     product_id: values[index]?.product_id ?? "",
-    warehouse_id: values[index]?.warehouse_id ?? "",
     quantity: values[index]?.quantity ?? Number.NaN,
     unit_price: values[index]?.unit_price ?? "",
   }))
@@ -43,7 +40,6 @@ export function useLineItemsEditor<T extends FieldValues & LinesForm>(
     return error
       ? {
           product_id: error.product_id?.message,
-          warehouse_id: error.warehouse_id?.message,
           quantity: error.quantity?.message,
           unit_price: error.unit_price?.message,
         }
@@ -64,10 +60,9 @@ export function useLineItemsEditor<T extends FieldValues & LinesForm>(
       const proposed = priceOf(productId)
       if (proposed !== undefined) setValue(`items.${index}.unit_price`, proposed, validate)
     },
-    onWarehouseChange: (index: number, warehouseId: string) => setValue(`items.${index}.warehouse_id`, warehouseId, validate),
     onQuantityChange: (index: number, quantity: number) => setValue(`items.${index}.quantity`, quantity, validate),
     onPriceChange: (index: number, price: string) => setValue(`items.${index}.unit_price`, price, validate),
-    onAdd: () => append({ ...EMPTY_LINE, warehouse_id: "" }),
+    onAdd: () => append({ ...EMPTY_LINE }),
     onRemove: (index: number) => remove(index),
   }
 }

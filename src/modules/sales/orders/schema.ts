@@ -1,6 +1,6 @@
 import { z } from "zod"
 import type { StatusTone } from "@/shared/components/StatusBadge"
-import { EMPTY_LINE } from "@/shared/lib/lines"
+import { EMPTY_LINE, documentLinesSchema } from "@/shared/lib/lines"
 import { notesSchema } from "@/shared/lib/schemas"
 
 export const ORDER_STATUSES = ["draft", "confirmed", "invoiced", "cancelled"] as const
@@ -42,26 +42,12 @@ export const PAYMENT_CONDITION_LABELS: Record<PaymentCondition, string> = {
 
 export const MAX_CREDIT_DAYS = 365
 
-const orderLineInputSchema = z.object({
-  product_id: z.string().min(1, "Selecciona un producto"),
-  warehouse_id: z.string().min(1, "Selecciona un almacén"),
-  quantity: z
-    .number({ message: "Ingresa una cantidad válida" })
-    .int("La cantidad debe ser entera")
-    .positive("La cantidad debe ser mayor que cero"),
-  unit_price: z
-    .string()
-    .trim()
-    .min(1, "Ingresa el precio")
-    .regex(/^\d+(\.\d{1,2})?$/, "Precio no válido, ejemplo: 45.50"),
-})
-
 export const orderInputSchema = z
   .object({
     customer_id: z.string().min(1, "Selecciona un cliente"),
     /** Cotización de origen, o "" si el pedido se creó directo */
     quote_id: z.string(),
-    items: z.array(orderLineInputSchema).min(1, "Agrega al menos un producto"),
+    items: documentLinesSchema,
     payment_condition: z.enum(PAYMENT_CONDITIONS),
     credit_days: z
       .number({ message: "Ingresa los días de crédito" })
@@ -84,8 +70,6 @@ export type OrderInput = z.infer<typeof orderInputSchema>
 const orderLineSchema = z.object({
   product_id: z.string(),
   product_name: z.string(),
-  warehouse_id: z.string(),
-  warehouse_name: z.string(),
   quantity: z.number(),
   unit_price: z.string(),
 })
@@ -119,7 +103,7 @@ export type Order = z.infer<typeof orderSchema>
 export const EMPTY_ORDER: OrderInput = {
   customer_id: "",
   quote_id: "",
-  items: [{ ...EMPTY_LINE, warehouse_id: "" }],
+  items: [{ ...EMPTY_LINE }],
   payment_condition: "cash",
   credit_days: 0,
   notes: "",
@@ -129,7 +113,7 @@ export function toOrderInput(order: Order): OrderInput {
   return {
     customer_id: order.customer_id,
     quote_id: order.quote_id,
-    items: order.items.map(({ product_id, warehouse_id, quantity, unit_price }) => ({ product_id, warehouse_id, quantity, unit_price })),
+    items: order.items.map(({ product_id, quantity, unit_price }) => ({ product_id, quantity, unit_price })),
     payment_condition: order.payment_condition,
     credit_days: order.credit_days,
     notes: order.notes,
