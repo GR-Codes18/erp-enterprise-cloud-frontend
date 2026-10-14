@@ -1,4 +1,5 @@
 import { createDocumentHandlers, nextNumber } from "@/mocks/utils/documents"
+import { applyInventoryMovement } from "@/modules/inventory/state"
 import { PRODUCTS, WAREHOUSES, productRef, warehouseRef } from "../mockRefs"
 import type { Transfer, TransferInput } from "./schema"
 import { transferInputSchema } from "./schema"
@@ -72,8 +73,42 @@ export const { handlers: transferHandlers } = createDocumentHandlers<Transfer, T
   dateField: "created_at",
   inputSchema: transferInputSchema,
   actions: [
-    { action: "send", from: ["draft"], to: "in_transit" },
-    { action: "receive", from: ["in_transit"], to: "received" },
+    {
+      action: "send",
+      from: ["draft"],
+      to: "in_transit",
+      respond: (transfer) => {
+        transfer.items.forEach((item) => {
+          applyInventoryMovement({
+            product_id: item.product_id,
+            warehouse_id: transfer.origin_warehouse_id,
+            quantity: item.quantity,
+            direction: "out",
+            type: "transfer_out",
+            reference: transfer.number,
+          })
+        })
+        return transfer
+      },
+    },
+    {
+      action: "receive",
+      from: ["in_transit"],
+      to: "received",
+      respond: (transfer) => {
+        transfer.items.forEach((item) => {
+          applyInventoryMovement({
+            product_id: item.product_id,
+            warehouse_id: transfer.destination_warehouse_id,
+            quantity: item.quantity,
+            direction: "in",
+            type: "transfer_in",
+            reference: transfer.number,
+          })
+        })
+        return transfer
+      },
+    },
     {
       action: "cancel",
       from: ["draft"],

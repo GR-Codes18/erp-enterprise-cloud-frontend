@@ -1,8 +1,9 @@
 import { useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { Link, useNavigate, useParams } from "react-router"
-import { useCustomerOptions, useProductOptions } from "@/modules/maintenance"
+import { useStock } from "@/modules/inventory/stock/hooks"
+import { useCustomerOptions, useProductOptions, useWarehouseOptions } from "@/modules/maintenance"
 import { ErrorState } from "@/shared/components/ErrorState"
 import { Field } from "@/shared/components/Field"
 import { LineItemsEditor } from "@/shared/components/LineItemsEditor"
@@ -17,6 +18,7 @@ import { todayInLima } from "@/shared/lib/dates"
 import { activeOrSelected, withDocumentProducts } from "@/shared/lib/options"
 import { useCreateQuote, useQuote, useUpdateQuote } from "../hooks"
 import { emptyQuote, quoteInputSchema, toQuoteInput, type Quote, type QuoteInput } from "../quotes/schema"
+import { buildWarehouseOptionsForProduct } from "../quotes/warehouseOptions"
 
 const TOP_FIELDS = new Set(["customer_id", "issue_date", "valid_until", "notes"])
 
@@ -45,6 +47,8 @@ function QuoteForm({ quote }: { quote?: Quote }) {
   // Regla 4: solo activos para lo nuevo, pero un borrador antiguo conserva su cliente o producto inactivo
   const customers = useCustomerOptions({ includeInactive: true })
   const products = useProductOptions()
+  const warehouses = useWarehouseOptions({ includeInactive: true })
+  const stock = useStock({ page: 1, size: 200, filters: {} })
   const customerOptions = activeOrSelected(customers.data ?? [], quote ? [quote.customer_id] : [])
   const productOptions = withDocumentProducts(products.data ?? [], quote?.items ?? [])
 
@@ -55,13 +59,35 @@ function QuoteForm({ quote }: { quote?: Quote }) {
   const {
     control,
     register,
-    handleSubmit,
-    setError,
+    handleSubmit,    setValue,    setError,
     formState: { errors },
   } = form
 
   // El precio se propone desde el producto, pero es editable
   const editor = useLineItemsEditor(form, (productId) => products.data?.find((p) => p.id === productId)?.sale_price)
+  const watchItems = useWatch({ control, name: "items" }) ?? []
+  const uniqueProductIds = Array.from(
+    new Set(
+      watchItems
+        .map((line: { product_id?: string }) => line.product_id)
+        .filter((productId): productId is string => Boolean(productId)),
+    ),
+  )
+  const warehouseOptionsByProduct = Object.fromEntries(
+    uniqueProductIds.map((productId) => [
+      productId,
+      buildWarehouseOptionsForProduct(productId, warehouses.data ?? [], stock.data?.items ?? []),
+    ]),
+  )
+
+  const handleProductChange = (index: number, productId: string) => {
+    editor.onProductChange(index, productId)
+    const productWarehouses = warehouseOptionsByProduct[productId] ?? []
+    setValue(`items.${index}.warehouse_id`, productWarehouses.length === 1 ? productWarehouses[0].id : "", {
+      shouldDirty: true,
+      shouldValidate: form.formState.isSubmitted,
+    })
+  }
 
   const handleError = (error: unknown) => {
     const fieldErrors = isApiError(error) ? error.fieldErrors.filter((item) => TOP_FIELDS.has(item.field)) : []
@@ -142,6 +168,12 @@ function QuoteForm({ quote }: { quote?: Quote }) {
         <LineItemsEditor
           {...editor}
           products={productOptions}
+          warehouseOptionsByProduct={warehouseOptionsByProduct as Record<string, { id: string; name: string }[]>}
+          onProductChange={handleProductChange}
+          onWarehouseChange={(index, warehouseId) => setValue(`items.${index}.warehouse_id`, warehouseId, {
+            shouldDirty: true,
+            shouldValidate: form.formState.isSubmitted,
+          })}
           priceLabel="Precio unitario (S/)"
           disabled={isPending || products.isPending}
         />
