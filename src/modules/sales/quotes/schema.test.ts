@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildWarehouseOptionsForProduct } from "../pages/QuoteFormPage"
+import { buildWarehouseOptionsForProduct } from "./warehouseOptions"
 import {
   QUOTE_STATUSES,
   QUOTE_STATUS_LABELS,

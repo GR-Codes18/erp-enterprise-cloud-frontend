@@ -18,23 +18,9 @@ import { todayInLima } from "@/shared/lib/dates"
 import { activeOrSelected, withDocumentProducts } from "@/shared/lib/options"
 import { useCreateQuote, useQuote, useUpdateQuote } from "../hooks"
 import { emptyQuote, quoteInputSchema, toQuoteInput, type Quote, type QuoteInput } from "../quotes/schema"
+import { buildWarehouseOptionsForProduct } from "../quotes/warehouseOptions"
 
 const TOP_FIELDS = new Set(["customer_id", "issue_date", "valid_until", "notes"])
-
-export function buildWarehouseOptionsForProduct(
-  productId: string,
-  warehouses: Array<{ id: string; name: string }>,
-  stockRows: Array<{ product_id: string; warehouse_id: string; quantity: number }> = [],
-) {
-  if (!productId) return []
-  const warehouseIdsWithStock = new Set(
-    stockRows
-      .filter((row) => row.product_id === productId && row.quantity > 0)
-      .map((row) => row.warehouse_id),
-  )
-
-  return warehouses.filter((warehouse) => warehouseIdsWithStock.has(warehouse.id))
-}
 
 export default function QuoteFormPage() {
   const { id = "" } = useParams()
@@ -80,7 +66,13 @@ function QuoteForm({ quote }: { quote?: Quote }) {
   // El precio se propone desde el producto, pero es editable
   const editor = useLineItemsEditor(form, (productId) => products.data?.find((p) => p.id === productId)?.sale_price)
   const watchItems = useWatch({ control, name: "items" }) ?? []
-  const uniqueProductIds = Array.from(new Set(watchItems.map((line: { product_id?: string }) => line.product_id).filter(Boolean)))
+  const uniqueProductIds = Array.from(
+    new Set(
+      watchItems
+        .map((line: { product_id?: string }) => line.product_id)
+        .filter((productId): productId is string => Boolean(productId)),
+    ),
+  )
   const warehouseOptionsByProduct = Object.fromEntries(
     uniqueProductIds.map((productId) => [
       productId,
