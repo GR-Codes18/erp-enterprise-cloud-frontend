@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from "react-router"
 import { useProductOptions, useWarehouseOptions } from "@/modules/maintenance"
 import { ErrorState } from "@/shared/components/ErrorState"
 import { Field } from "@/shared/components/Field"
-import { PageHeader } from "@/shared/components/PageHeader"
+import { RouteFormDialog } from "@/shared/components/RouteFormDialog"
 import { Button } from "@/shared/components/ui/button"
 import { Textarea } from "@/shared/components/ui/textarea"
 import {
@@ -128,11 +128,11 @@ function AdjustmentForm({ adjustment }: { adjustment?: NonNullable<ReturnType<ty
       : undefined
 
   return (
-    <>
-      <PageHeader
-        title={adjustment ? "Editar ajuste" : "Nuevo ajuste"}
-        description="Registra aumentos o disminuciones de inventario. Aplicar el ajuste lo hará inmutable."
-      />
+    <RouteFormDialog
+      title={adjustment ? "Editar ajuste" : "Nuevo ajuste"}
+      description="Registra aumentos o disminuciones de inventario. Aplicar el ajuste lo hará inmutable."
+      onClose={() => navigate(adjustment ? `/inventory/adjustments/${adjustment.id}` : "/inventory/adjustments")}
+    >
       {optionsError && <p role="alert" className="mb-4 text-sm text-destructive">{optionsError}</p>}
       {availability.error && <p role="alert" className="mb-4 text-sm text-destructive">{getErrorMessage(availability.error)}</p>}
 
@@ -219,7 +219,7 @@ function AdjustmentForm({ adjustment }: { adjustment?: NonNullable<ReturnType<ty
           </Button>
         </div>
       </form>
-    </>
+    </RouteFormDialog>
   )
 }
 

@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from "react-router"
 import { useProductOptions, useWarehouseOptions } from "@/modules/maintenance"
 import { ErrorState } from "@/shared/components/ErrorState"
 import { Field } from "@/shared/components/Field"
-import { PageHeader } from "@/shared/components/PageHeader"
+import { RouteFormDialog } from "@/shared/components/RouteFormDialog"
 import { Button } from "@/shared/components/ui/button"
 import {
   Select,
@@ -113,11 +113,11 @@ function TransferForm({ transfer }: { transfer?: NonNullable<ReturnType<typeof u
       : undefined
 
   return (
-    <>
-      <PageHeader
-        title={transfer ? "Editar transferencia" : "Nueva transferencia"}
-        description="Las cantidades se validan contra el stock disponible en el almacén de origen."
-      />
+    <RouteFormDialog
+      title={transfer ? "Editar transferencia" : "Nueva transferencia"}
+      description="Las cantidades se validan contra el stock disponible en el almacén de origen."
+      onClose={() => navigate(transfer ? `/inventory/transfers/${transfer.id}` : "/inventory/transfers")}
+    >
       {optionsError && <p role="alert" className="mb-4 text-sm text-destructive">{optionsError}</p>}
       {availability.error && <p role="alert" className="mb-4 text-sm text-destructive">{getErrorMessage(availability.error)}</p>}
 
@@ -188,7 +188,7 @@ function TransferForm({ transfer }: { transfer?: NonNullable<ReturnType<typeof u
           </Button>
         </div>
       </form>
-    </>
+    </RouteFormDialog>
   )
 }
 

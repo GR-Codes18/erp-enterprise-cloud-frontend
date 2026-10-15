@@ -5,7 +5,7 @@ import { useFieldArray, useForm, useWatch } from "react-hook-form"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import { ErrorState } from "@/shared/components/ErrorState"
 import { Field } from "@/shared/components/Field"
-import { PageHeader } from "@/shared/components/PageHeader"
+import { RouteFormDialog } from "@/shared/components/RouteFormDialog"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select"
@@ -109,11 +109,11 @@ function ReturnForm({ salesReturn }: { salesReturn?: SalesReturn }) {
   const listError = typeof errors.items?.message === "string" ? errors.items.message : errors.items?.root?.message
 
   return (
-    <>
-      <PageHeader
-        title={salesReturn ? `Editar devolución ${salesReturn.number}` : "Nueva devolución"}
-        description="Solo se devuelve lo vendido menos lo ya devuelto. El motivo es obligatorio."
-      />
+    <RouteFormDialog
+      title={salesReturn ? `Editar devolución ${salesReturn.number}` : "Nueva devolución"}
+      description="Solo se devuelve lo vendido menos lo ya devuelto. El motivo es obligatorio."
+      onClose={() => navigate(salesReturn ? `/sales/returns/${salesReturn.id}` : "/sales/returns")}
+    >
       {invoices.isError && (
         <p role="alert" className="mb-4 text-sm text-danger-text">
           {getErrorMessage(invoices.error)}
@@ -256,6 +256,6 @@ function ReturnForm({ salesReturn }: { salesReturn?: SalesReturn }) {
           </Button>
         </div>
       </form>
-    </>
+    </RouteFormDialog>
   )
 }

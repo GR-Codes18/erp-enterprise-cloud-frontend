@@ -7,12 +7,13 @@ import { useCustomerOptions, useProductOptions, useWarehouseOptions } from "@/mo
 import { ErrorState } from "@/shared/components/ErrorState"
 import { Field } from "@/shared/components/Field"
 import { LineItemsEditor } from "@/shared/components/LineItemsEditor"
-import { PageHeader } from "@/shared/components/PageHeader"
+import { RouteFormDialog } from "@/shared/components/RouteFormDialog"
+import { SearchableSelect } from "@/shared/components/SearchableSelect"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select"
 import { Textarea } from "@/shared/components/ui/textarea"
 import { useLineItemsEditor } from "@/shared/hooks/useLineItemsEditor"
+import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
 import { getErrorMessage, isApiError } from "@/shared/lib/api/errors"
 import { todayInLima } from "@/shared/lib/dates"
 import { activeOrSelected, withDocumentProducts } from "@/shared/lib/options"
@@ -43,9 +44,11 @@ function QuoteForm({ quote }: { quote?: Quote }) {
   const updateQuote = useUpdateQuote()
   const isPending = createQuote.isPending || updateQuote.isPending
   const [serverError, setServerError] = useState<string | null>(null)
+  const [customerSearchInput, setCustomerSearchInput] = useState("")
+  const customerSearch = useDebouncedValue(customerSearchInput.trim(), 300)
 
   // Regla 4: solo activos para lo nuevo, pero un borrador antiguo conserva su cliente o producto inactivo
-  const customers = useCustomerOptions({ includeInactive: true })
+  const customers = useCustomerOptions({ includeInactive: true, search: customerSearch })
   const products = useProductOptions()
   const warehouses = useWarehouseOptions({ includeInactive: true })
   const stock = useStock({ page: 1, size: 200, filters: {} })
@@ -105,41 +108,42 @@ function QuoteForm({ quote }: { quote?: Quote }) {
   const optionsError = customers.isError ? customers.error : products.isError ? products.error : null
 
   return (
-    <>
-      <PageHeader
-        title={quote ? `Editar cotización ${quote.number}` : "Nueva cotización"}
-        description="Solo clientes y productos activos. El total oficial lo calcula el sistema al guardar."
-      />
+    <RouteFormDialog
+      title={quote ? `Editar cotización ${quote.number}` : "Nueva cotización"}
+      description="Solo clientes y productos activos. El total oficial lo calcula el sistema al guardar."
+      onClose={() => navigate(quote ? `/sales/quotes/${quote.id}` : "/sales/quotes")}
+      className="sm:max-w-5xl"
+    >
       {optionsError && (
         <p role="alert" className="mb-4 text-sm text-danger-text">
           {getErrorMessage(optionsError)}
         </p>
       )}
 
-      <form noValidate onSubmit={handleSubmit(onSubmit)} className="max-w-5xl space-y-6">
+      <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid gap-4 md:grid-cols-3">
           <Field id="customer_id" label="Cliente" error={errors.customer_id?.message}>
             <Controller
               control={control}
               name="customer_id"
               render={({ field }) => (
-                <Select value={field.value || undefined} onValueChange={field.onChange} disabled={isPending || customers.isPending}>
-                  <SelectTrigger
-                    id="customer_id"
-                    className="w-full"
-                    aria-invalid={!!errors.customer_id}
-                    aria-describedby={errors.customer_id ? "customer_id-error" : undefined}
-                  >
-                    <SelectValue placeholder="Selecciona un cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customerOptions.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name} · {customer.document_type} {customer.document_number}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  options={customerOptions.map((customer) => ({
+                    value: customer.id,
+                    label: `${customer.name} · ${customer.document_type} ${customer.document_number}`,
+                  }))}
+                  placeholder="Selecciona un cliente"
+                  searchPlaceholder="Buscar por nombre o documento"
+                  disabled={isPending || customers.isPending}
+                  onSearchChange={setCustomerSearchInput}
+                  isLoading={customers.isFetching}
+                  errorMessage={customers.isError ? getErrorMessage(customers.error) : undefined}
+                  aria-invalid={!!errors.customer_id}
+                  aria-describedby={errors.customer_id ? "customer_id-error" : undefined}
+                  aria-label="Cliente"
+                />
               )}
             />
           </Field>
@@ -205,6 +209,6 @@ function QuoteForm({ quote }: { quote?: Quote }) {
           </Button>
         </div>
       </form>
-    </>
+    </RouteFormDialog>
   )
 }

@@ -50,41 +50,43 @@ export function ListPageLayout<T>({
     <>
       <PageHeader title={title} description={description} actions={actions} />
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        {toolbar}
-        {hasFilters && (
-          <Button variant="outline" onClick={onClearFilters}>
-            Limpiar filtros
-          </Button>
-        )}
-      </div>
+      <section className="space-y-4 rounded-xl border bg-card p-4 shadow-sm md:p-5" aria-label={`Listado: ${title}`}>
+        <div className="flex flex-wrap items-end gap-3">
+          {toolbar}
+          {hasFilters && (
+            <Button variant="outline" onClick={onClearFilters}>
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
 
-      {query.isError ? (
-        <ErrorState message={getErrorMessage(query.error)} onRetry={() => void query.refetch()} />
-      ) : (
-        <>
-          <DataTable
-            columns={columns}
-            rows={query.data?.items ?? []}
-            getRowKey={getRowKey}
-            isLoading={query.isPending}
-            empty={
-              hasFilters ? (
-                <EmptyState title="Sin resultados" description="Nada coincide con la búsqueda o los filtros." />
-              ) : (
-                <EmptyState title={empty.title} description={empty.description} action={empty.action} />
-              )
-            }
-          />
-          <Pagination
-            page={query.data?.page ?? 1}
-            pages={query.data?.pages ?? 1}
-            total={query.data?.total ?? 0}
-            disabled={query.isFetching}
-            onPageChange={onPageChange}
-          />
-        </>
-      )}
+        {query.isError ? (
+          <ErrorState message={getErrorMessage(query.error)} onRetry={() => void query.refetch()} />
+        ) : (
+          <>
+            <DataTable
+              columns={columns}
+              rows={query.data?.items ?? []}
+              getRowKey={getRowKey}
+              isLoading={query.isPending}
+              empty={
+                hasFilters ? (
+                  <EmptyState title="Sin resultados" description="Nada coincide con la búsqueda o los filtros." />
+                ) : (
+                  <EmptyState title={empty.title} description={empty.description} action={empty.action} />
+                )
+              }
+            />
+            <Pagination
+              page={query.data?.page ?? 1}
+              pages={query.data?.pages ?? 1}
+              total={query.data?.total ?? 0}
+              disabled={query.isFetching}
+              onPageChange={onPageChange}
+            />
+          </>
+        )}
+      </section>
     </>
   )
 }

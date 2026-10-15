@@ -95,7 +95,7 @@ export default function StockPage() {
         description="Existencias por producto y almacén. Solo lectura: el stock cambia únicamente por movimientos."
       />
 
-      <div className="mb-4 flex flex-wrap gap-3">
+      <div className="mb-4 flex flex-wrap gap-3 rounded-xl border bg-card p-4 shadow-sm">
         <div className="w-full max-w-sm">
           <Input
             type="search"

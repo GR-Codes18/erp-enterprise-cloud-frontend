@@ -17,7 +17,7 @@ export default function AppLayout({ modules }: AppLayoutProps) {
       <Sidebar modules={modules} open={mobileMenuOpen} onClose={closeMobileMenu} />
       <div className="lg:pl-64 print:pl-0">
         <Topbar modules={modules} onMenuClick={() => setMobileMenuOpen(true)} />
-        <main className="p-4 md:p-6">
+        <main className="mx-auto w-full max-w-screen-2xl p-4 md:p-6">
           <Outlet />
         </main>
       </div>

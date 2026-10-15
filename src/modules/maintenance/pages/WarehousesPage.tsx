@@ -147,7 +147,7 @@ export default function WarehousesPage() {
         actions={newWarehouseButton}
       />
 
-      <div className="mb-4 flex flex-wrap gap-3">
+      <div className="mb-4 flex flex-wrap gap-3 rounded-xl border bg-card p-4 shadow-sm">
         <div className="w-full max-w-sm">
           <Input
             type="search"

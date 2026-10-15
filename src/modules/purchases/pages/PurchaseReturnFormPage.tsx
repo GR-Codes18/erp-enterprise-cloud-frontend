@@ -4,7 +4,7 @@ import { useFieldArray, useForm, useWatch } from "react-hook-form"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import { ErrorState } from "@/shared/components/ErrorState"
 import { Field } from "@/shared/components/Field"
-import { PageHeader } from "@/shared/components/PageHeader"
+import { RouteFormDialog } from "@/shared/components/RouteFormDialog"
 import { QuantityLinesEditor } from "@/shared/components/QuantityLinesEditor"
 import { Button } from "@/shared/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select"
@@ -91,11 +91,11 @@ function PurchaseReturnForm({ purchaseReturn }: { purchaseReturn?: PurchaseRetur
   }
 
   return (
-    <>
-      <PageHeader
-        title={purchaseReturn ? `Editar devolución ${purchaseReturn.number}` : "Nueva devolución al proveedor"}
-        description="Solo se devuelve lo recibido menos lo ya devuelto. El motivo es obligatorio."
-      />
+    <RouteFormDialog
+      title={purchaseReturn ? `Editar devolución ${purchaseReturn.number}` : "Nueva devolución al proveedor"}
+      description="Solo se devuelve lo recibido menos lo ya devuelto. El motivo es obligatorio."
+      onClose={() => navigate(purchaseReturn ? `/purchases/returns/${purchaseReturn.id}` : "/purchases/returns")}
+    >
       {receptions.isError && (
         <p role="alert" className="mb-4 text-sm text-danger-text">
           {getErrorMessage(receptions.error)}
@@ -186,6 +186,6 @@ function PurchaseReturnForm({ purchaseReturn }: { purchaseReturn?: PurchaseRetur
           </Button>
         </div>
       </form>
-    </>
+    </RouteFormDialog>
   )
 }

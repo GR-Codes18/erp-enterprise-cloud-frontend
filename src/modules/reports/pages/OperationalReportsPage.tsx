@@ -126,7 +126,7 @@ export default function OperationalReportsPage() {
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-end gap-3 print:hidden" role="group" aria-label="Filtros del reporte">
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4 shadow-sm print:hidden" role="group" aria-label="Filtros del reporte">
         <div className="flex flex-wrap gap-1 rounded-md border p-1" role="tablist" aria-label="Reporte">
           {OPERATIONAL_REPORTS.map((value) => (
             <Button

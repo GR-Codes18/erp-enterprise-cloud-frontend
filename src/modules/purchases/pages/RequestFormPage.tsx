@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from "react-router"
 import { useProductOptions } from "@/modules/maintenance"
 import { ErrorState } from "@/shared/components/ErrorState"
 import { Field } from "@/shared/components/Field"
-import { PageHeader } from "@/shared/components/PageHeader"
+import { RouteFormDialog } from "@/shared/components/RouteFormDialog"
 import { QuantityLinesEditor } from "@/shared/components/QuantityLinesEditor"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
@@ -65,11 +65,11 @@ function RequestForm({ request }: { request?: PurchaseRequest }) {
   }
 
   return (
-    <>
-      <PageHeader
-        title={request ? `Editar solicitud ${request.number}` : "Nueva solicitud de compra"}
-        description="Indica qué se necesita, para cuándo y por qué. Luego envíala a aprobación."
-      />
+    <RouteFormDialog
+      title={request ? `Editar solicitud ${request.number}` : "Nueva solicitud de compra"}
+      description="Indica qué se necesita, para cuándo y por qué. Luego envíala a aprobación."
+      onClose={() => navigate(request ? `/purchases/requests/${request.id}` : "/purchases/requests")}
+    >
       {products.isError && (
         <p role="alert" className="mb-4 text-sm text-danger-text">
           {getErrorMessage(products.error)}
@@ -136,6 +136,6 @@ function RequestForm({ request }: { request?: PurchaseRequest }) {
           </Button>
         </div>
       </form>
-    </>
+    </RouteFormDialog>
   )
 }

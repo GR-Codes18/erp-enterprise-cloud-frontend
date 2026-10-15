@@ -6,7 +6,8 @@ import type { Customer, CustomerCreateInput, CustomerUpdateInput } from "./schem
 export const customerKeys = {
   all: ["customers"] as const,
   list: (params: PageParams) => [...customerKeys.all, "list", params] as const,
-  options: (includeInactive: boolean) => [...customerKeys.all, "options", { includeInactive }] as const,
+  options: (includeInactive: boolean, search: string) =>
+    [...customerKeys.all, "options", { includeInactive, search }] as const,
 }
 
 export function useCustomers(params: PageParams) {
@@ -30,10 +31,18 @@ export interface CustomerOption {
  * Clientes para selectores de otros módulos (regla 0.5). Por defecto solo activos (documentos
  * nuevos); includeInactive para vistas de consulta o documentos antiguos.
  */
-export function useCustomerOptions({ includeInactive = false }: { includeInactive?: boolean } = {}) {
-  const params: PageParams = { page: 1, size: 100, filters: includeInactive ? {} : { status: "active" } }
+export function useCustomerOptions({
+  includeInactive = false,
+  search = "",
+}: { includeInactive?: boolean; search?: string } = {}) {
+  const params: PageParams = {
+    page: 1,
+    size: 100,
+    search: search.trim() || undefined,
+    filters: includeInactive ? {} : { status: "active" },
+  }
   return useQuery({
-    queryKey: customerKeys.options(includeInactive),
+    queryKey: customerKeys.options(includeInactive, params.search ?? ""),
     queryFn: ({ signal }) => customerService.list(params, signal),
     select: (data): CustomerOption[] =>
       data.items.map((c) => ({
