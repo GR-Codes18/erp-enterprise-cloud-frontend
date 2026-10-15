@@ -105,7 +105,7 @@ export default function AdjustmentsPage() {
         actions={newAdjustmentButton}
       />
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4 shadow-sm">
         <Input
           type="search"
           className="max-w-sm"

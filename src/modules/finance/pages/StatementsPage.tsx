@@ -4,10 +4,12 @@ import { useCustomerOptions, useSupplierOptions } from "@/modules/maintenance"
 import { ErrorState } from "@/shared/components/ErrorState"
 import { Field } from "@/shared/components/Field"
 import { PageHeader } from "@/shared/components/PageHeader"
+import { SearchableSelect } from "@/shared/components/SearchableSelect"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/components/ui/table"
+import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import { formatBusinessDate, todayInLima } from "@/shared/lib/dates"
 import { formatMoney } from "@/shared/lib/money"
@@ -25,6 +27,8 @@ export default function StatementsPage() {
   const today = todayInLima()
   const [partyType, setPartyType] = useState<PartyType>("customer")
   const [partyId, setPartyId] = useState("")
+  const [partySearchInput, setPartySearchInput] = useState("")
+  const partySearch = useDebouncedValue(partySearchInput.trim(), 300)
   const [dateFrom, setDateFrom] = useState(`${today.slice(0, 8)}01`)
   const [dateTo, setDateTo] = useState(today)
   const [errors, setErrors] = useState<Partial<Record<keyof StatementQuery, string>>>({})
@@ -33,9 +37,16 @@ export default function StatementsPage() {
   const statement = useStatement(query)
 
   // Consulta histórica: también terceros inactivos
-  const customers = useCustomerOptions({ includeInactive: true })
-  const suppliers = useSupplierOptions({ includeInactive: true })
+  const customers = useCustomerOptions({
+    includeInactive: true,
+    search: partyType === "customer" ? partySearch : "",
+  })
+  const suppliers = useSupplierOptions({
+    includeInactive: true,
+    search: partyType === "supplier" ? partySearch : "",
+  })
   const parties = (partyType === "customer" ? customers.data : suppliers.data) ?? []
+  const partiesQuery = partyType === "customer" ? customers : suppliers
 
   const consult = () => {
     const parsed = statementQuerySchema.safeParse({ party_type: partyType, party_id: partyId, date_from: dateFrom, date_to: dateTo })
@@ -76,6 +87,7 @@ export default function StatementsPage() {
             onValueChange={(value) => {
               setPartyType(value as PartyType)
               setPartyId("")
+              setPartySearchInput("")
             }}
           >
             <SelectTrigger id="party_type" className="w-36">
@@ -91,23 +103,24 @@ export default function StatementsPage() {
           </Select>
         </Field>
         <Field id="party_id" label={PARTY_TYPE_LABELS[partyType]} error={errors.party_id}>
-          <Select value={partyId || undefined} onValueChange={setPartyId}>
-            <SelectTrigger
-              id="party_id"
-              className="w-72"
-              aria-invalid={!!errors.party_id}
-              aria-describedby={errors.party_id ? "party_id-error" : undefined}
-            >
-              <SelectValue placeholder="Selecciona a quién" />
-            </SelectTrigger>
-            <SelectContent>
-              {parties.map((party) => (
-                <SelectItem key={party.id} value={party.id}>
-                  {party.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={partyId}
+            onValueChange={setPartyId}
+            onSearchChange={setPartySearchInput}
+            options={parties.map((party) => ({
+              value: party.id,
+              label: `${party.name} · ${party.document_number}`,
+            }))}
+            placeholder="Selecciona a quién"
+            searchPlaceholder="Buscar por nombre o documento"
+            disabled={partiesQuery.isPending}
+            isLoading={partiesQuery.isFetching}
+            errorMessage={partiesQuery.isError ? getErrorMessage(partiesQuery.error) : undefined}
+            aria-invalid={!!errors.party_id}
+            aria-describedby={errors.party_id ? "party_id-error" : undefined}
+            aria-label={PARTY_TYPE_LABELS[partyType]}
+            className="w-72"
+          />
         </Field>
         <Field id="statement_from" label="Desde" error={errors.date_from}>
           <Input id="statement_from" type="date" className="w-40" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />

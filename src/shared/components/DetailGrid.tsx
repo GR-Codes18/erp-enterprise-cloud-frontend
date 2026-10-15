@@ -8,7 +8,7 @@ export interface DetailItem {
 /** Datos de un documento en modo lectura: etiqueta arriba, valor abajo, en columnas */
 export function DetailGrid({ items }: { items: DetailItem[] }) {
   return (
-    <dl className="mb-6 grid gap-4 rounded-md border p-4 sm:grid-cols-2 lg:grid-cols-4">
+    <dl className="mb-6 grid gap-4 rounded-xl border bg-card p-5 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
       {items.map((item) => (
         <div key={item.label} className="min-w-0">
           <dt className="text-sm text-muted-foreground">{item.label}</dt>

@@ -111,7 +111,7 @@ export default function KardexPage() {
         description="Historial de movimientos de un producto. Elige el producto y el rango de fechas para consultarlo."
       />
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4 shadow-sm">
         <Field id="product_id" label="Producto">
           <Select value={productId} onValueChange={withReset(setProductId)}>
             <SelectTrigger id="product_id" className="w-80" aria-label="Producto">

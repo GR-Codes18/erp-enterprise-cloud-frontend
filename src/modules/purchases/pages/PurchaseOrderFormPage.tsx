@@ -6,12 +6,13 @@ import { useProductOptions, useSupplierOptions } from "@/modules/maintenance"
 import { ErrorState } from "@/shared/components/ErrorState"
 import { Field } from "@/shared/components/Field"
 import { LineItemsEditor } from "@/shared/components/LineItemsEditor"
-import { PageHeader } from "@/shared/components/PageHeader"
+import { RouteFormDialog } from "@/shared/components/RouteFormDialog"
+import { SearchableSelect } from "@/shared/components/SearchableSelect"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select"
 import { Textarea } from "@/shared/components/ui/textarea"
 import { useLineItemsEditor } from "@/shared/hooks/useLineItemsEditor"
+import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import { addDays, todayInLima } from "@/shared/lib/dates"
 import { activeOrSelected, withDocumentProducts } from "@/shared/lib/options"
@@ -52,9 +53,11 @@ function PurchaseOrderForm({ order, fromRequest }: { order?: PurchaseOrder; from
   const update = purchaseOrderHooks.useUpdate()
   const isPending = create.isPending || update.isPending
   const [serverError, setServerError] = useState<string | null>(null)
+  const [supplierSearchInput, setSupplierSearchInput] = useState("")
+  const supplierSearch = useDebouncedValue(supplierSearchInput.trim(), 300)
 
   // Regla 4: solo activos para lo nuevo; un borrador antiguo conserva su proveedor o producto inactivo
-  const suppliers = useSupplierOptions({ includeInactive: true })
+  const suppliers = useSupplierOptions({ includeInactive: true, search: supplierSearch })
   const products = useProductOptions()
   const supplierOptions = activeOrSelected(suppliers.data ?? [], order ? [order.supplier_id] : [])
   // Incluye los productos de la orden o de la solicitud que hoy estén inactivos, marcados como tales
@@ -99,15 +102,16 @@ function PurchaseOrderForm({ order, fromRequest }: { order?: PurchaseOrder; from
   const optionsError = suppliers.isError ? suppliers.error : products.isError ? products.error : null
 
   return (
-    <>
-      <PageHeader
-        title={order ? `Editar orden ${order.number}` : "Nueva orden de compra"}
-        description={
-          fromRequest
-            ? `Desde la solicitud ${fromRequest.number}. Revisa los costos pactados con el proveedor.`
-            : "Solo proveedores y productos activos. El total con IGV es una vista previa."
-        }
-      />
+    <RouteFormDialog
+      title={order ? `Editar orden ${order.number}` : "Nueva orden de compra"}
+      description={
+        fromRequest
+          ? `Desde la solicitud ${fromRequest.number}. Revisa los costos pactados con el proveedor.`
+          : "Solo proveedores y productos activos. El total con IGV es una vista previa."
+      }
+      onClose={() => navigate(order ? `/purchases/orders/${order.id}` : "/purchases/orders")}
+      className="sm:max-w-5xl"
+    >
       {optionsError && (
         <p role="alert" className="mb-4 text-sm text-danger-text">
           {getErrorMessage(optionsError)}
@@ -121,23 +125,23 @@ function PurchaseOrderForm({ order, fromRequest }: { order?: PurchaseOrder; from
               control={control}
               name="supplier_id"
               render={({ field }) => (
-                <Select value={field.value || undefined} onValueChange={field.onChange} disabled={isPending || suppliers.isPending}>
-                  <SelectTrigger
-                    id="supplier_id"
-                    className="w-full"
-                    aria-invalid={!!errors.supplier_id}
-                    aria-describedby={errors.supplier_id ? "supplier_id-error" : undefined}
-                  >
-                    <SelectValue placeholder="Selecciona un proveedor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {supplierOptions.map((supplier) => (
-                      <SelectItem key={supplier.id} value={supplier.id}>
-                        {supplier.name} · {supplier.document_number}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  options={supplierOptions.map((supplier) => ({
+                    value: supplier.id,
+                    label: `${supplier.name} · ${supplier.document_number}`,
+                  }))}
+                  placeholder="Selecciona un proveedor"
+                  searchPlaceholder="Buscar por nombre o documento"
+                  disabled={isPending || suppliers.isPending}
+                  onSearchChange={setSupplierSearchInput}
+                  isLoading={suppliers.isFetching}
+                  errorMessage={suppliers.isError ? getErrorMessage(suppliers.error) : undefined}
+                  aria-invalid={!!errors.supplier_id}
+                  aria-describedby={errors.supplier_id ? "supplier_id-error" : undefined}
+                  aria-label="Proveedor"
+                />
               )}
             />
           </Field>
@@ -187,6 +191,6 @@ function PurchaseOrderForm({ order, fromRequest }: { order?: PurchaseOrder; from
           </Button>
         </div>
       </form>
-    </>
+    </RouteFormDialog>
   )
 }

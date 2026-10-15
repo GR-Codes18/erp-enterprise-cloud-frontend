@@ -8,6 +8,7 @@ import { ErrorState } from "@/shared/components/ErrorState"
 import { FilterSelect } from "@/shared/components/FilterSelect"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
+import { SearchableSelect } from "@/shared/components/SearchableSelect"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
@@ -38,8 +39,10 @@ export default function InvoicesPage() {
   const [customerId, setCustomerId] = useState(FILTER_ALL)
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
+  const [customerSearchInput, setCustomerSearchInput] = useState("")
+  const customerSearch = useDebouncedValue(customerSearchInput.trim(), 300)
 
-  const customers = useCustomerOptions({ includeInactive: true })
+  const customers = useCustomerOptions({ includeInactive: true, search: customerSearch })
   const filters = pickFilters({ status, type, customer_id: customerId })
   const invoices = useInvoices({ page, size: PAGE_SIZE, search, filters, ...dateRangeParams(dateFrom, dateTo) })
   const hasFilters = search !== "" || Object.keys(filters).length > 0 || dateFrom !== "" || dateTo !== ""
@@ -89,7 +92,7 @@ export default function InvoicesPage() {
         description="Facturas y boletas emitidas desde pedidos confirmados. No se editan: se anulan con motivo."
       />
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4 shadow-sm">
         <Input
           type="search"
           className="max-w-xs"
@@ -113,12 +116,21 @@ export default function InvoicesPage() {
           allLabel="Todos los estados"
           options={INVOICE_STATUSES.map((value) => ({ value, label: INVOICE_STATUS_LABELS[value] }))}
         />
-        <FilterSelect
-          label="Filtrar por cliente"
+        <SearchableSelect
+          aria-label="Filtrar por cliente"
           value={customerId}
-          onChange={withReset(setCustomerId)}
-          allLabel="Todos los clientes"
-          options={(customers.data ?? []).map((customer) => ({ value: customer.id, label: customer.name }))}
+          onValueChange={withReset(setCustomerId)}
+          onSearchChange={setCustomerSearchInput}
+          isLoading={customers.isFetching}
+          errorMessage={customers.isError ? getErrorMessage(customers.error) : undefined}
+          searchPlaceholder="Buscar por nombre o documento"
+          placeholder="Todos los clientes"
+          allOption={{ value: FILTER_ALL, label: "Todos los clientes" }}
+          options={(customers.data ?? []).map((customer) => ({
+            value: customer.id,
+            label: `${customer.name} · ${customer.document_type} ${customer.document_number}`,
+          }))}
+          disabled={customers.isPending}
           className="w-60"
         />
         <DateRangeFilter from={dateFrom} to={dateTo} onFromChange={withReset(setDateFrom)} onToChange={withReset(setDateTo)} />

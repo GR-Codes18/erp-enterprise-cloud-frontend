@@ -9,6 +9,7 @@ import { ErrorState } from "@/shared/components/ErrorState"
 import { FilterSelect } from "@/shared/components/FilterSelect"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
+import { SearchableSelect } from "@/shared/components/SearchableSelect"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
@@ -38,9 +39,11 @@ export default function OrdersPage() {
   const [condition, setCondition] = useState(FILTER_ALL)
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
+  const [customerSearchInput, setCustomerSearchInput] = useState("")
+  const customerSearch = useDebouncedValue(customerSearchInput.trim(), 300)
   const canCreate = useHasPermission("sales.orders:create")
 
-  const customers = useCustomerOptions({ includeInactive: true })
+  const customers = useCustomerOptions({ includeInactive: true, search: customerSearch })
   const filters = pickFilters({ status, customer_id: customerId, payment_condition: condition })
   const orders = useOrders({ page, size: PAGE_SIZE, search, filters, ...dateRangeParams(dateFrom, dateTo) })
   const hasFilters = search !== "" || Object.keys(filters).length > 0 || dateFrom !== "" || dateTo !== ""
@@ -103,7 +106,7 @@ export default function OrdersPage() {
         actions={newOrderButton}
       />
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4 shadow-sm">
         <Input
           type="search"
           className="max-w-xs"
@@ -119,12 +122,21 @@ export default function OrdersPage() {
           allLabel="Todos los estados"
           options={ORDER_STATUSES.map((value) => ({ value, label: ORDER_STATUS_LABELS[value] }))}
         />
-        <FilterSelect
-          label="Filtrar por cliente"
+        <SearchableSelect
+          aria-label="Filtrar por cliente"
           value={customerId}
-          onChange={withReset(setCustomerId)}
-          allLabel="Todos los clientes"
-          options={(customers.data ?? []).map((customer) => ({ value: customer.id, label: customer.name }))}
+          onValueChange={withReset(setCustomerId)}
+          onSearchChange={setCustomerSearchInput}
+          isLoading={customers.isFetching}
+          errorMessage={customers.isError ? getErrorMessage(customers.error) : undefined}
+          searchPlaceholder="Buscar por nombre o documento"
+          placeholder="Todos los clientes"
+          allOption={{ value: FILTER_ALL, label: "Todos los clientes" }}
+          options={(customers.data ?? []).map((customer) => ({
+            value: customer.id,
+            label: `${customer.name} · ${customer.document_type} ${customer.document_number}`,
+          }))}
+          disabled={customers.isPending}
           className="w-60"
         />
         <FilterSelect

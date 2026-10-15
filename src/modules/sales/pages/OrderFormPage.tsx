@@ -6,12 +6,14 @@ import { useCustomerOptions, useProductOptions } from "@/modules/maintenance"
 import { ErrorState } from "@/shared/components/ErrorState"
 import { Field } from "@/shared/components/Field"
 import { LineItemsEditor } from "@/shared/components/LineItemsEditor"
-import { PageHeader } from "@/shared/components/PageHeader"
+import { RouteFormDialog } from "@/shared/components/RouteFormDialog"
+import { SearchableSelect } from "@/shared/components/SearchableSelect"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select"
 import { Textarea } from "@/shared/components/ui/textarea"
 import { useLineItemsEditor } from "@/shared/hooks/useLineItemsEditor"
+import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
 import { getErrorMessage, isApiError } from "@/shared/lib/api/errors"
 import { formatMoney } from "@/shared/lib/money"
 import { activeOrSelected, withDocumentProducts } from "@/shared/lib/options"
@@ -49,8 +51,10 @@ function OrderForm({ order }: { order?: Order }) {
   const updateOrder = useUpdateOrder()
   const isPending = createOrder.isPending || updateOrder.isPending
   const [serverError, setServerError] = useState<string | null>(null)
+  const [customerSearchInput, setCustomerSearchInput] = useState("")
+  const customerSearch = useDebouncedValue(customerSearchInput.trim(), 300)
 
-  const customers = useCustomerOptions({ includeInactive: true })
+  const customers = useCustomerOptions({ includeInactive: true, search: customerSearch })
   const products = useProductOptions()
   const customerOptions = activeOrSelected(customers.data ?? [], order ? [order.customer_id] : [])
   const productOptions = withDocumentProducts(products.data ?? [], order?.items ?? [])
@@ -94,45 +98,46 @@ function OrderForm({ order }: { order?: Order }) {
   const optionsError = customers.isError ? customers.error : products.isError ? products.error : null
 
   return (
-    <>
-      <PageHeader
-        title={order ? `Editar pedido ${order.number}` : "Nuevo pedido"}
-        description={
-          order?.quote_number
-            ? `Creado desde la cotización ${order.quote_number}. Al confirmar se validan stock y crédito.`
-            : "Al confirmar, el sistema valida el stock disponible y, si es a crédito, el límite del cliente."
-        }
-      />
+    <RouteFormDialog
+      title={order ? `Editar pedido ${order.number}` : "Nuevo pedido"}
+      description={
+        order?.quote_number
+          ? `Creado desde la cotización ${order.quote_number}. Al confirmar se validan stock y crédito.`
+          : "Al confirmar, el sistema valida el stock disponible y, si es a crédito, el límite del cliente."
+      }
+      onClose={() => navigate(order ? `/sales/orders/${order.id}` : "/sales/orders")}
+      className="sm:max-w-5xl"
+    >
       {optionsError && (
         <p role="alert" className="mb-4 text-sm text-danger-text">
           {getErrorMessage(optionsError)}
         </p>
       )}
 
-      <form noValidate onSubmit={handleSubmit(onSubmit)} className="max-w-5xl space-y-6">
+      <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid gap-4 md:grid-cols-3">
           <Field id="customer_id" label="Cliente" error={errors.customer_id?.message}>
             <Controller
               control={control}
               name="customer_id"
               render={({ field }) => (
-                <Select value={field.value || undefined} onValueChange={field.onChange} disabled={isPending || customers.isPending}>
-                  <SelectTrigger
-                    id="customer_id"
-                    className="w-full"
-                    aria-invalid={!!errors.customer_id}
-                    aria-describedby={errors.customer_id ? "customer_id-error" : customer ? "customer-credit" : undefined}
-                  >
-                    <SelectValue placeholder="Selecciona un cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customerOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {option.name} · {option.document_type} {option.document_number}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  options={customerOptions.map((option) => ({
+                    value: option.id,
+                    label: `${option.name} · ${option.document_type} ${option.document_number}`,
+                  }))}
+                  placeholder="Selecciona un cliente"
+                  searchPlaceholder="Buscar por nombre o documento"
+                  disabled={isPending || customers.isPending}
+                  onSearchChange={setCustomerSearchInput}
+                  isLoading={customers.isFetching}
+                  errorMessage={customers.isError ? getErrorMessage(customers.error) : undefined}
+                  aria-invalid={!!errors.customer_id}
+                  aria-describedby={errors.customer_id ? "customer_id-error" : customer ? "customer-credit" : undefined}
+                  aria-label="Cliente"
+                />
               )}
             />
             {customer && (
@@ -201,6 +206,6 @@ function OrderForm({ order }: { order?: Order }) {
           </Button>
         </div>
       </form>
-    </>
+    </RouteFormDialog>
   )
 }
