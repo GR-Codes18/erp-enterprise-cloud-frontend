@@ -31,10 +31,11 @@ export const useOperationalReport = <R extends OperationalReport>(report: R, par
     placeholderData: keepPreviousData,
   })
 
-export const useMonthlyReport = (period: Period) =>
+export const useMonthlyReport = (period: Period, enabled = true) =>
   useQuery({
     queryKey: ["reports", "monthly", period],
     queryFn: ({ signal }) => reportService.monthly(period, signal),
+    enabled,
   })
 
 export const useTopProducts = (period: Period) =>

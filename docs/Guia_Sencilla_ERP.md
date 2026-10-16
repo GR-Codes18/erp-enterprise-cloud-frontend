@@ -124,6 +124,8 @@ Cotización → Pedido → Comprobante → Cobro (en Finanzas)
                      Devolución (si el cliente devuelve)
 ```
 
+La cotización es opcional: para una venta directa, ve a **Ventas > Pedidos > Nueva venta** y registra el pedido sin crear una cotización primero.
+
 ### Paso 1: Cotización (la propuesta de precio)
 
 Una cotización es una oferta al cliente. **No reserva stock ni compromete nada.**
@@ -140,10 +142,15 @@ Una cotización es una oferta al cliente. **No reserva stock ni compromete nada.
 ### Paso 2: Pedido (la venta comprometida)
 
 1. En la cotización aceptada, presiona **"Convertir en pedido"**. Se copian cliente y productos.
-2. En el pedido, elige la **condición de pago**:
+2. Puedes guardar el pedido como borrador para revisarlo o usar **"Guardar y confirmar"**. Esta opción conserva la validación de cliente, stock y crédito y permite completar el paso sin salir primero al detalle.
+3. Indica el **tipo de venta**:
+   - **Por unidad / presencial**: no requiere datos de entrega.
+   - **Al por mayor**: elige **Envío** o **Recojo**. Envío viene seleccionado.
+   - Para envío, la dirección aparece en el mismo formulario. Puedes agregarla o corregirla ahí; se guarda en el perfil del cliente para reutilizarla en próximas ventas.
+4. Elige la **condición de pago**:
    - **Contado**
    - **Crédito** (indicando cuántos días)
-3. Presiona **"Confirmar pedido"**.
+5. Si guardaste el borrador, desde el pedido presiona **"Confirmar pedido"**.
 
 **El sistema revisa tres cosas antes de confirmar:**
 
@@ -256,6 +263,12 @@ Es el **historial de entradas y salidas** de un producto.
 1. Ve a **Inventario > Kardex**.
 2. Elige el **producto** y el rango de **fechas** (obligatorios).
 3. Verás cada movimiento con entrada, salida y saldo.
+
+### Kardex comercial
+
+En **Inventario > Kardex comercial** aparecen directamente las **compras** (entradas) y **ventas** (salidas) del día actual, sin tener que elegir un producto. Si hace falta, se puede filtrar por producto, almacén o cambiar el rango de fechas. Los ajustes, devoluciones y transferencias siguen apareciendo en el Kardex completo y en sus pantallas correspondientes.
+
+En un pedido mayorista confirmado, el estado de la entrega se actualiza desde el detalle: **Pendiente de envío → En camino → Entregado**, o **Pendiente de recojo → Listo para recojo → Recogido**.
 
 ### Transferencias (mover productos entre almacenes)
 

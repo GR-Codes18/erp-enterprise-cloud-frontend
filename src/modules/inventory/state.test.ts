@@ -41,7 +41,14 @@ describe("inventory state", () => {
 
     expect(getAvailableQuantity(productId)).toBe(before - 15)
     expect(getStockRows().some((row) => row.product_id === productId && row.quantity < 150)).toBe(true)
-    expect(getKardexEntries().some((row) => row.type === "sale" && row.reference === "VT-TEST-001")).toBe(true)
+    expect(getKardexEntries()).toContainEqual(
+      expect.objectContaining({
+        type: "sale",
+        reference: "VT-TEST-001",
+        product_name: "Cemento Portland Tipo I 42.5kg",
+        product_sku: "PROD-003",
+      }),
+    )
   })
 
   it("suma stock en el almacén de la recepción de compra", () => {

@@ -121,10 +121,13 @@ function appendKardexEntry(input: {
     0,
     (stockItems.find((row) => row.product_id === input.product_id && row.warehouse_id === warehouseId)?.quantity ?? 0),
   )
+  const product = Object.values(PRODUCTS).find((candidate) => productRef(candidate.n) === input.product_id)
 
   const row: KardexRow = {
     id: `00000000-0000-4000-8031-${String(kardexItems.length + 1).padStart(12, "0")}`,
     product_id: input.product_id,
+    product_name: product?.name,
+    product_sku: product?.sku,
     warehouse_id: warehouseId,
     warehouse_name: warehouse?.name ?? "Almacén",
     occurred_at: input.occurred_at ?? new Date().toISOString(),

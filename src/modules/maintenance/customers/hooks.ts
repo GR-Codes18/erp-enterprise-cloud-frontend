@@ -21,6 +21,7 @@ export function useCustomers(params: PageParams) {
 export interface CustomerOption {
   id: string
   name: string
+  address: string
   document_type: Customer["document_type"]
   document_number: string
   credit_limit: string
@@ -48,6 +49,7 @@ export function useCustomerOptions({
       data.items.map((c) => ({
         id: c.id,
         name: c.status === "active" ? c.name : `${c.name} (inactivo)`,
+        address: c.address,
         document_type: c.document_type,
         document_number: c.document_number,
         credit_limit: c.credit_limit,
@@ -75,6 +77,15 @@ export function useUpdateCustomer() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: CustomerUpdateInput }) =>
       customerService.update(id, input),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateCustomerAddress() {
+  const invalidate = useInvalidateCustomers()
+  return useMutation({
+    mutationFn: ({ id, address }: { id: string; address: string }) =>
+      customerService.patch(id, { address }),
     onSuccess: invalidate,
   })
 }

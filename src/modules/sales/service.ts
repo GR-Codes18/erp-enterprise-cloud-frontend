@@ -2,7 +2,7 @@ import { api } from "@/shared/lib/api/client"
 import { toListQuery } from "@/shared/lib/api/query"
 import type { PageParams, Paginated } from "@/shared/lib/api/types"
 import type { Invoice, IssueInvoiceInput } from "./invoices/schema"
-import type { Order, OrderInput } from "./orders/schema"
+import type { DeliveryStatus, Order, OrderInput } from "./orders/schema"
 import type { Quote, QuoteInput } from "./quotes/schema"
 import type { ReturnInput, SalesReturn } from "./returns/schema"
 
@@ -38,6 +38,8 @@ export const orderService = {
   /** El backend valida cliente activo, stock y límite de crédito (409 con el motivo) */
   confirm: (id: string) => api.post<Order>(path(ORDERS, id, "confirm"), {}),
   cancel: (id: string, reason: string) => api.post<Order>(path(ORDERS, id, "cancel"), { reason }),
+  updateDeliveryStatus: (id: string, status: DeliveryStatus) =>
+    api.patch<Order>(path(ORDERS, id, "delivery-status"), { status }),
   /** Emite el comprobante del pedido confirmado: descuenta stock y, a crédito, crea la cuenta por cobrar */
   issueInvoice: (id: string, input: IssueInvoiceInput) => api.post<Invoice>(path(ORDERS, id, "invoice"), input),
 }

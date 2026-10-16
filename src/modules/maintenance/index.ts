@@ -3,6 +3,7 @@ import type { AppModule } from "@/shared/types/module"
 
 // Lo que este módulo publica para otros (regla 0.5): solo tipos y hooks de consulta
 export { useCustomerOptions } from "./customers/hooks"
+export { useUpdateCustomerAddress } from "./customers/hooks"
 export type { CustomerOption } from "./customers/hooks"
 export { useSupplierOptions } from "./suppliers/hooks"
 export type { SupplierOption } from "./suppliers/hooks"

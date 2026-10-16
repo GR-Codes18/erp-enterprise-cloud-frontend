@@ -30,7 +30,7 @@ export const salesModule: AppModule = {
           permission: "sales.orders:view",
           page: () => import("./pages/OrdersPage"),
           subRoutes: [
-            { label: "Nuevo pedido", path: "new", page: () => import("./pages/OrderFormPage") },
+            { label: "Nueva venta", path: "new", page: () => import("./pages/OrderFormPage") },
             { label: "Editar pedido", path: ":id/edit", page: () => import("./pages/OrderFormPage") },
             { label: "Detalle de pedido", path: ":id", page: () => import("./pages/OrderDetailPage") },
           ],

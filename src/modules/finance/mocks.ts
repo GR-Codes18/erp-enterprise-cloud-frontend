@@ -4,8 +4,17 @@ import { CUSTOMERS, SUPPLIERS, customerRef, supplierRef } from "@/mocks/refs"
 import { createCrudHandlers } from "@/mocks/utils/crud"
 import { applyListFilters } from "@/mocks/utils/filters"
 import { nextNumber } from "@/mocks/utils/documents"
-import { currentSalesInvoices, currentSalesReturns, salesInvoiceSeed } from "@/modules/sales/mocks"
-import { currentSupplierInvoices, supplierInvoiceSeed } from "@/modules/purchases/mocks"
+import {
+  applySalesInvoicePayment,
+  currentSalesInvoices,
+  currentSalesReturns,
+  salesInvoiceSeed,
+} from "@/modules/sales/mocks"
+import {
+  applySupplierInvoicePayment,
+  currentSupplierInvoices,
+  supplierInvoiceSeed,
+} from "@/modules/purchases/mocks"
 import type { ApiErrorBody, Paginated } from "@/shared/lib/api/types"
 import { todayInLima } from "@/shared/lib/dates"
 import { fromCents, toCents } from "@/shared/lib/money"
@@ -117,12 +126,70 @@ let payables: (AccountRow & { supplier_id: string; supplier_name: string })[] = 
     total: invoice.total,
     paid: invoice.paid,
   }))
+let receivableCounter = receivables.length
+let payableCounter = payables.length
 
 const withStatus = <T extends AccountRow>(row: T) => ({
   ...row,
   balance: fromCents(toCents(row.total) - toCents(row.paid)),
   status: accountStatus(row.total, row.paid, row.due_date),
 })
+
+function syncFinancialAccounts() {
+  const salesAccounts = currentSalesInvoices().filter(
+    (invoice) => invoice.payment_condition === "credit" && invoice.status !== "void",
+  )
+  receivables = salesAccounts.map((invoice) => {
+    const existing = receivables.find((row) => row.invoice_id === invoice.id)
+    if (existing) {
+      return {
+        ...existing,
+        invoice_code: `${invoice.series}-${invoice.number}`,
+        issue_date: invoice.issue_date,
+        due_date: invoice.due_date,
+        total: invoice.total,
+      }
+    }
+    receivableCounter += 1
+    return {
+      id: uuid("8060", receivableCounter),
+      invoice_id: invoice.id,
+      invoice_code: `${invoice.series}-${invoice.number}`,
+      customer_id: invoice.customer_id,
+      customer_name: invoice.customer_name,
+      issue_date: invoice.issue_date,
+      due_date: invoice.due_date,
+      total: invoice.total,
+      paid: invoice.paid,
+    }
+  })
+
+  const supplierAccounts = currentSupplierInvoices().filter((invoice) => invoice.status !== "void")
+  payables = supplierAccounts.map((invoice) => {
+    const existing = payables.find((row) => row.invoice_id === invoice.id)
+    if (existing) {
+      return {
+        ...existing,
+        invoice_code: `${invoice.series}-${invoice.number}`,
+        issue_date: invoice.issue_date,
+        due_date: invoice.due_date,
+        total: invoice.total,
+      }
+    }
+    payableCounter += 1
+    return {
+      id: uuid("8061", payableCounter),
+      invoice_id: invoice.id,
+      invoice_code: `${invoice.series}-${invoice.number}`,
+      supplier_id: invoice.supplier_id,
+      supplier_name: invoice.supplier_name,
+      issue_date: invoice.issue_date,
+      due_date: invoice.due_date,
+      total: invoice.total,
+      paid: invoice.paid,
+    }
+  })
+}
 
 /**
  * Saldo de un documento por cobrar o pagar, incluidos los comprobantes al contado y los
@@ -148,10 +215,13 @@ function documentBalance(documentType: string, documentId: string) {
 }
 
 function addPaidToAccount(documentId: string, deltaCents: number) {
+  syncFinancialAccounts()
   const apply = <T extends AccountRow>(row: T): T =>
     row.invoice_id === documentId ? { ...row, paid: fromCents(toCents(row.paid) + deltaCents) } : row
   receivables = receivables.map(apply)
   payables = payables.map(apply)
+  applySalesInvoicePayment(documentId, deltaCents)
+  applySupplierInvoicePayment(documentId, deltaCents)
 }
 
 // ---------------------------------------------------------------- Bancos
@@ -339,10 +409,13 @@ function buildStatement(partyType: string, partyId: string, from: string, to: st
 }
 
 /** Cuentas vigentes (con estado calculado), para que los mocks de Dashboard y Reportes lean lo mismo */
-export const financeSnapshot = () => ({
-  receivables: receivables.map(withStatus),
-  payables: payables.map(withStatus),
-})
+export const financeSnapshot = () => {
+  syncFinancialAccounts()
+  return {
+    receivables: receivables.map(withStatus),
+    payables: payables.map(withStatus),
+  }
+}
 
 // ---------------------------------------------------------------- Handlers
 
@@ -355,6 +428,7 @@ const listOf = <T,>(items: T[], request: Request, options: Parameters<typeof app
 export const financeHandlers: RequestHandler[] = [
   http.get(base("receivables"), async ({ request }) => {
     await delay(300)
+    syncFinancialAccounts()
     return listOf(receivables.map(withStatus) as Receivable[], request, {
       searchFields: ["customer_name", "invoice_code"],
       filterFields: ["customer_id", "status"],
@@ -364,6 +438,7 @@ export const financeHandlers: RequestHandler[] = [
 
   http.get(base("payables"), async ({ request }) => {
     await delay(300)
+    syncFinancialAccounts()
     return listOf(payables.map(withStatus) as Payable[], request, {
       searchFields: ["supplier_name", "invoice_code"],
       filterFields: ["supplier_id", "status"],

@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 import { setupServer } from "msw/node"
+import { getAvailableQuantity, getKardexEntries } from "@/modules/inventory/state"
+import { productRef, warehouseRef } from "@/modules/inventory/mockRefs"
 
 vi.mock("@/config/env", () => ({
   env: { apiBaseUrl: "http://localhost/api/v1", enableMocks: false },
@@ -21,6 +23,13 @@ describe("mocks de Compras", () => {
   const server = setupServer(...purchaseHandlers)
   beforeAll(() => server.listen())
   afterAll(() => server.close())
+
+  it("mantiene las listas de datos semilla reducidas a cinco registros como máximo", async () => {
+    for (const resource of ["requests", "orders", "receptions", "invoices", "returns"]) {
+      const result = await (await fetch(`${API}/${resource}?size=50`)).json()
+      expect(result.total, resource).toBeLessThanOrEqual(5)
+    }
+  })
 
   it("nadie aprueba su propia solicitud", async () => {
     const own = await post(`${API}/requests/${id("8050", 3)}/approve`) // la creó el administrador
@@ -58,6 +67,50 @@ describe("mocks de Compras", () => {
 
     const order = await (await fetch(`${API}/orders/${id("8051", 2)}`)).json()
     expect(order.status).toBe("received")
+  })
+
+  it("la recepción suma existencias y la devolución al proveedor las resta del mismo almacén", async () => {
+    const productId = productRef(7)
+    const warehouseId = warehouseRef(3)
+    const initialQuantity = getAvailableQuantity(productId, warehouseId)
+    const draft = await post(`${API}/receptions`, {
+      order_id: id("8051", 3),
+      warehouse_id: warehouseId,
+      guide_number: "EG07-000951",
+      items: [{ product_id: productId, quantity: 5 }],
+    })
+    expect(draft.status).toBe(201)
+    const reception = await draft.json()
+    expect((await post(`${API}/receptions/${reception.id}/confirm`)).status).toBe(200)
+    expect(getAvailableQuantity(productId, warehouseId)).toBe(initialQuantity + 5)
+    expect(getKardexEntries()).toContainEqual(
+      expect.objectContaining({
+        product_id: productId,
+        warehouse_id: warehouseId,
+        type: "purchase",
+        reference: reception.number,
+        quantity_in: 5,
+      }),
+    )
+
+    const returnDraft = await post(`${API}/returns`, {
+      reception_id: reception.id,
+      items: [{ product_id: productId, quantity: 2 }],
+      reason: "Producto dañado",
+    })
+    expect(returnDraft.status).toBe(201)
+    const purchaseReturn = await returnDraft.json()
+    expect((await post(`${API}/returns/${purchaseReturn.id}/confirm`)).status).toBe(200)
+    expect(getAvailableQuantity(productId, warehouseId)).toBe(initialQuantity + 3)
+    expect(getKardexEntries()).toContainEqual(
+      expect.objectContaining({
+        product_id: productId,
+        warehouse_id: warehouseId,
+        type: "return",
+        reference: purchaseReturn.number,
+        quantity_out: 2,
+      }),
+    )
   })
 
   it("la factura repetida responde 409 y un total distinto a lo recibido trae aviso", async () => {

@@ -11,7 +11,11 @@ vi.mock("@/shared/lib/dates", async (importOriginal) => {
 })
 
 const { financeHandlers } = await import("./mocks")
+const { salesHandlers } = await import("@/modules/sales/mocks")
+const { purchaseHandlers } = await import("@/modules/purchases/mocks")
 const API = "http://localhost/api/v1/finance"
+const SALES_API = "http://localhost/api/v1/sales"
+const PURCHASES_API = "http://localhost/api/v1/purchases"
 const id = (prefix: string, n: number) => `00000000-0000-4000-${prefix}-${String(n).padStart(12, "0")}`
 const json = (method: string, body: unknown) => ({
   method,
@@ -32,7 +36,7 @@ const collection = (amount: string, extra: object = {}) => ({
 })
 
 describe("mocks de Finanzas", () => {
-  const server = setupServer(...financeHandlers)
+  const server = setupServer(...salesHandlers, ...purchaseHandlers, ...financeHandlers)
   beforeAll(() => server.listen())
   afterAll(() => server.close())
 
@@ -62,6 +66,109 @@ describe("mocks de Finanzas", () => {
     await fetch(`${API}/payments/${created.id}/void`, json("POST", { reason: "Monto mal digitado" }))
     expect((await balanceOf()).paid).toBe("0.00")
   })
+
+  it("sincroniza comprobantes nuevos de ventas y compras con sus cuentas y sus pagos", async () => {
+    const orderResponse = await fetch(
+      `${SALES_API}/orders`,
+      json("POST", {
+        customer_id: id("8000", 1),
+        buyer_name: "",
+        buyer_document_type: "",
+        buyer_document_number: "",
+        sale_type: "unit",
+        delivery_method: "none",
+        quote_id: "",
+        items: [{ product_id: id("8004", 1), warehouse_id: id("8003", 1), quantity: 1, unit_price: "10.00" }],
+        payment_condition: "credit",
+        credit_days: 30,
+        notes: "",
+      }),
+    )
+    expect(orderResponse.status).toBe(201)
+    const order = await orderResponse.json()
+    expect((await fetch(`${SALES_API}/orders/${order.id}/confirm`, json("POST", {}))).status).toBe(200)
+    const invoiceResponse = await fetch(
+      `${SALES_API}/orders/${order.id}/invoice`,
+      json("POST", { type: "receipt" }),
+    )
+    expect(invoiceResponse.status).toBe(200)
+    const salesInvoice = await invoiceResponse.json()
+
+    const receivableResponse = await fetch(`${API}/receivables?search=${salesInvoice.series}-${salesInvoice.number}`)
+    const receivable = (await receivableResponse.json()).items[0]
+    expect(receivable).toMatchObject({
+      invoice_id: salesInvoice.id,
+      total: salesInvoice.total,
+      paid: "0.00",
+      balance: salesInvoice.total,
+    })
+
+    const collectionResponse = await fetch(
+      `${API}/payments`,
+      json("POST", collection(salesInvoice.total, {
+        document_id: salesInvoice.id,
+        method: "transfer",
+        bank_account_id: id("8066", 1),
+        operation_number: "SALE-001",
+      })),
+    )
+    expect(collectionResponse.status).toBe(201)
+    const collectionPayment = await collectionResponse.json()
+    expect((await (await fetch(`${API}/receivables?search=${salesInvoice.series}-${salesInvoice.number}`)).json()).items[0])
+      .toMatchObject({ paid: salesInvoice.total, balance: "0.00", status: "paid" })
+    expect((await (await fetch(`${SALES_API}/invoices/${salesInvoice.id}`)).json()))
+      .toMatchObject({ paid: salesInvoice.total, balance: "0.00", status: "paid" })
+    expect((await fetch(`${API}/payments/${collectionPayment.id}/void`, json("POST", { reason: "Pago aplicado por error" }))).status)
+      .toBe(200)
+    expect((await (await fetch(`${API}/receivables?search=${salesInvoice.series}-${salesInvoice.number}`)).json()).items[0])
+      .toMatchObject({ paid: "0.00", balance: salesInvoice.total, status: "pending" })
+    expect((await (await fetch(`${SALES_API}/invoices/${salesInvoice.id}`)).json()))
+      .toMatchObject({ paid: "0.00", balance: salesInvoice.total, status: "issued" })
+
+    const supplierInvoiceResponse = await fetch(
+      `${PURCHASES_API}/invoices`,
+      json("POST", {
+        supplier_id: id("8001", 8),
+        order_id: id("8051", 3),
+        series: "F009",
+        number: "99001234",
+        issue_date: "2026-10-08",
+        due_date: "2026-11-07",
+        total: "1.00",
+      }),
+    )
+    expect(supplierInvoiceResponse.status).toBe(201)
+    const supplierInvoice = await supplierInvoiceResponse.json()
+    expect((await (await fetch(`${API}/payables?search=F009-99001234`)).json()).items[0])
+      .toMatchObject({ invoice_id: supplierInvoice.id, total: "1.00", paid: "0.00", balance: "1.00" })
+
+    const paymentResponse = await fetch(
+      `${API}/payments`,
+      json("POST", {
+        type: "payment",
+        document_type: "supplier_invoice",
+        document_id: supplierInvoice.id,
+        method: "transfer",
+        amount: "1.00",
+        payment_date: "2026-10-08",
+        bank_account_id: id("8066", 1),
+        operation_number: "PURCHASE-001",
+        reference: "",
+      }),
+    )
+    expect(paymentResponse.status).toBe(201)
+    const supplierPayment = await paymentResponse.json()
+    expect((await (await fetch(`${API}/payables?search=F009-99001234`)).json()).items[0])
+      .toMatchObject({ paid: "1.00", balance: "0.00", status: "paid" })
+    expect((await (await fetch(`${PURCHASES_API}/invoices/${supplierInvoice.id}`)).json()))
+      .toMatchObject({ paid: "1.00", balance: "0.00", status: "paid" })
+    expect((await fetch(`${API}/payments/${supplierPayment.id}/void`, json("POST", { reason: "Pago aplicado por error" }))).status)
+      .toBe(200)
+    expect((await (await fetch(`${API}/payables?search=F009-99001234`)).json()).items[0])
+      .toMatchObject({ paid: "0.00", balance: "1.00", status: "pending" })
+    expect((await (await fetch(`${PURCHASES_API}/invoices/${supplierInvoice.id}`)).json()))
+      .toMatchObject({ paid: "0.00", balance: "1.00", status: "registered" })
+  }, 15000)
 
   it("una caja solo tiene una sesión abierta y sin caja abierta no hay efectivo", async () => {
     const register = id("8063", 1)

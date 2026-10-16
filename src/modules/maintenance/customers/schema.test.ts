@@ -5,6 +5,7 @@ const VALID: CustomerInput = {
   document_type: "RUC",
   document_number: "20100000001",
   name: "Comercial Andina S.A.C.",
+  address: "Av. Los Álamos 123, Lima",
   email: "ventas@andina.example",
   phone: "014000001",
   credit_limit: "5000.00",
@@ -61,6 +62,13 @@ describe("customerInputSchema", () => {
   describe("nombre, correo y teléfono", () => {
     it("rechaza un nombre de un solo carácter", () => {
       expect(errorsOf({ ...VALID, name: "A" }).name).toBe("Ingresa el nombre o razón social")
+    })
+
+    it("recorta y limita la dirección principal", () => {
+      const result = customerInputSchema.safeParse({ ...VALID, address: "  Av. Principal 123  " })
+      expect(result.success).toBe(true)
+      if (result.success) expect(result.data.address).toBe("Av. Principal 123")
+      expect(errorsOf({ ...VALID, address: "a".repeat(251) })).toHaveProperty("address")
     })
 
     it("el correo puede estar vacío, pero si se escribe debe ser válido", () => {

@@ -32,6 +32,9 @@ function documentHooks<T, I>(resource: string, service: DocumentService<T, I>) {
         queryClient.invalidateQueries({ queryKey: purchaseKeys.all }),
         queryClient.invalidateQueries({ queryKey: ["stock"] }),
         queryClient.invalidateQueries({ queryKey: ["kardex"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance"] }),
+        queryClient.invalidateQueries({ queryKey: ["reports"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
       ])
   }
 

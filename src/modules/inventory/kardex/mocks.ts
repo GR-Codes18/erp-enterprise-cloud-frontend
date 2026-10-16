@@ -3,6 +3,7 @@ import { env } from "@/config/env"
 import { applyListFilters } from "@/mocks/utils/filters"
 import type { Paginated } from "@/shared/lib/api/types"
 import { getKardexEntries } from "../state"
+import { KARDEX_TYPES } from "./schema"
 
 const base = `${env.apiBaseUrl}/inventory/kardex`
 
@@ -11,15 +12,23 @@ const positiveInt = (value: string | null, fallback: number, max?: number) => {
   if (!Number.isInteger(parsed) || parsed < 1) return fallback
   return max ? Math.min(parsed, max) : parsed
 }
+const allowedTypes = new Set<string>(KARDEX_TYPES)
 
 export const kardexHandlers: RequestHandler[] = [
   http.get(base, async ({ request }) => {
     await delay(250)
-    const items = getKardexEntries()
     const params = new URL(request.url).searchParams
+    const requestedTypes = params.get("types")?.split(",").filter(Boolean) ?? []
+    if (requestedTypes.some((type) => !allowedTypes.has(type))) {
+      return HttpResponse.json(
+        { code: "VALIDATION_ERROR", message: "El filtro de tipos de movimiento no es válido." },
+        { status: 422 },
+      )
+    }
+    const items = getKardexEntries().filter((item) => requestedTypes.length === 0 || requestedTypes.includes(item.type))
     const result = applyListFilters(items, params, {
       searchFields: ["reference"],
-      filterFields: ["product_id", "warehouse_id", "type"],
+      filterFields: ["product_id", "warehouse_id"],
       dateField: "occurred_at",
     })
     if (!result.ok) {

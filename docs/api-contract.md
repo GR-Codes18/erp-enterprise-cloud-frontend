@@ -132,6 +132,7 @@ Implementado en el frontend. Reglas de validación en `src/modules/maintenance/c
 | `document_type` | texto | `DNI`, `RUC` o `CE` |
 | `document_number` | texto | DNI: 8 dígitos. RUC: 11 dígitos. CE: 9 a 12 caracteres alfanuméricos |
 | `name` | texto | 2 a 120 caracteres |
+| `address` | texto | Dirección principal para envíos, máximo 250 caracteres; opcional, se devuelve como `""` si no se registró |
 | `email` | texto | Correo válido, o cadena vacía `""` si no tiene |
 | `phone` | texto | Máximo 20 caracteres. Cadena vacía si no tiene |
 | `credit_limit` | texto decimal | `"0.00"` o mayor, hasta 2 decimales |
@@ -140,6 +141,7 @@ Implementado en el frontend. Reglas de validación en `src/modules/maintenance/c
 Notas para el backend:
 
 - Los campos opcionales se devuelven como "", nunca como null. (Decidido.)
+- `PATCH /customers/{id}` con el único campo `address` puede ejecutarlo una persona con `sales.orders:create` o `sales.orders:edit`, para registrar/actualizar la dirección desde el formulario de venta. Esta excepción no autoriza cambiar ningún otro campo del cliente; los demás cambios requieren `maintenance.customers:edit`.
 - La búsqueda `search` debe cubrir `name`, `document_number` y `email`.
 - Se espera validar con las mismas reglas de la tabla y devolver 422 con `errors` por campo.
 - Un documento duplicado (mismo `document_type` + `document_number`) debe responder 409. **Por confirmar** con la regla de negocio.
@@ -152,6 +154,7 @@ Ejemplo (respuesta de `GET /customers/{id}`):
   "document_type": "RUC",
   "document_number": "20100000001",
   "name": "Comercial Andina S.A.C.",
+  "address": "Dirección de ejemplo 123, Lima",
   "email": "ventas@andina.example",
   "phone": "014000001",
   "credit_limit": "5000.00",
@@ -377,7 +380,9 @@ CRUD estándar (sección 5) con `PATCH` para activar/desactivar. Opcionales como
 | Ruta | Respuesta | Filtros |
 |---|---|---|
 | `GET /inventory/stock` | Filas producto × almacén: `product_id`, `product_sku`, `product_name`, `category_id`, `category_name`, `warehouse_id`, `warehouse_name`, `unit`, `quantity`, `min_stock`, `status` (`normal`, `low`, `out`) y `below_min` (`quantity <= min_stock`) calculados | `status`, `warehouse_id`, `category_id`, `product_id`, `below_min=true` |
-| `GET /inventory/kardex` | Movimientos con `occurred_at`, `type` (compra, venta, transferencia entrada/salida, ajuste, devolución), documento de origen, entrada, salida y `balance` acumulado (lo calcula el backend) | `product_id` (obligatorio), `warehouse_id`, `type`; rango sobre `occurred_at` (obligatorio) |
+| `GET /inventory/kardex` | Movimientos con `product_name`, `product_sku`, `occurred_at`, `type` (compra, venta, anulación de venta, transferencia entrada/salida, ajuste, devolución), documento de origen, entrada, salida y `balance` acumulado (lo calcula el backend) | `product_id` (obligatorio en Kardex completo; opcional en Kardex comercial), `warehouse_id`, `type`; `types` opcional, lista separada por comas; rango sobre `occurred_at` (obligatorio) |
+
+La vista **Kardex comercial** envía `types=purchase,sale`; el backend debe filtrar ambos tipos antes de paginar. Por defecto consulta el día actual en hora de Lima sin requerir producto; `product_id` se puede agregar como filtro opcional. `balance` conserva el saldo real del inventario, que puede incluir movimientos no mostrados en esta vista.
 
 Transferencias y ajustes (sección 11) devuelven además `number` (`TR-000004`, `AJ-000004`). Cancelar una transferencia exige `{ "reason" }` (sección 5.1).
 
@@ -393,8 +398,9 @@ Las líneas de documento son `{ product_id, quantity (entero > 0), unit_price (t
 | `/sales/returns` | `draft → confirmed` | `confirm` | `status`, `invoice_id`; rango sobre `created_at` |
 
 - **Cotización:** `customer_id`, `issue_date`, `valid_until` (≥ emisión), `items`, `notes`. Respuesta: `number` (`COT-…`), `customer_name`, `order_id` (`""` si no se convirtió), `rejection_reason`. `expired` lo marca el backend al pasar `valid_until`.
-- **Pedido:** `customer_id`, `quote_id` (`""` si no viene de cotización), `items`, `payment_condition` (`cash` con `credit_days` 0, o `credit` con 1 a 365), `notes`. Al confirmar, el backend valida cliente activo (409 `CUSTOMER_INACTIVE`), stock (409 `INSUFFICIENT_STOCK` con la lista en `message`) y límite de crédito: saldo pendiente del cliente + total del pedido ≤ `credit_limit` (409 `CREDIT_LIMIT_EXCEEDED`: "Excede el límite de crédito"). Respuesta: `number` (`PED-…`), `customer_name`, `customer_document_type`, `quote_number`, `invoice_id`, `cancel_reason`.
-- **Comprobante:** nace de `POST /sales/orders/{id}/invoice`. Incluye `payment_condition` (`cash` \| `credit`) del pedido. La factura exige cliente con RUC (422 `RUC_REQUIRED`). `series` y `number` los asigna el backend. Al emitir: descuenta stock y, si es a crédito, crea la cuenta por cobrar. Respuesta: `type`, `series`, `number`, `order_id`, `order_number`, `customer_*`, `issue_date`, `due_date` (`""` al contado), `items` con `returned_quantity`, totales, `paid`, `balance`, `status`, `void_reason`. Anular revierte el stock (409 `HAS_PAYMENTS` si tiene cobros).
+- **Pedido:** `customer_id` registrado o `""` para comprador ocasional, `buyer_name`, `buyer_document_type` (`DNI`, `RUC`, `CE` o `""`), `buyer_document_number`, `sale_type` (`unit` o `wholesale`), `delivery_method` (`none` para unidad/presencial; `shipping` o `pickup` para mayorista), `quote_id` (`""` si no viene de cotización), `items`, `payment_condition` (`cash` con `credit_days` 0, o `credit` con 1 a 365), `notes`. Un comprador ocasional solo puede tener venta presencial por unidad, al contado y sin cotización; debe proporcionar nombre o tipo y número de documento. No crea una ficha en `/customers` y solo puede recibir boleta. Crédito, venta mayorista, envío/recojo y conversión desde cotización requieren un cliente registrado. Para `shipping`, el backend obtiene `address` del perfil de cliente y lo copia a `delivery_address` en el pedido; rechaza la operación si no hay dirección registrada (422 `DELIVERY_ADDRESS_REQUIRED`). Para `pickup`, no requiere dirección. Al confirmar, el backend valida cliente activo cuando existe cliente registrado, stock (409 `INSUFFICIENT_STOCK` con la lista en `message`) y límite de crédito: saldo pendiente del cliente + total del pedido ≤ `credit_limit` (409 `CREDIT_LIMIT_EXCEEDED`: "Excede el límite de crédito"). Respuesta: `number` (`PED-…`), `customer_id`, `customer_name`, `customer_document_type`, `buyer_name`, `buyer_document_type`, `buyer_document_number`, `quote_number`, `delivery_status`, `delivery_address`, `invoice_id`, `cancel_reason`.
+- **Estado de entrega:** inicia como `pending` al crear pedido mayorista; `PATCH /sales/orders/{id}/delivery-status` con `{ "status": "in_transit" | "delivered" | "ready_for_pickup" | "picked_up" }` avanza solo al próximo estado válido. Envío: `pending → in_transit → delivered`. Recojo: `pending → ready_for_pickup → picked_up`. Solo se actualiza en pedidos confirmados/facturados y requiere `sales.orders:edit`; no cambia el estado comercial del pedido.
+- **Comprobante:** nace de `POST /sales/orders/{id}/invoice`. Incluye `payment_condition` (`cash` \| `credit`) del pedido. La factura exige cliente registrado con RUC (422 `RUC_REQUIRED`); para comprador ocasional solo se permite boleta (422 `GUEST_RECEIPT_REQUIRED`). La boleta del comprador ocasional guarda el nombre/documento del pedido sin crear un cliente; si solo proporcionó nombre, `customer_document` indica `"Sin documento"`. `series` y `number` los asigna el backend. Al emitir: descuenta stock y, si es a crédito, crea la cuenta por cobrar. Respuesta: `type`, `series`, `number`, `order_id`, `order_number`, `customer_*`, `issue_date`, `due_date` (`""` al contado), `items` con `returned_quantity`, totales, `paid`, `balance`, `status`, `void_reason`. Anular revierte el stock (409 `HAS_PAYMENTS` si tiene cobros).
 - **Devolución:** `invoice_id`, `items` `{ product_id, quantity }` y `reason` (5 a 255). Cantidad ≤ vendida − ya devuelta (422 con el error en `items.N.quantity`). Al confirmar: nota de crédito, reingreso de stock y menor deuda. Respuesta: `number` (`DEV-…`), `invoice_code`, `customer_name`, `total` (monto de la nota de crédito).
 
 ## 17. Propuesta del frontend: Compras
@@ -441,6 +447,7 @@ Todos los agregados los calcula el backend. Rango con `date_from` y `date_to` (f
 | Campo | Definición |
 |---|---|
 | `sales` | Suma de comprobantes emitidos del periodo, sin anulados, menos el valor de las devoluciones confirmadas (con IGV) |
+| `cost_of_sales` | Estimado con el costo actual del catálogo por unidades vendidas no devueltas; se debe conservar costo histórico por línea antes de tratarlo como cifra contable |
 | `purchases` | Suma de facturas de proveedor registradas del periodo, sin anuladas |
 | `gross_profit` | Ventas netas sin IGV menos el costo de lo vendido |
 | `gross_margin` | `gross_profit` ÷ ventas netas sin IGV, en % con 1 decimal (`"25.0"`); `""` si no hubo ventas |
@@ -450,6 +457,9 @@ Todos los agregados los calcula el backend. Rango con `date_from` y `date_to` (f
 | `inventory_turnover` | Costo de ventas ÷ inventario promedio del periodo, texto con 2 decimales |
 | `alerts.low_stock` | Productos bajo mínimo: `product_id`, `product_name`, `unit`, `stock`, `min_stock` |
 | `alerts.overdue_receivables` | Cuentas vencidas: `invoice_id`, `invoice_code`, `customer_name`, `balance`, `due_date` |
+| `alerts.orders_to_invoice` | Pedidos confirmados pendientes de comprobante: `id`, `number`, `customer_name`, `total` |
+| `alerts.pending_deliveries` | Pedidos mayoristas con envío/recojo pendiente: `id`, `number`, `customer_name`, `method`, `status` |
+| `alerts.purchase_orders_to_receive` | Órdenes emitidas o parcialmente recibidas con saldo pendiente: `id`, `number`, `supplier_name`, `expected_date`, `status` |
 
 ### 19.2 Reportes
 

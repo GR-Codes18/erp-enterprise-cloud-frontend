@@ -365,6 +365,18 @@ const invoices = createDocumentHandlers<SupplierInvoice, SupplierInvoiceInput, S
   ],
 })
 
+export function applySupplierInvoicePayment(invoiceId: string, deltaCents: number) {
+  const invoice = invoices.store.find(invoiceId)
+  if (!invoice || invoice.status === "void") return
+  const paid = Math.max(0, Math.min(toCents(invoice.total), toCents(invoice.paid) + deltaCents))
+  const balance = toCents(invoice.total) - paid
+  invoices.store.update(invoice.id, {
+    paid: fromCents(paid),
+    balance: fromCents(balance),
+    status: balance === 0 ? "paid" : "registered",
+  })
+}
+
 function checkReturn(input: PurchaseReturnInput) {
   const reception = receptions.store.find(input.reception_id)
   if (!reception || reception.status !== "confirmed") {
@@ -439,3 +451,5 @@ export const purchaseHandlers = [
 export const supplierInvoiceSeed = invoiceSeed
 /** Facturas vigentes (incluye las registradas en la sesión), para Finanzas */
 export const currentSupplierInvoices = () => invoices.store.all()
+/** Órdenes de compra en memoria para las alertas del dashboard simulado */
+export const currentPurchaseOrders = () => orders.store.all()

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   FILTER_ALL,
+  COMMERCIAL_KARDEX_TYPES,
   KARDEX_TYPES,
   KARDEX_TYPE_LABELS,
   buildKardexFilters,
@@ -25,6 +26,27 @@ const valid = {
 describe("kardexRowSchema", () => {
   it("acepta una entrada válida", () => {
     expect(kardexRowSchema.safeParse(valid).success).toBe(true)
+  })
+
+  it("conserva nombre y SKU cuando la API los incluye", () => {
+    expect(
+      kardexRowSchema.safeParse({
+        ...valid,
+        product_name: "Cemento Portland Tipo I 42.5kg",
+        product_sku: "PROD-003",
+      }).success,
+    ).toBe(true)
+  })
+
+  it("acepta una anulación de venta como entrada de inventario", () => {
+    expect(
+      kardexRowSchema.safeParse({
+        ...valid,
+        type: "sale_void",
+        quantity_in: 2,
+        quantity_out: 0,
+      }).success,
+    ).toBe(true)
   })
 
   it("acepta una salida válida y una referencia vacía", () => {
@@ -88,6 +110,15 @@ describe("isKardexQueryReady", () => {
   it("no consulta con un rango invertido", () => {
     expect(isKardexQueryReady({ ...ready, date_from: "2026-11-01" })).toBe(false)
   })
+
+  it("permite consultar sin producto cuando el producto es opcional", () => {
+    expect(
+      isKardexQueryReady(
+        { product_id: FILTER_ALL, date_from: "2026-09-01", date_to: "2026-09-01" },
+        { requireProduct: false },
+      ),
+    ).toBe(true)
+  })
 })
 
 describe("buildKardexFilters", () => {
@@ -101,6 +132,13 @@ describe("buildKardexFilters", () => {
     expect(buildKardexFilters({ product_id: "abc", warehouse_id: "xyz" })).toEqual({
       product_id: "abc",
       warehouse_id: "xyz",
+    })
+  })
+
+  it("limita la vista comercial a compras y ventas", () => {
+    expect(buildKardexFilters({ product_id: "abc", warehouse_id: FILTER_ALL }, COMMERCIAL_KARDEX_TYPES)).toEqual({
+      product_id: "abc",
+      types: "purchase,sale",
     })
   })
 })
