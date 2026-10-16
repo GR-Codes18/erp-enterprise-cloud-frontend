@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useListsByStatus } from "@/shared/hooks/useListsByStatus"
 import type { PageParams } from "@/shared/lib/api/types"
 import type { InvoiceStatus, IssueInvoiceInput } from "./invoices/schema"
-import type { OrderInput } from "./orders/schema"
+import type { DeliveryStatus, OrderInput } from "./orders/schema"
 import type { QuoteInput } from "./quotes/schema"
 import type { ReturnInput } from "./returns/schema"
 import { invoiceService, orderService, quoteService, returnService } from "./service"
@@ -19,7 +19,15 @@ export const salesKeys = {
 
 function useInvalidateSales() {
   const queryClient = useQueryClient()
-  return () => queryClient.invalidateQueries({ queryKey: salesKeys.all })
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: salesKeys.all }),
+      queryClient.invalidateQueries({ queryKey: ["stock"] }),
+      queryClient.invalidateQueries({ queryKey: ["kardex"] }),
+      queryClient.invalidateQueries({ queryKey: ["finance"] }),
+      queryClient.invalidateQueries({ queryKey: ["reports"] }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+    ])
 }
 
 /** Mutación de Ventas que, al terminar bien, refresca todos sus listados y detalles */
@@ -71,6 +79,8 @@ export const useDeleteOrder = () => useSalesMutation((id: string) => orderServic
 export const useConfirmOrder = () => useSalesMutation((id: string) => orderService.confirm(id))
 export const useCancelOrder = () =>
   useSalesMutation(({ id, reason }: { id: string; reason: string }) => orderService.cancel(id, reason))
+export const useUpdateDeliveryStatus = () =>
+  useSalesMutation(({ id, status }: { id: string; status: DeliveryStatus }) => orderService.updateDeliveryStatus(id, status))
 export const useIssueInvoice = () =>
   useSalesMutation(({ id, input }: { id: string; input: IssueInvoiceInput }) => orderService.issueInvoice(id, input))
 

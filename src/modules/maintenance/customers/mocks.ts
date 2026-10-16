@@ -9,6 +9,7 @@ const customer = (
   document_type: DocumentType,
   document_number: string,
   name: string,
+  address: string,
   email: string,
   phone: string,
   credit_limit: string,
@@ -18,6 +19,7 @@ const customer = (
   document_type,
   document_number,
   name,
+  address,
   email,
   phone,
   credit_limit,
@@ -26,19 +28,22 @@ const customer = (
 
 // 12 registros para poder ver la paginación con size=10
 const seed: Customer[] = [
-  customer(1, "RUC", "20100000001", "Comercial Andina S.A.C.", "ventas@andina.example", "014000001", "5000.00", "active"),
-  customer(2, "RUC", "20100000002", "Distribuidora Pacífico S.R.L.", "contacto@pacifico.example", "014000002", "12000.00", "active"),
-  customer(3, "DNI", "70000003", "María Quispe Huamán", "maria.quispe@example.com", "999000003", "800.00", "active"),
-  customer(4, "DNI", "70000004", "Luis Ramírez Torres", "luis.ramirez@example.com", "999000004", "1500.50", "active"),
-  customer(5, "RUC", "20100000005", "Ferretería El Constructor E.I.R.L.", "", "014000005", "3000.00", "inactive"),
-  customer(6, "DNI", "70000006", "Carmen Flores Vega", "carmen.flores@example.com", "999000006", "0.00", "active"),
-  customer(7, "CE", "001234567", "John Smith", "john.smith@example.com", "999000007", "2500.00", "active"),
-  customer(8, "RUC", "20100000008", "Agroexport del Sur S.A.", "info@agrosur.example", "054000008", "20000.00", "active"),
-  customer(9, "DNI", "70000009", "Pedro Castillo Rojas", "", "999000009", "500.00", "inactive"),
-  customer(10, "RUC", "20100000010", "Textiles Inca S.A.C.", "pedidos@textilesinca.example", "014000010", "8000.00", "active"),
-  customer(11, "DNI", "70000011", "Ana Torres Salazar", "ana.torres@example.com", "999000011", "1200.00", "active"),
-  customer(12, "CE", "002345678", "Marie Dubois", "marie.dubois@example.com", "999000012", "0.00", "inactive"),
+  customer(1, "RUC", "20100000001", "Comercial Andina S.A.C.", "Dirección de prueba 123, Lima", "ventas@andina.example", "014000001", "5000.00", "active"),
+  customer(2, "RUC", "20100000002", "Distribuidora Pacífico S.R.L.", "Dirección de prueba 456, Lima", "contacto@pacifico.example", "014000002", "12000.00", "active"),
+  customer(3, "DNI", "70000003", "María Quispe Huamán", "", "maria.quispe@example.com", "999000003", "800.00", "active"),
+  customer(4, "DNI", "70000004", "Luis Ramírez Torres", "", "luis.ramirez@example.com", "999000004", "1500.50", "active"),
+  customer(5, "RUC", "20100000005", "Ferretería El Constructor E.I.R.L.", "", "", "014000005", "3000.00", "inactive"),
+  customer(6, "DNI", "70000006", "Carmen Flores Vega", "", "carmen.flores@example.com", "999000006", "0.00", "active"),
+  customer(7, "CE", "001234567", "John Smith", "", "john.smith@example.com", "999000007", "2500.00", "active"),
+  customer(8, "RUC", "20100000008", "Agroexport del Sur S.A.", "Dirección de prueba 789, Arequipa", "info@agrosur.example", "054000008", "20000.00", "active"),
+  customer(9, "DNI", "70000009", "Pedro Castillo Rojas", "", "", "999000009", "500.00", "inactive"),
+  customer(10, "RUC", "20100000010", "Textiles Inca S.A.C.", "", "pedidos@textilesinca.example", "014000010", "8000.00", "active"),
+  customer(11, "DNI", "70000011", "Ana Torres Salazar", "", "ana.torres@example.com", "999000011", "1200.00", "active"),
+  customer(12, "CE", "002345678", "Marie Dubois", "", "marie.dubois@example.com", "999000012", "0.00", "inactive"),
 ]
+
+let currentCustomers = new Map(seed.map((item) => [item.id, item]))
+export const getMockCustomer = (id: string) => currentCustomers.get(id)
 
 /** Clientes 1 y 2 tienen ventas o cotizaciones asociadas */
 const IN_USE_IDS = [uuid(1), uuid(2)]
@@ -46,6 +51,9 @@ const IN_USE_IDS = [uuid(1), uuid(2)]
 export const customerHandlers = createCrudHandlers<Customer>({
   resource: "customers",
   seed,
+  onChange: (items) => {
+    currentCustomers = new Map(items.map((item) => [item.id, item]))
+  },
   // Un registro nuevo aparece primero en el listado
   insertAt: "start",
   searchFields: ["name", "document_number", "email"],
@@ -72,6 +80,7 @@ export const customerHandlers = createCrudHandlers<Customer>({
     document_type: (body.document_type as DocumentType) || "DNI",
     document_number: String(body.document_number ?? "").trim(),
     name: String(body.name ?? "").trim(),
+    address: String(body.address ?? "").trim(),
     email: String(body.email ?? "").trim(),
     phone: String(body.phone ?? "").trim(),
     credit_limit: String(body.credit_limit ?? "0.00").trim(),
@@ -79,6 +88,7 @@ export const customerHandlers = createCrudHandlers<Customer>({
   }),
   prepareUpdate: (_current, body) => ({
     name: String(body.name ?? "").trim(),
+    address: String(body.address ?? "").trim(),
     email: String(body.email ?? "").trim(),
     phone: String(body.phone ?? "").trim(),
     credit_limit: String(body.credit_limit ?? "0.00").trim(),

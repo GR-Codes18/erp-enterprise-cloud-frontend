@@ -4,10 +4,12 @@ import { useForm, useWatch } from "react-hook-form"
 import { Link, useNavigate, useSearchParams } from "react-router"
 import { useSupplierOptions } from "@/modules/maintenance"
 import { Field } from "@/shared/components/Field"
-import { PageHeader } from "@/shared/components/PageHeader"
+import { RouteFormDialog } from "@/shared/components/RouteFormDialog"
+import { SearchableSelect } from "@/shared/components/SearchableSelect"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select"
+import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
 import { getErrorMessage, isApiError } from "@/shared/lib/api/errors"
 import { isBusinessDate, todayInLima } from "@/shared/lib/dates"
 import { previewTotals } from "@/shared/lib/lines"
@@ -29,8 +31,10 @@ export default function SupplierInvoiceFormPage() {
   const [searchParams] = useSearchParams()
   const create = supplierInvoiceHooks.useCreate()
   const [serverError, setServerError] = useState<string | null>(null)
+  const [supplierSearchInput, setSupplierSearchInput] = useState("")
+  const supplierSearch = useDebouncedValue(supplierSearchInput.trim(), 300)
 
-  const suppliers = useSupplierOptions()
+  const suppliers = useSupplierOptions({ search: supplierSearch })
   // Desde el detalle de una orden llega ?order=: proveedor, orden y vencimiento quedan propuestos
   const presetOrder = purchaseOrderHooks.useDetail(searchParams.get("order") ?? "").data
   const presetSupplier = suppliers.data?.find((candidate) => candidate.id === presetOrder?.supplier_id)
@@ -94,11 +98,12 @@ export default function SupplierInvoiceFormPage() {
   })
 
   return (
-    <>
-      <PageHeader
-        title="Registrar factura de proveedor"
-        description="Proveedor + serie + número no se repiten. El vencimiento se propone con el plazo del proveedor."
-      />
+    <RouteFormDialog
+      title="Registrar factura de proveedor"
+      description="Proveedor + serie + número no se repiten. El vencimiento se propone con el plazo del proveedor."
+      onClose={() => navigate("/purchases/invoices")}
+      className="sm:max-w-3xl"
+    >
       {(suppliers.isError || orders.isError) && (
         <p role="alert" className="mb-4 text-sm text-danger-text">
           {getErrorMessage(suppliers.error ?? orders.error)}
@@ -108,26 +113,27 @@ export default function SupplierInvoiceFormPage() {
       <form noValidate onSubmit={handleSubmit(onSubmit)} className="max-w-3xl space-y-6">
         <div className="grid gap-4 md:grid-cols-2">
           <Field id="supplier_id" label="Proveedor" error={errors.supplier_id?.message}>
-            <Select
-              value={supplierId || undefined}
+            <SearchableSelect
+              value={supplierId}
               onValueChange={(value) => {
                 setValue("supplier_id", value, { shouldDirty: true })
                 setValue("order_id", "", { shouldDirty: true })
                 proposeDueDate(issueDate, suppliers.data?.find((candidate) => candidate.id === value)?.credit_days)
               }}
+              options={(suppliers.data ?? []).map((option) => ({
+                value: option.id,
+                label: `${option.name} · ${option.document_number} · ${option.credit_days} días de crédito`,
+              }))}
+              placeholder="Selecciona el proveedor"
+              searchPlaceholder="Buscar por nombre o documento"
               disabled={create.isPending || suppliers.isPending}
-            >
-              <SelectTrigger id="supplier_id" className="w-full" {...fieldProps("supplier_id")}>
-                <SelectValue placeholder="Selecciona el proveedor" />
-              </SelectTrigger>
-              <SelectContent>
-                {(suppliers.data ?? []).map((option) => (
-                  <SelectItem key={option.id} value={option.id}>
-                    {option.name} · {option.credit_days} días de crédito
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onSearchChange={setSupplierSearchInput}
+              isLoading={suppliers.isFetching}
+              errorMessage={suppliers.isError ? getErrorMessage(suppliers.error) : undefined}
+              aria-invalid={!!errors.supplier_id}
+              aria-describedby={errors.supplier_id ? "supplier_id-error" : undefined}
+              aria-label="Proveedor"
+            />
           </Field>
           <Field id="order_id" label="Orden de compra" error={errors.order_id?.message}>
             <Select
@@ -190,6 +196,6 @@ export default function SupplierInvoiceFormPage() {
           </Button>
         </div>
       </form>
-    </>
+    </RouteFormDialog>
   )
 }

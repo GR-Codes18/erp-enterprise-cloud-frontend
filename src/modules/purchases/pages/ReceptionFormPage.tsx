@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import { useWarehouseOptions } from "@/modules/maintenance"
 import { ErrorState } from "@/shared/components/ErrorState"
 import { Field } from "@/shared/components/Field"
-import { PageHeader } from "@/shared/components/PageHeader"
+import { RouteFormDialog } from "@/shared/components/RouteFormDialog"
 import { QuantityLinesEditor } from "@/shared/components/QuantityLinesEditor"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
@@ -111,11 +111,11 @@ function ReceptionForm({ reception }: { reception?: Reception }) {
   }
 
   return (
-    <>
-      <PageHeader
-        title={reception ? `Editar recepción ${reception.number}` : "Nueva recepción"}
-        description="Registra lo que llegó con su guía de remisión. Solo se recibe lo pendiente de la orden."
-      />
+    <RouteFormDialog
+      title={reception ? `Editar recepción ${reception.number}` : "Nueva recepción"}
+      description="Registra lo que llegó con su guía de remisión. Solo se recibe lo pendiente de la orden."
+      onClose={() => navigate(reception ? `/purchases/receptions/${reception.id}` : "/purchases/receptions")}
+    >
       {(orders.isError || warehouses.isError) && (
         <p role="alert" className="mb-4 text-sm text-danger-text">
           {getErrorMessage(orders.error ?? warehouses.error)}
@@ -222,6 +222,6 @@ function ReceptionForm({ reception }: { reception?: Reception }) {
           </Button>
         </div>
       </form>
-    </>
+    </RouteFormDialog>
   )
 }

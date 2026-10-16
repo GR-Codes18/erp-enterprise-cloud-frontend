@@ -13,6 +13,7 @@ import { TotalsSummary } from "@/shared/components/TotalsSummary"
 import { Button } from "@/shared/components/ui/button"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import { formatBusinessDate, formatDateTimeLima } from "@/shared/lib/dates"
+import { formatMoney } from "@/shared/lib/money"
 import { purchaseOrderHooks } from "../hooks"
 import {
   PURCHASE_ORDER_STATUS_LABELS,
@@ -98,7 +99,11 @@ export default function PurchaseOrderDetailPage() {
 
   return (
     <>
-      <PageHeader title={`Orden de compra ${document.number}`} description={`Registrada ${formatDateTimeLima(document.created_at)}`} actions={actions} />
+      <PageHeader
+        title="Detalle de la orden de compra"
+        description="Consulta lo pactado con el proveedor y controla las recepciones."
+        actions={<div className="flex flex-wrap gap-2">{actions}</div>}
+      />
 
       {actionError && (
         <p role="alert" className="mb-4 rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-text">
@@ -106,12 +111,21 @@ export default function PurchaseOrderDetailPage() {
         </p>
       )}
 
+      <section className="mb-5 flex flex-col gap-4 rounded-xl border bg-gradient-to-r from-primary/10 via-card to-card p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Orden de compra</p>
+          <p className="mt-1 font-mono text-2xl font-semibold tracking-tight">{document.number}</p>
+          <p className="mt-1 text-sm text-muted-foreground">Registrada {formatDateTimeLima(document.created_at)}</p>
+        </div>
+        <div className="flex items-center justify-between gap-6 rounded-lg border bg-background/80 px-4 py-3 sm:min-w-56 sm:flex-col sm:items-end sm:gap-1">
+          <StatusBadge tone={PURCHASE_ORDER_STATUS_TONES[document.status]} label={PURCHASE_ORDER_STATUS_LABELS[document.status]} />
+          <p className="font-mono text-xl font-semibold">{formatMoney(document.total)}</p>
+        </div>
+      </section>
+
       <DetailGrid
+        variant="cards"
         items={[
-          {
-            label: "Estado",
-            value: <StatusBadge tone={PURCHASE_ORDER_STATUS_TONES[document.status]} label={PURCHASE_ORDER_STATUS_LABELS[document.status]} />,
-          },
           { label: "Proveedor", value: document.supplier_name },
           { label: "Entrega esperada", value: formatBusinessDate(document.expected_date) },
           {
@@ -139,10 +153,11 @@ export default function PurchaseOrderDetailPage() {
         </section>
       )}
 
-      <section className="space-y-3" aria-labelledby="lines-title">
-        <h2 id="lines-title" className="text-base font-medium">
-          Productos
-        </h2>
+      <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm md:p-5" aria-labelledby="lines-title">
+        <div>
+          <h2 id="lines-title" className="text-base font-semibold">Productos de la orden</h2>
+          <p className="text-sm text-muted-foreground">Cantidades pactadas, costo unitario y recibido.</p>
+        </div>
         <DocumentLinesTable
           lines={document.items}
           priceLabel="Costo unitario"

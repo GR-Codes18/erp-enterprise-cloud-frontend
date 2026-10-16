@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Link } from "react-router"
 import { useHasPermission } from "@/modules/auth"
 import { useSupplierOptions } from "@/modules/maintenance"
@@ -5,10 +6,13 @@ import type { Column } from "@/shared/components/DataTable"
 import { DateRangeFilter } from "@/shared/components/DateRangeFilter"
 import { FilterSelect } from "@/shared/components/FilterSelect"
 import { ListPageLayout } from "@/shared/components/ListPageLayout"
+import { SearchableSelect } from "@/shared/components/SearchableSelect"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { useListFilters } from "@/shared/hooks/useListFilters"
+import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
+import { getErrorMessage } from "@/shared/lib/api/errors"
 import { formatBusinessDate } from "@/shared/lib/dates"
 import { formatMoney } from "@/shared/lib/money"
 import { supplierInvoiceHooks } from "../hooks"
@@ -21,9 +25,11 @@ import {
 } from "../invoices/schema"
 
 export default function SupplierInvoicesPage() {
+  const [supplierSearchInput, setSupplierSearchInput] = useState("")
+  const supplierSearch = useDebouncedValue(supplierSearchInput.trim(), 300)
   const list = useListFilters(["status", "supplier_id"] as const)
   const invoices = supplierInvoiceHooks.useList(list.params)
-  const suppliers = useSupplierOptions({ includeInactive: true })
+  const suppliers = useSupplierOptions({ includeInactive: true, search: supplierSearch })
   const canCreate = useHasPermission("purchases.invoices:create")
 
   const columns: Column<SupplierInvoice>[] = [
@@ -89,12 +95,21 @@ export default function SupplierInvoicesPage() {
             allLabel="Todos los estados"
             options={SUPPLIER_INVOICE_STATUSES.map((value) => ({ value, label: SUPPLIER_INVOICE_STATUS_LABELS[value] }))}
           />
-          <FilterSelect
-            label="Filtrar por proveedor"
+          <SearchableSelect
+            aria-label="Filtrar por proveedor"
             value={list.values.supplier_id}
-            onChange={list.setFilter("supplier_id")}
-            allLabel="Todos los proveedores"
-            options={(suppliers.data ?? []).map((supplier) => ({ value: supplier.id, label: supplier.name }))}
+            onValueChange={list.setFilter("supplier_id")}
+            onSearchChange={setSupplierSearchInput}
+            isLoading={suppliers.isFetching}
+            errorMessage={suppliers.isError ? getErrorMessage(suppliers.error) : undefined}
+            searchPlaceholder="Buscar por nombre o documento"
+            placeholder="Todos los proveedores"
+            allOption={{ value: "all", label: "Todos los proveedores" }}
+            options={(suppliers.data ?? []).map((supplier) => ({
+              value: supplier.id,
+              label: `${supplier.name} · ${supplier.document_number}`,
+            }))}
+            disabled={suppliers.isPending}
             className="w-64"
           />
           <DateRangeFilter from={list.dateFrom} to={list.dateTo} onFromChange={list.setDateFrom} onToChange={list.setDateTo} />

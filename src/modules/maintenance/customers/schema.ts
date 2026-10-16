@@ -28,6 +28,7 @@ const baseCreateFields = z.object({
     .trim()
     .min(2, "Ingresa el nombre o razón social")
     .max(120, "Máximo 120 caracteres"),
+  address: z.string().trim().max(250, "Máximo 250 caracteres"),
   email: z.union([z.literal(""), z.string().email("Correo no válido")]),
   phone: z.string().trim().max(20, "Máximo 20 caracteres"),
   credit_limit: z.string().trim().regex(AMOUNT_PATTERN, "Monto no válido, ejemplo: 1500.00"),
@@ -52,6 +53,7 @@ export const customerUpdateSchema = z.object({
     .trim()
     .min(2, "Ingresa el nombre o razón social")
     .max(120, "Máximo 120 caracteres"),
+  address: z.string().trim().max(250, "Máximo 250 caracteres"),
   email: z.union([z.literal(""), z.string().email("Correo no válido")]),
   phone: z.string().trim().max(20, "Máximo 20 caracteres"),
   credit_limit: z.string().trim().regex(AMOUNT_PATTERN, "Monto no válido, ejemplo: 1500.00"),
@@ -59,7 +61,7 @@ export const customerUpdateSchema = z.object({
 })
 
 /** Lo que devuelve la API. */
-export const customerSchema = baseCreateFields.extend({ id: z.string() })
+export const customerSchema = baseCreateFields.extend({ address: z.string().default(""), id: z.string() })
 
 export type CustomerCreateInput = z.infer<typeof customerCreateSchema>
 export type CustomerUpdateInput = z.infer<typeof customerUpdateSchema>
@@ -70,6 +72,7 @@ export const EMPTY_CUSTOMER: CustomerCreateInput = {
   document_type: "DNI",
   document_number: "",
   name: "",
+  address: "",
   email: "",
   phone: "",
   credit_limit: "0.00",

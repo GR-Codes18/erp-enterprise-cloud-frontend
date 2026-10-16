@@ -6,7 +6,8 @@ import type { Supplier, SupplierCreateInput, SupplierUpdateInput } from "./schem
 export const supplierKeys = {
   all: ["suppliers"] as const,
   list: (params: PageParams) => [...supplierKeys.all, "list", params] as const,
-  options: (includeInactive: boolean) => [...supplierKeys.all, "options", { includeInactive }] as const,
+  options: (includeInactive: boolean, search: string) =>
+    [...supplierKeys.all, "options", { includeInactive, search }] as const,
 }
 
 export function useSuppliers(params: PageParams) {
@@ -29,10 +30,18 @@ export interface SupplierOption {
  * Proveedores para selectores de otros módulos (regla 0.5). Por defecto solo activos;
  * includeInactive para vistas de consulta o documentos antiguos.
  */
-export function useSupplierOptions({ includeInactive = false }: { includeInactive?: boolean } = {}) {
-  const params: PageParams = { page: 1, size: 100, filters: includeInactive ? {} : { status: "active" } }
+export function useSupplierOptions({
+  includeInactive = false,
+  search = "",
+}: { includeInactive?: boolean; search?: string } = {}) {
+  const params: PageParams = {
+    page: 1,
+    size: 100,
+    search: search.trim() || undefined,
+    filters: includeInactive ? {} : { status: "active" },
+  }
   return useQuery({
-    queryKey: supplierKeys.options(includeInactive),
+    queryKey: supplierKeys.options(includeInactive, params.search ?? ""),
     queryFn: ({ signal }) => supplierService.list(params, signal),
     select: (data): SupplierOption[] =>
       data.items.map((s) => ({

@@ -11,6 +11,8 @@ export const dashboardSchema = z.object({
   sales: z.string(),
   /** Facturas de proveedor registradas del periodo (sin anuladas) */
   purchases: z.string(),
+  /** Costo actual estimado de los productos vendidos del periodo */
+  cost_of_sales: z.string(),
   /** Ventas netas sin IGV menos el costo de lo vendido */
   gross_profit: z.string(),
   /** Utilidad bruta / ventas netas sin IGV, en % con 1 decimal ("25.0"); "" si no hubo ventas */
@@ -28,6 +30,27 @@ export const dashboardSchema = z.object({
     ),
     overdue_receivables: z.array(
       z.object({ invoice_id: z.string(), invoice_code: z.string(), customer_name: z.string(), balance: z.string(), due_date: z.string() }),
+    ),
+    orders_to_invoice: z.array(
+      z.object({ id: z.string(), number: z.string(), customer_name: z.string(), total: z.string() }),
+    ),
+    pending_deliveries: z.array(
+      z.object({
+        id: z.string(),
+        number: z.string(),
+        customer_name: z.string(),
+        method: z.enum(["shipping", "pickup"]),
+        status: z.enum(["pending", "in_transit", "ready_for_pickup"]),
+      }),
+    ),
+    purchase_orders_to_receive: z.array(
+      z.object({
+        id: z.string(),
+        number: z.string(),
+        supplier_name: z.string(),
+        expected_date: z.string(),
+        status: z.enum(["issued", "partially_received"]),
+      }),
     ),
   }),
 })

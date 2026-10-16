@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { Link } from "react-router"
+import { ArrowUpRight, ClipboardList } from "lucide-react"
 import { useHasPermission } from "@/modules/auth"
 import { useCustomerOptions } from "@/modules/maintenance"
 import { DataTable, type Column } from "@/shared/components/DataTable"
@@ -9,6 +10,7 @@ import { ErrorState } from "@/shared/components/ErrorState"
 import { FilterSelect } from "@/shared/components/FilterSelect"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
+import { SearchableSelect } from "@/shared/components/SearchableSelect"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
@@ -24,6 +26,9 @@ import {
   ORDER_STATUS_TONES,
   PAYMENT_CONDITIONS,
   PAYMENT_CONDITION_LABELS,
+  DELIVERY_METHOD_LABELS,
+  SALE_TYPE_LABELS,
+  getDeliveryStatusLabel,
   type Order,
 } from "../orders/schema"
 
@@ -38,9 +43,11 @@ export default function OrdersPage() {
   const [condition, setCondition] = useState(FILTER_ALL)
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
+  const [customerSearchInput, setCustomerSearchInput] = useState("")
+  const customerSearch = useDebouncedValue(customerSearchInput.trim(), 300)
   const canCreate = useHasPermission("sales.orders:create")
 
-  const customers = useCustomerOptions({ includeInactive: true })
+  const customers = useCustomerOptions({ includeInactive: true, search: customerSearch })
   const filters = pickFilters({ status, customer_id: customerId, payment_condition: condition })
   const orders = useOrders({ page, size: PAGE_SIZE, search, filters, ...dateRangeParams(dateFrom, dateTo) })
   const hasFilters = search !== "" || Object.keys(filters).length > 0 || dateFrom !== "" || dateTo !== ""
@@ -61,9 +68,46 @@ export default function OrdersPage() {
   }
 
   const columns: Column<Order>[] = [
-    { key: "number", header: "Número", cell: (row) => <span className="font-mono text-sm">{row.number}</span> },
+    {
+      key: "number",
+      header: "Número",
+      cell: (row) => <span className="inline-flex rounded-md border bg-muted/40 px-2 py-1 font-mono text-xs">{row.number}</span>,
+    },
     { key: "date", header: "Fecha", cell: (row) => formatDateTimeLima(row.created_at) },
-    { key: "customer", header: "Cliente", cell: (row) => <span className="font-medium">{row.customer_name}</span> },
+    {
+      key: "customer",
+      header: "Cliente",
+      cell: (row) => (
+        <span className="font-medium">
+          {row.customer_name}
+          {!row.customer_id && <span className="ml-2 text-xs font-normal text-muted-foreground">Ocasional</span>}
+        </span>
+      ),
+    },
+    {
+      key: "sale_type",
+      header: "Tipo",
+      cell: (row) => <span className="text-sm text-muted-foreground">{SALE_TYPE_LABELS[row.sale_type]}</span>,
+    },
+    {
+      key: "delivery",
+      header: "Entrega",
+      cell: (row) =>
+        row.sale_type === "wholesale" ? (
+          <StatusBadge
+            tone={
+              row.delivery_status === "delivered" || row.delivery_status === "picked_up"
+                ? "success"
+                : row.delivery_status === "pending"
+                  ? "neutral"
+                  : "warning"
+            }
+            label={`${DELIVERY_METHOD_LABELS[row.delivery_method]} · ${getDeliveryStatusLabel(row.delivery_method, row.delivery_status)}`}
+          />
+        ) : (
+          <span className="text-sm text-muted-foreground">Presencial</span>
+        ),
+    },
     {
       key: "condition",
       header: "Condición",
@@ -72,7 +116,12 @@ export default function OrdersPage() {
           ? `${PAYMENT_CONDITION_LABELS.credit} ${row.credit_days} días`
           : PAYMENT_CONDITION_LABELS.cash,
     },
-    { key: "total", header: "Total", className: "text-right", cell: (row) => <span className="font-mono">{formatMoney(row.total)}</span> },
+    {
+      key: "total",
+      header: "Total",
+      className: "text-right",
+      cell: (row) => <span className="font-mono text-sm font-semibold">{formatMoney(row.total)}</span>,
+    },
     {
       key: "status",
       header: "Estado",
@@ -82,8 +131,11 @@ export default function OrdersPage() {
       key: "detail",
       header: "Detalle",
       cell: (row) => (
-        <Button variant="link" size="sm" asChild>
-          <Link to={`/sales/orders/${row.id}`}>Ver pedido</Link>
+        <Button variant="ghost" size="sm" className="gap-1" asChild>
+          <Link to={`/sales/orders/${row.id}`}>
+            Ver detalle
+            <ArrowUpRight aria-hidden="true" className="size-3.5" />
+          </Link>
         </Button>
       ),
     },
@@ -91,7 +143,7 @@ export default function OrdersPage() {
 
   const newOrderButton = canCreate && (
     <Button asChild>
-      <Link to="/sales/orders/new">Nuevo pedido</Link>
+      <Link to="/sales/orders/new">Nueva venta</Link>
     </Button>
   )
 
@@ -103,7 +155,21 @@ export default function OrdersPage() {
         actions={newOrderButton}
       />
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4 shadow-sm">
+        <div className="flex basis-full items-center justify-between border-b pb-3">
+          <div className="flex items-center gap-2">
+            <span className="rounded-lg bg-primary/10 p-2 text-primary">
+              <ClipboardList aria-hidden="true" className="size-4" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold">Seguimiento de pedidos</p>
+              <p className="text-xs text-muted-foreground">Busca y filtra tus ventas</p>
+            </div>
+          </div>
+          <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+            {orders.data?.total ?? 0} resultados
+          </span>
+        </div>
         <Input
           type="search"
           className="max-w-xs"
@@ -119,12 +185,21 @@ export default function OrdersPage() {
           allLabel="Todos los estados"
           options={ORDER_STATUSES.map((value) => ({ value, label: ORDER_STATUS_LABELS[value] }))}
         />
-        <FilterSelect
-          label="Filtrar por cliente"
+        <SearchableSelect
+          aria-label="Filtrar por cliente"
           value={customerId}
-          onChange={withReset(setCustomerId)}
-          allLabel="Todos los clientes"
-          options={(customers.data ?? []).map((customer) => ({ value: customer.id, label: customer.name }))}
+          onValueChange={withReset(setCustomerId)}
+          onSearchChange={setCustomerSearchInput}
+          isLoading={customers.isFetching}
+          errorMessage={customers.isError ? getErrorMessage(customers.error) : undefined}
+          searchPlaceholder="Buscar por nombre o documento"
+          placeholder="Todos los clientes"
+          allOption={{ value: FILTER_ALL, label: "Todos los clientes" }}
+          options={(customers.data ?? []).map((customer) => ({
+            value: customer.id,
+            label: `${customer.name} · ${customer.document_type} ${customer.document_number}`,
+          }))}
+          disabled={customers.isPending}
           className="w-60"
         />
         <FilterSelect
@@ -143,10 +218,11 @@ export default function OrdersPage() {
         )}
       </div>
 
-      {orders.isError ? (
-        <ErrorState message={getErrorMessage(orders.error)} onRetry={() => void orders.refetch()} />
-      ) : (
-        <>
+      <section className="space-y-4 rounded-xl border bg-card p-3 shadow-sm md:p-4" aria-label="Resultados de pedidos">
+        {orders.isError ? (
+          <ErrorState message={getErrorMessage(orders.error)} onRetry={() => void orders.refetch()} />
+        ) : (
+          <>
           <DataTable
             columns={columns}
             rows={orders.data?.items ?? []}
@@ -167,8 +243,9 @@ export default function OrdersPage() {
             disabled={orders.isFetching}
             onPageChange={setPage}
           />
-        </>
-      )}
+          </>
+        )}
+      </section>
     </>
   )
 }

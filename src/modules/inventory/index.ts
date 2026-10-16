@@ -11,6 +11,7 @@ export const inventoryModule: AppModule = {
       items: [
         { label: "Stock", path: "stock", permission: "inventory.stock:view", page: () => import("./pages/StockPage") },
         { label: "Kardex", path: "kardex", permission: "inventory.kardex:view", page: () => import("./pages/KardexPage") },
+        { label: "Kardex comercial", path: "commercial-kardex", permission: "inventory.kardex:view", page: () => import("./pages/CommercialKardexPage") },
         {
           label: "Transferencias",
           path: "transfers",

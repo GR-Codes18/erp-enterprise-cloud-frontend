@@ -28,6 +28,8 @@ function useFinanceMutation<TVariables, TResult>(mutationFn: (variables: TVariab
       // El saldo y el estado de comprobantes y facturas de compra también cambian
       void queryClient.invalidateQueries({ queryKey: ["sales"] })
       void queryClient.invalidateQueries({ queryKey: ["purchases"] })
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      void queryClient.invalidateQueries({ queryKey: ["reports"] })
     },
   })
 }

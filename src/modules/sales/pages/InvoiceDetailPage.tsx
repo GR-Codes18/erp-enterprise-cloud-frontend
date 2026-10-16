@@ -30,8 +30,8 @@ export default function InvoiceDetailPage() {
   const canVoid = useHasPermission("sales.invoices:void")
   const canReturn = useHasPermission("sales.returns:create")
   const canSeeFinance = useHasPermission("finance.payments:view")
-  const payments = useDocumentPayments(id, { enabled: canSeeFinance })
   const canAttach = useHasPermission("documents.files:create")
+  const payments = useDocumentPayments(id, { enabled: canSeeFinance })
   const [voidOpen, setVoidOpen] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -95,10 +95,11 @@ export default function InvoiceDetailPage() {
         ]}
       />
 
-      <section className="space-y-3" aria-labelledby="lines-title">
-        <h2 id="lines-title" className="text-base font-medium">
-          Productos
-        </h2>
+      <section className="mt-6 space-y-3 rounded-xl border bg-card p-4 shadow-sm md:p-5" aria-labelledby="invoice-lines-title">
+        <div>
+          <h2 id="invoice-lines-title" className="text-base font-semibold">Productos</h2>
+          <p className="text-sm text-muted-foreground">Cantidades, precios, devoluciones y subtotales del comprobante.</p>
+        </div>
         <DocumentLinesTable
           lines={document.items}
           extraColumn={{ header: "Devuelto", cell: (line) => line.returned_quantity }}
@@ -106,14 +107,14 @@ export default function InvoiceDetailPage() {
         <TotalsSummary official={document} />
       </section>
 
-      {/* Los cobros se ven en lectura; se registran en Finanzas */}
-      <section className="mt-6 space-y-3 rounded-md border p-4" aria-labelledby="payments-title">
+      <section className="mt-6 space-y-3 rounded-xl border bg-card p-4 shadow-sm md:p-5" aria-labelledby="invoice-payments-title">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="payments-title" className="text-base font-medium">
-            Cobros
-          </h2>
+          <div>
+            <h2 id="invoice-payments-title" className="text-base font-semibold">Cobros</h2>
+            <p className="text-sm text-muted-foreground">Pagos registrados para este comprobante.</p>
+          </div>
           {canSeeFinance && (
-            <Button variant="link" size="sm" asChild>
+            <Button variant="outline" size="sm" asChild>
               <Link to={`/finance/payments?document_id=${document.id}`}>Ver en Finanzas</Link>
             </Button>
           )}
@@ -123,13 +124,11 @@ export default function InvoiceDetailPage() {
         ) : payments.isError ? (
           <ErrorState message={getErrorMessage(payments.error)} onRetry={() => void payments.refetch()} />
         ) : payments.isPending ? (
-          <p role="status" className="text-sm text-muted-foreground">
-            Cargando cobros…
-          </p>
+          <p role="status" className="text-sm text-muted-foreground">Cargando cobros…</p>
         ) : payments.data.length === 0 ? (
           <p className="text-sm text-muted-foreground">Este comprobante aún no tiene cobros registrados.</p>
         ) : (
-          <ul className="divide-y rounded-md border">
+          <ul className="divide-y rounded-lg border">
             {payments.data.map((payment) => (
               <li key={payment.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
                 <span>

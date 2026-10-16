@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { buildWarehouseOptionsForProduct } from "./warehouseOptions"
 import {
   QUOTE_STATUSES,
   QUOTE_STATUS_LABELS,
@@ -13,7 +14,7 @@ const valid = {
   customer_id: "00000000-0000-4000-8000-000000000001",
   issue_date: "2026-10-08",
   valid_until: "2026-10-23",
-  items: [{ product_id: "00000000-0000-4000-8004-000000000001", quantity: 2, unit_price: "45.50" }],
+  items: [{ product_id: "00000000-0000-4000-8004-000000000001", warehouse_id: "00000000-0000-4000-8003-000000000001", quantity: 2, unit_price: "45.50" }],
   notes: "",
 }
 
@@ -38,8 +39,9 @@ describe("quoteInputSchema", () => {
     expect(invalidFields({ ...valid, valid_until: "2026-10-08" })).toEqual([])
   })
 
-  it("la cantidad debe ser mayor que cero", () => {
+  it("la cantidad debe ser mayor que cero y cada línea exige un almacén", () => {
     expect(invalidFields({ ...valid, items: [{ ...valid.items[0], quantity: 0 }] })).toContain("items")
+    expect(invalidFields({ ...valid, items: [{ ...valid.items[0], warehouse_id: "" }] })).toContain("items")
   })
 
   it("una cotización nueva propone 15 días de validez y una línea vacía", () => {
@@ -78,5 +80,25 @@ describe("canConvertQuote", () => {
     expect(canConvertQuote({ status: "accepted", order_id: "" })).toBe(true)
     expect(canConvertQuote({ status: "accepted", order_id: "abc" })).toBe(false)
     expect(canConvertQuote({ status: "sent", order_id: "" })).toBe(false)
+  })
+})
+
+describe("buildWarehouseOptionsForProduct", () => {
+  it("solo incluye almacenes donde el producto tiene stock real", () => {
+    const warehouses = [
+      { id: "w-central", name: "Almacén Central" },
+      { id: "w-south", name: "Almacén Sur" },
+      { id: "w-north", name: "Almacén Norte" },
+    ]
+    const stockRows = [
+      { product_id: "prod-7", warehouse_id: "w-central", quantity: 0 },
+      { product_id: "prod-7", warehouse_id: "w-south", quantity: 12 },
+      { product_id: "prod-7", warehouse_id: "w-north", quantity: 0 },
+      { product_id: "prod-9", warehouse_id: "w-central", quantity: 5 },
+    ]
+
+    expect(buildWarehouseOptionsForProduct("prod-7", warehouses, stockRows)).toEqual([
+      { id: "w-south", name: "Almacén Sur" },
+    ])
   })
 })

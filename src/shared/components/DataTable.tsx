@@ -37,7 +37,7 @@ export function DataTable<T>({
   empty,
 }: DataTableProps<T>) {
   return (
-    <div className="rounded-md border" aria-busy={isLoading}>
+    <div className="overflow-hidden rounded-lg border bg-card" aria-busy={isLoading}>
       <Table>
         <TableHeader>
           <TableRow>

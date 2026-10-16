@@ -142,7 +142,7 @@ export default function AuditPage() {
         description="Registro de lo que ocurre en el sistema. Solo lectura."
       />
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4 shadow-sm">
         <FilterSelect
           label="Filtrar por usuario"
           value={userId}

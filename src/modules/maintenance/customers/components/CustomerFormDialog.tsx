@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/shared/components/ui/dialog"
 import { Input } from "@/shared/components/ui/input"
+import { Textarea } from "@/shared/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -137,6 +138,17 @@ function CustomerCreateForm({ onDone }: { onDone: () => void }) {
         />
       </Field>
 
+      <Field id="address" label="Dirección principal (para envíos)" error={errors.address?.message}>
+        <Textarea
+          id="address"
+          maxLength={250}
+          autoComplete="street-address"
+          aria-invalid={!!errors.address}
+          aria-describedby={errors.address ? "address-error" : undefined}
+          {...register("address")}
+        />
+      </Field>
+
       <div className="grid grid-cols-2 gap-3">
         <Field id="email" label="Correo" error={errors.email?.message}>
           <Input
@@ -224,6 +236,7 @@ function CustomerUpdateForm({ customer, onDone }: { customer: Customer; onDone: 
     resolver: zodResolver(customerUpdateSchema),
     defaultValues: {
       name: customer.name,
+      address: customer.address,
       email: customer.email ?? "",
       phone: customer.phone ?? "",
       credit_limit: customer.credit_limit,
@@ -282,6 +295,17 @@ function CustomerUpdateForm({ customer, onDone }: { customer: Customer; onDone: 
           aria-invalid={!!errors.name}
           aria-describedby={errors.name ? "name-error" : undefined}
           {...register("name")}
+        />
+      </Field>
+
+      <Field id="address" label="Dirección principal (para envíos)" error={errors.address?.message}>
+        <Textarea
+          id="address"
+          maxLength={250}
+          autoComplete="street-address"
+          aria-invalid={!!errors.address}
+          aria-describedby={errors.address ? "address-error" : undefined}
+          {...register("address")}
         />
       </Field>
 

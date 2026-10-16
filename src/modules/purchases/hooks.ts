@@ -27,7 +27,15 @@ export const purchaseKeys = {
 function documentHooks<T, I>(resource: string, service: DocumentService<T, I>) {
   const useInvalidate = () => {
     const queryClient = useQueryClient()
-    return () => queryClient.invalidateQueries({ queryKey: purchaseKeys.all })
+    return () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: purchaseKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ["stock"] }),
+        queryClient.invalidateQueries({ queryKey: ["kardex"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance"] }),
+        queryClient.invalidateQueries({ queryKey: ["reports"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+      ])
   }
 
   return {

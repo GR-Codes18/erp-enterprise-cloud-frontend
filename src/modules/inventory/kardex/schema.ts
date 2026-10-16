@@ -3,16 +3,19 @@ import { z } from "zod"
 export const KARDEX_TYPES = [
   "purchase",
   "sale",
+  "sale_void",
   "transfer_in",
   "transfer_out",
   "adjustment",
   "return",
 ] as const
 export type KardexType = (typeof KARDEX_TYPES)[number]
+export const COMMERCIAL_KARDEX_TYPES = ["purchase", "sale"] as const satisfies readonly KardexType[]
 
 export const KARDEX_TYPE_LABELS: Record<KardexType, string> = {
   purchase: "Compra",
   sale: "Venta",
+  sale_void: "Anulación de venta",
   transfer_in: "Transferencia (entrada)",
   transfer_out: "Transferencia (salida)",
   adjustment: "Ajuste",
@@ -28,6 +31,8 @@ export const kardexRowSchema = z
   .object({
     id: z.string(),
     product_id: z.string(),
+    product_name: z.string().optional(),
+    product_sku: z.string().optional(),
     warehouse_id: z.string(),
     warehouse_name: z.string(),
     /** Fecha y hora UTC (ISO 8601). Se muestra con formatDateTimeLima */
@@ -60,9 +65,9 @@ export function isKardexQueryReady(query: {
   product_id: string
   date_from: string
   date_to: string
-}): boolean {
+}, { requireProduct = true }: { requireProduct?: boolean } = {}): boolean {
   return (
-    query.product_id !== "" &&
+    (!requireProduct || (query.product_id !== "" && query.product_id !== FILTER_ALL)) &&
     query.date_from !== "" &&
     query.date_to !== "" &&
     isValidDateRange(query.date_from, query.date_to)
@@ -73,10 +78,11 @@ export function isKardexQueryReady(query: {
 export function buildKardexFilters(values: {
   product_id: string
   warehouse_id: string
-}): Record<string, string> {
+}, types?: readonly KardexType[]): Record<string, string> {
   const filters: Record<string, string> = {}
   for (const [key, value] of Object.entries(values)) {
     if (value !== FILTER_ALL && value !== "") filters[key] = value
   }
+  if (types?.length) filters.types = types.join(",")
   return filters
 }

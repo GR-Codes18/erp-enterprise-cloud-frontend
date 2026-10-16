@@ -2,8 +2,8 @@ import { delay, http, HttpResponse, type RequestHandler } from "msw"
 import { env } from "@/config/env"
 import { PRODUCTS, findProduct, productRef } from "@/mocks/refs"
 import { financeSnapshot } from "@/modules/finance/mocks"
-import { currentSupplierInvoices } from "@/modules/purchases/mocks"
-import { currentSalesInvoices } from "@/modules/sales/mocks"
+import { currentPurchaseOrders, currentSupplierInvoices } from "@/modules/purchases/mocks"
+import { currentSalesInvoices, currentSalesOrders } from "@/modules/sales/mocks"
 import type { ApiErrorBody } from "@/shared/lib/api/types"
 import { addDays, isBusinessDate, todayInLima } from "@/shared/lib/dates"
 import { baseFromTotal, calculateTotals } from "@/shared/lib/tax"
@@ -96,6 +96,7 @@ export const reportHandlers: RequestHandler[] = [
       date_to: to,
       sales: fromCents(sales),
       purchases: fromCents(activePurchases(from, to).reduce((sum, invoice) => sum + toCents(invoice.total), 0)),
+      cost_of_sales: fromCents(cost),
       // Ventas netas sin IGV menos costo de lo vendido
       gross_profit: fromCents(baseFromTotal(sales) - cost),
       gross_margin: (() => {
@@ -122,6 +123,40 @@ export const reportHandlers: RequestHandler[] = [
         overdue_receivables: receivables
           .filter((row) => row.status === "overdue")
           .map(({ invoice_id, invoice_code, customer_name, balance, due_date }) => ({ invoice_id, invoice_code, customer_name, balance, due_date })),
+        orders_to_invoice: currentSalesOrders()
+          .filter((order) => order.status === "confirmed")
+          .map(({ id, number, customer_name, total }) => ({ id, number, customer_name, total })),
+        pending_deliveries: currentSalesOrders()
+          .filter(
+            (order) =>
+              order.sale_type === "wholesale" &&
+              order.delivery_method !== "none" &&
+              (order.status === "confirmed" || order.status === "invoiced") &&
+              (order.delivery_status === "pending" ||
+                order.delivery_status === "in_transit" ||
+                order.delivery_status === "ready_for_pickup"),
+          )
+          .map((order) => ({
+            id: order.id,
+            number: order.number,
+            customer_name: order.customer_name,
+            method: order.delivery_method === "pickup" ? "pickup" as const : "shipping" as const,
+            status:
+              order.delivery_status === "pending"
+                ? "pending" as const
+                : order.delivery_status === "in_transit"
+                  ? "in_transit" as const
+                  : "ready_for_pickup" as const,
+          })),
+        purchase_orders_to_receive: currentPurchaseOrders()
+          .filter((order) => order.status === "issued" || order.status === "partially_received")
+          .map(({ id, number, supplier_name, expected_date, status }) => ({
+            id,
+            number,
+            supplier_name,
+            expected_date,
+            status: status === "issued" ? "issued" as const : "partially_received" as const,
+          })),
       },
     }
     return HttpResponse.json(body)

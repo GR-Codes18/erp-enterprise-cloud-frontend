@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { Link } from "react-router"
 import { useCategoryOptions, useWarehouseOptions } from "@/modules/maintenance"
 import { DataTable, type Column } from "@/shared/components/DataTable"
 import { EmptyState } from "@/shared/components/EmptyState"
@@ -93,9 +94,18 @@ export default function StockPage() {
       <PageHeader
         title="Stock"
         description="Existencias por producto y almacén. Solo lectura: el stock cambia únicamente por movimientos."
+        actions={
+          <Button variant="outline" asChild>
+            <Link to="/inventory/kardex">Ver Kardex</Link>
+          </Button>
+        }
       />
 
-      <div className="mb-4 flex flex-wrap gap-3">
+      <p className="mb-4 rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+        El stock se actualiza automáticamente al registrar una recepción de compra o emitir una factura o boleta de venta.
+      </p>
+
+      <div className="mb-4 flex flex-wrap gap-3 rounded-xl border bg-card p-4 shadow-sm">
         <div className="w-full max-w-sm">
           <Input
             type="search"
