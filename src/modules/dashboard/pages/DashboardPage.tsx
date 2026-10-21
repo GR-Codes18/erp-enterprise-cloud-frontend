@@ -1,16 +1,16 @@
-import { useState, type ReactNode } from "react"
+﻿import { useState, type ReactNode } from "react"
 import { ArrowRight, CheckCircle2, PackageCheck, Truck, WalletCards } from "lucide-react"
 import { Link } from "react-router"
 import { useHasPermission } from "@/modules/auth"
-import { GroupedBarChart, type SeriesDef } from "@/modules/reports/components/charts"
-import { useMonthlyReport } from "@/modules/reports/hooks"
+import { GroupedBarChart, HorizontalBarChart, type SeriesDef } from "@/modules/reports/components/charts"
+import { useMonthlyReport, useTopProducts } from "@/modules/reports/hooks"
 import { monthLabel } from "@/modules/reports/schema"
 import { ErrorState } from "@/shared/components/ErrorState"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { PeriodSelect } from "@/shared/components/PeriodSelect"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Skeleton } from "@/shared/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/components/ui/table"
+
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import { formatBusinessDate, todayInLima } from "@/shared/lib/dates"
 import { formatMoney, toCents } from "@/shared/lib/money"
@@ -24,7 +24,7 @@ const MONTHLY_SERIES: SeriesDef[] = [
   { key: "purchases", label: "Compras", fillClass: "fill-chart-4", swatchClass: "bg-chart-4" },
 ]
 
-/** Indicador: cifra grande y su explicación; el color nunca es lo único que informa */
+/** Indicador: cifra grande y su explicaciÃ³n; el color nunca es lo Ãºnico que informa */
 function StatTile({
   label,
   value,
@@ -91,6 +91,7 @@ export default function DashboardPage() {
   const canSeeReceptions = useHasPermission("purchases.receptions:view")
   const canSeeAnalytics = useHasPermission("reports.analytics:view")
   const monthly = useMonthlyReport(period, canSeeAnalytics)
+  const topProducts = useTopProducts(period)
   const hasVisibleAlertPanel =
     canSeeReceivables || canSeeStock || canSeeOrders || canSeePurchaseOrders || canSeeReceptions
 
@@ -141,7 +142,7 @@ export default function DashboardPage() {
                   />
                   <StatTile
                     label="Margen bruto estimado"
-                    value={data.gross_margin === "" ? "—" : `${data.gross_margin} %`}
+                    value={data.gross_margin === "" ? "â€”" : `${data.gross_margin} %`}
                     hint="Utilidad bruta sobre ventas sin IGV"
                   />
                   <StatTile label="Compras" value={formatMoney(data.purchases)} hint="Facturas de proveedor no anuladas" />
@@ -149,62 +150,15 @@ export default function DashboardPage() {
               </section>
 
               {canSeeAnalytics && (
-                <section aria-labelledby="monthly-chart-title" className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
-                  <div className="flex flex-wrap items-end justify-between gap-2">
-                    <div>
-                      <h2 id="monthly-chart-title" className="text-lg font-semibold">Ventas y compras por mes</h2>
-                      <p className="text-sm text-muted-foreground">Comparación de los montos registrados en el periodo seleccionado.</p>
-                    </div>
-                    <Link className="text-sm font-medium text-primary hover:underline" to="/reports/analytical">
-                      Ver reportes analíticos
-                    </Link>
+                <section aria-labelledby="analytics-title" className="space-y-3">
+                  <div className="flex flex-wrap items-end justify-between gap-2"><div><h2 id="analytics-title" className="text-lg font-semibold">Análisis del negocio</h2><p className="text-sm text-muted-foreground">Tendencia comercial, productos líderes y posición financiera.</p></div><Link className="text-sm font-medium text-primary hover:underline" to="/reports/analytical">Ver reportes analíticos</Link></div>
+                  <div className="grid items-stretch gap-4 lg:grid-cols-3">
+                    <section className="min-w-0 rounded-xl border bg-card p-4 shadow-sm" aria-label="Tendencia mensual"><h3 className="mb-2 font-semibold">Tendencia mensual</h3>{monthly.isError ? <ErrorState message={getErrorMessage(monthly.error)} onRetry={() => void monthly.refetch()} /> : monthly.isPending ? <Skeleton className="h-64 w-full" /> : <GroupedBarChart title="Ventas y compras por mes" series={MONTHLY_SERIES} groups={monthly.data.map((point) => ({ key: point.month, label: monthLabel(point.month), values: { sales: toCents(point.sales), purchases: toCents(point.purchases) } }))} />}</section>
+                    <section className="min-w-0 rounded-xl border bg-card p-4 shadow-sm" aria-label="Productos líderes"><h3 className="mb-2 font-semibold">Productos líderes</h3>{topProducts.isError ? <ErrorState message={getErrorMessage(topProducts.error)} onRetry={() => void topProducts.refetch()} /> : topProducts.isPending ? <Skeleton className="h-64 w-full" /> : <HorizontalBarChart title="Ventas netas por producto" fillClass="fill-chart-2" bars={topProducts.data.slice(0, 5).map((item) => ({ key: item.product_id, label: item.product_name, cents: toCents(item.amount), detail: `${item.quantity} unidades` }))} />}</section>
+                    <section className="min-w-0 rounded-xl border bg-card p-4 shadow-sm" aria-label="Saldos financieros"><h3 className="mb-2 font-semibold">Posición de caja</h3><HorizontalBarChart title="Saldos pendientes" fillClass="fill-chart-3" bars={[{ key: "receivables", label: "Por cobrar", cents: toCents(data.receivables.total), detail: `${formatMoney(data.receivables.overdue)} vencido` }, { key: "payables", label: "Por pagar", cents: toCents(data.payables.total), detail: `${formatMoney(data.payables.due_soon)} vence en 7 días` }]} /></section>
                   </div>
-                  {monthly.isError ? (
-                    <ErrorState message={getErrorMessage(monthly.error)} onRetry={() => void monthly.refetch()} />
-                  ) : monthly.isPending ? (
-                    <Skeleton className="h-64 w-full" />
-                  ) : (
-                    <>
-                      <GroupedBarChart
-                        title="Montos mensuales en soles"
-                        series={MONTHLY_SERIES}
-                        groups={monthly.data.map((point) => ({
-                          key: point.month,
-                          label: monthLabel(point.month),
-                          values: { sales: toCents(point.sales), purchases: toCents(point.purchases) },
-                        }))}
-                      />
-                      <details className="pt-2">
-                        <summary className="w-fit cursor-pointer text-sm font-medium text-primary hover:underline">
-                          Ver datos en tabla
-                        </summary>
-                        <div className="mt-3">
-                          <Table>
-                            <caption className="sr-only">Ventas y compras por mes en el periodo seleccionado</caption>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Mes</TableHead>
-                                <TableHead className="text-right">Ventas</TableHead>
-                                <TableHead className="text-right">Compras</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {monthly.data.map((point) => (
-                                <TableRow key={point.month}>
-                                  <TableCell>{monthLabel(point.month)}</TableCell>
-                                  <TableCell className="text-right font-mono">{formatMoney(point.sales)}</TableCell>
-                                  <TableCell className="text-right font-mono">{formatMoney(point.purchases)}</TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      </details>
-                    </>
-                  )}
                 </section>
               )}
-
               <section aria-labelledby="alerts-title" className="space-y-3">
                 <div>
                   <h2 id="alerts-title" className="text-lg font-semibold">Alertas y pendientes</h2>
@@ -222,10 +176,10 @@ export default function DashboardPage() {
                       <ul className="divide-y">
                         {data.alerts.overdue_receivables.slice(0, 5).map((item) => (
                           <li key={item.invoice_id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                            <span>{item.customer_name} · <span className="font-mono">{item.invoice_code}</span></span>
+                            <span>{item.customer_name} Â· <span className="font-mono">{item.invoice_code}</span></span>
                             <span className="flex items-center gap-2">
                               <span className="font-mono">{formatMoney(item.balance)}</span>
-                              <StatusBadge tone="danger" label={`Venció ${formatBusinessDate(item.due_date)}`} />
+                              <StatusBadge tone="danger" label={`VenciÃ³ ${formatBusinessDate(item.due_date)}`} />
                             </span>
                           </li>
                         ))}
@@ -238,14 +192,14 @@ export default function DashboardPage() {
                       count={data.alerts.low_stock.length}
                       href="/inventory/stock"
                       linkLabel="Ver inventario"
-                      emptyMessage="Ningún producto está bajo su mínimo."
+                      emptyMessage="Ningún producto está bajo su mí­nimo."
                     >
                       <ul className="divide-y">
                         {data.alerts.low_stock.slice(0, 5).map((item) => (
                           <li key={item.product_id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
                             <span>{item.product_name}</span>
                             <span className="flex items-center gap-2">
-                              <span className="font-mono">{item.stock} / mín. {item.min_stock} {item.unit}</span>
+                              <span className="font-mono">{item.stock} / mÃ­n. {item.min_stock} {item.unit}</span>
                               <StatusBadge tone={item.stock === 0 ? "danger" : "warning"} label={item.stock === 0 ? "Sin stock" : "Bajo"} />
                             </span>
                           </li>
@@ -264,7 +218,7 @@ export default function DashboardPage() {
                       <ul className="divide-y">
                         {data.alerts.orders_to_invoice.slice(0, 5).map((item) => (
                           <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                            <span>{item.customer_name} · <span className="font-mono">{item.number}</span></span>
+                            <span>{item.customer_name} Â· <span className="font-mono">{item.number}</span></span>
                             <span className="font-mono">{formatMoney(item.total)}</span>
                           </li>
                         ))}
@@ -282,7 +236,7 @@ export default function DashboardPage() {
                       <ul className="divide-y">
                         {data.alerts.pending_deliveries.slice(0, 5).map((item) => (
                           <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                            <span>{item.customer_name} · <span className="font-mono">{item.number}</span></span>
+                            <span>{item.customer_name} Â· <span className="font-mono">{item.number}</span></span>
                             <StatusBadge tone="warning" label={getDeliveryStatusLabel(item.method, item.status)} />
                           </li>
                         ))}
@@ -300,7 +254,7 @@ export default function DashboardPage() {
                       <ul className="divide-y">
                         {data.alerts.purchase_orders_to_receive.slice(0, 5).map((item) => (
                           <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                            <span>{item.supplier_name} · <span className="font-mono">{item.number}</span></span>
+                            <span>{item.supplier_name} <span className="font-mono">{item.number}</span></span>
                             <span className="flex items-center gap-2">
                               <StatusBadge tone="neutral" label={PURCHASE_ORDER_STATUS_LABELS[item.status]} />
                               <span className="text-muted-foreground">{formatBusinessDate(item.expected_date)}</span>
@@ -325,21 +279,11 @@ export default function DashboardPage() {
                   <p className="text-sm text-muted-foreground">Saldos pendientes y productos que necesitan atención.</p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  {canSeeReceivables && (
-                    <StatTile label="Cuentas por cobrar" value={formatMoney(data.receivables.total)} hint="Saldo total pendiente">
-                      {toCents(data.receivables.overdue) > 0 && <StatusBadge tone="danger" label={`Vencido ${formatMoney(data.receivables.overdue)}`} />}
-                    </StatTile>
-                  )}
-                  {canSeePayables && (
-                    <StatTile label="Cuentas por pagar" value={formatMoney(data.payables.total)} hint="Saldo total pendiente">
-                      {toCents(data.payables.due_soon) > 0 && <StatusBadge tone="warning" label={`Vence en 7 días ${formatMoney(data.payables.due_soon)}`} />}
-                    </StatTile>
-                  )}
                   {canSeeStock && (
                     <StatTile
-                      label="Stock crítico"
+                      label="Stock crí­tico"
                       value={String(data.critical_stock_count)}
-                      hint={data.critical_stock_count === 1 ? "producto en o bajo su mínimo" : "productos en o bajo su mínimo"}
+                      hint={data.critical_stock_count === 1 ? "producto en o bajo su mí­nimo" : "productos en o bajo su mí­nimo"}
                     />
                   )}
                   <StatTile label="Rotación de inventario" value={data.inventory_turnover} hint="Indicador aproximado del periodo" />
@@ -353,7 +297,7 @@ export default function DashboardPage() {
                   {canSeeReceptions && data.alerts.purchase_orders_to_receive.length > 0 && (
                     <Link to="/purchases/receptions" className="flex items-center gap-3 rounded-xl border p-4 text-sm transition-colors hover:bg-muted/50">
                       <PackageCheck aria-hidden="true" className="size-5 text-primary" />
-                      <span>{data.alerts.purchase_orders_to_receive.length} órdenes esperan recepción</span>
+                      <span>{data.alerts.purchase_orders_to_receive.length} Ordenes esperan recepción</span>
                       <ArrowRight aria-hidden="true" className="ml-auto size-4" />
                     </Link>
                   )}
