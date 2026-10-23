@@ -39,7 +39,7 @@ export function IssueInvoiceDialog({
           <DialogDescription>
             {forceReceipt
               ? "Para una venta ocasional se emite boleta. Al emitirla se descuenta el stock."
-              : "Al emitirlo se descuenta el stock y, si el pedido es a crédito, nace la cuenta por cobrar. El comprobante no se edita: un error se corrige anulándolo o con una devolución."}
+              : "Al emitirlo se descuenta el stock y, si la orden de venta es a crédito, nace la cuenta por cobrar. El comprobante no se edita: un error se corrige anulándolo o con una devolución."}
           </DialogDescription>
         </DialogHeader>
 

@@ -143,14 +143,14 @@ export default function OrdersPage() {
 
   const newOrderButton = canCreate && (
     <Button asChild>
-      <Link to="/sales/orders/new">Nueva venta</Link>
+      <Link to="/sales/orders/new">Nueva orden de venta</Link>
     </Button>
   )
 
   return (
     <>
       <PageHeader
-        title="Pedidos"
+        title="Órdenes de venta"
         description="Ventas comprometidas. Al confirmar se valida stock y crédito; luego se emite el comprobante."
         actions={newOrderButton}
       />
@@ -162,7 +162,7 @@ export default function OrdersPage() {
               <ClipboardList aria-hidden="true" className="size-4" />
             </span>
             <div>
-              <p className="text-sm font-semibold">Seguimiento de pedidos</p>
+              <p className="text-sm font-semibold">Seguimiento de órdenes de venta</p>
               <p className="text-xs text-muted-foreground">Busca y filtra tus ventas</p>
             </div>
           </div>
@@ -174,7 +174,7 @@ export default function OrdersPage() {
           type="search"
           className="max-w-xs"
           placeholder="Buscar por número o cliente"
-          aria-label="Buscar pedidos"
+          aria-label="Buscar órdenes de venta"
           value={searchInput}
           onChange={(event) => withReset(setSearchInput)(event.target.value)}
         />
@@ -218,7 +218,7 @@ export default function OrdersPage() {
         )}
       </div>
 
-      <section className="space-y-4 rounded-xl border bg-card p-3 shadow-sm md:p-4" aria-label="Resultados de pedidos">
+      <section className="space-y-4 rounded-xl border bg-card p-3 shadow-sm md:p-4" aria-label="Resultados de órdenes de venta">
         {orders.isError ? (
           <ErrorState message={getErrorMessage(orders.error)} onRetry={() => void orders.refetch()} />
         ) : (
@@ -230,9 +230,9 @@ export default function OrdersPage() {
             isLoading={orders.isPending}
             empty={
               hasFilters ? (
-                <EmptyState title="Sin resultados" description="Ningún pedido coincide con la búsqueda o los filtros." />
+                <EmptyState title="Sin resultados" description="Ninguna orden de venta coincide con la búsqueda o los filtros." />
               ) : (
-                <EmptyState title="Aún no hay pedidos" description="Crea un pedido o convierte una cotización aceptada." action={newOrderButton} />
+                <EmptyState title="Aún no hay órdenes de venta" description="Crea una orden de venta o convierte una cotización aceptada." action={newOrderButton} />
               )
             }
           />

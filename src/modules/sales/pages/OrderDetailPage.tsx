@@ -55,7 +55,7 @@ export default function OrderDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null)
   const isPending = confirm.isPending || cancel.isPending || issue.isPending || updateDeliveryStatus.isPending || remove.isPending
 
-  if (order.isPending) return <p role="status">Cargando pedido…</p>
+  if (order.isPending) return <p role="status">Cargando orden de venta…</p>
   if (order.isError) return <ErrorState message={getErrorMessage(order.error)} onRetry={() => void order.refetch()} />
 
   const document = order.data
@@ -78,7 +78,7 @@ export default function OrderDetailPage() {
     <>
       {canApprove && canTransitionOrder(document.status, "confirmed") && (
         <Button disabled={isPending} onClick={() => setDialog("confirm")}>
-          Confirmar pedido
+          Confirmar orden de venta
         </Button>
       )}
       {canInvoice && canTransitionOrder(document.status, "invoiced") && (
@@ -120,7 +120,7 @@ export default function OrderDetailPage() {
       )}
       {canVoid && canTransitionOrder(document.status, "cancelled") && (
         <Button variant="destructive" disabled={isPending} onClick={() => setDialog("cancel")}>
-          Cancelar pedido
+          Cancelar orden de venta
         </Button>
       )}
       {canVoid && isDraft && (
@@ -137,7 +137,7 @@ export default function OrderDetailPage() {
   return (
     <>
       <PageHeader
-        title="Detalle del pedido"
+        title="Detalle de la orden de venta"
         description="Revisa el estado, los datos de la venta y los productos."
         actions={<div className="flex flex-wrap gap-2">{actions}</div>}
       />
@@ -150,7 +150,7 @@ export default function OrderDetailPage() {
 
       <section className="mb-5 flex flex-col gap-4 rounded-xl border bg-gradient-to-r from-primary/10 via-card to-card p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Pedido de venta</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Orden de venta</p>
           <p className="mt-1 font-mono text-2xl font-semibold tracking-tight">{document.number}</p>
           <p className="mt-1 text-sm text-muted-foreground">Registrado {formatDateTimeLima(document.created_at)}</p>
         </div>
@@ -215,7 +215,7 @@ export default function OrderDetailPage() {
 
       <section className="space-y-3 rounded-xl border bg-card p-4 shadow-sm md:p-5" aria-labelledby="lines-title">
         <div>
-          <h2 id="lines-title" className="text-base font-semibold">Productos del pedido</h2>
+          <h2 id="lines-title" className="text-base font-semibold">Productos de la orden de venta</h2>
           <p className="text-sm text-muted-foreground">Detalle de cantidades, almacén y precio de venta.</p>
         </div>
         <DocumentLinesTable lines={document.items} />
@@ -223,13 +223,13 @@ export default function OrderDetailPage() {
       </section>
 
       <div className="mt-6">
-        <DocumentsPanel entity={{ type: "sale", id: document.id, label: `el pedido ${document.number}` }} canUpload={canAttach} />
+        <DocumentsPanel entity={{ type: "sale", id: document.id, label: `la orden de venta ${document.number}` }} canUpload={canAttach} />
       </div>
 
       <ConfirmDialog
         open={dialog === "confirm"}
         onOpenChange={(open) => setDialog(open ? "confirm" : null)}
-        title="Confirmar pedido"
+        title="Confirmar orden de venta"
         description="El sistema validará el stock y, si corresponde, que el cliente esté activo y tenga crédito disponible."
         confirmText="Confirmar"
         confirmVariant="default"
@@ -239,9 +239,9 @@ export default function OrderDetailPage() {
       <ReasonDialog
         open={dialog === "cancel"}
         onOpenChange={(open) => setDialog(open ? "cancel" : null)}
-        title="Cancelar pedido"
+        title="Cancelar orden de venta"
         description="Solo se cancela antes de facturar. Indica el motivo."
-        confirmLabel="Cancelar pedido"
+        confirmLabel="Cancelar orden de venta"
         isPending={isPending}
         onConfirm={(reason) => run(() => cancel.mutate({ id: document.id, reason }, done))}
       />
@@ -266,7 +266,7 @@ export default function OrderDetailPage() {
         open={dialog === "delete"}
         onOpenChange={(open) => setDialog(open ? "delete" : null)}
         title="Eliminar borrador"
-        description="Este pedido en borrador se eliminará definitivamente."
+        description="Esta orden de venta en borrador se eliminará definitivamente."
         confirmText="Eliminar borrador"
         isLoading={isPending}
         onConfirm={() => run(() => remove.mutate(document.id, { onSuccess: () => navigate("/sales/orders"), onError: done.onError }))}

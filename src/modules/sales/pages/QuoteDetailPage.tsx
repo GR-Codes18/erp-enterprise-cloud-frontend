@@ -79,12 +79,12 @@ export default function QuoteDetailPage() {
       )}
       {canCreateOrder && canConvertQuote(document) && (
         <Button disabled={isPending} onClick={() => setDialog("convert")}>
-          Convertir en pedido
+          Convertir en orden de venta
         </Button>
       )}
       {document.order_id && (
         <Button variant="outline" asChild>
-          <Link to={`/sales/orders/${document.order_id}`}>Ver pedido</Link>
+          <Link to={`/sales/orders/${document.order_id}`}>Ver orden de venta</Link>
         </Button>
       )}
       {canEdit && isDraft && (
@@ -160,7 +160,7 @@ export default function QuoteDetailPage() {
         open={dialog === "accept"}
         onOpenChange={(open) => setDialog(open ? "accept" : null)}
         title="Marcar como aceptada"
-        description="Registra que el cliente aceptó la cotización. Luego podrás convertirla en pedido."
+        description="Registra que el cliente aceptó la cotización. Luego podrás convertirla en orden de venta."
         confirmText="Marcar aceptada"
         confirmVariant="default"
         isLoading={isPending}
@@ -178,9 +178,9 @@ export default function QuoteDetailPage() {
       <ConfirmDialog
         open={dialog === "convert"}
         onOpenChange={(open) => setDialog(open ? "convert" : null)}
-        title="Convertir en pedido"
-        description="Se creará un pedido en borrador con el cliente y los productos de esta cotización."
-        confirmText="Crear pedido"
+        title="Convertir en orden de venta"
+        description="Se creará una orden de venta en borrador con el cliente y los productos de esta cotización."
+        confirmText="Crear orden de venta"
         confirmVariant="default"
         isLoading={isPending}
         onConfirm={() =>
