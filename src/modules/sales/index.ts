@@ -25,14 +25,14 @@ export const salesModule: AppModule = {
           ],
         },
         {
-          label: "Pedidos",
+          label: "Orden de venta",
           path: "orders",
           permission: "sales.orders:view",
           page: () => import("./pages/OrdersPage"),
           subRoutes: [
-            { label: "Nueva venta", path: "new", page: () => import("./pages/OrderFormPage") },
-            { label: "Editar pedido", path: ":id/edit", page: () => import("./pages/OrderFormPage") },
-            { label: "Detalle de pedido", path: ":id", page: () => import("./pages/OrderDetailPage") },
+            { label: "Nueva orden de venta", path: "new", page: () => import("./pages/OrderFormPage") },
+            { label: "Editar orden de venta", path: ":id/edit", page: () => import("./pages/OrderFormPage") },
+            { label: "Detalle de orden de venta", path: ":id", page: () => import("./pages/OrderDetailPage") },
           ],
         },
         {

@@ -21,7 +21,7 @@ export const permissionSeed: PermissionScreen[] = [
   screen(1, "dashboard", "Dashboard", "dashboard.summary", "Indicadores", V),
 
   screen(2, "sales", "Ventas", "sales.quotes", "Cotizaciones", CRUD),
-  screen(3, "sales", "Ventas", "sales.orders", "Pedidos", [...CRUD, "approve"]),
+  screen(3, "sales", "Ventas", "sales.orders", "Orden de venta", [...CRUD, "approve"]),
   screen(4, "sales", "Ventas", "sales.invoices", "Comprobantes", ["view", "create", "void"]),
   screen(5, "sales", "Ventas", "sales.returns", "Devoluciones", ["view", "create", "void", "approve"]),
 

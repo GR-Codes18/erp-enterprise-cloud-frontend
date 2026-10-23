@@ -30,7 +30,7 @@ const mockModules: AppModule[] = [
           },
           {
             path: "orders",
-            label: "Pedidos",
+            label: "Orden de venta",
           },
         ],
       },

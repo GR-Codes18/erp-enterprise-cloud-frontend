@@ -86,7 +86,7 @@ export default function InvoiceDetailPage() {
             value: document.payment_condition === "credit" ? formatBusinessDate(document.due_date) : "Al contado",
           },
           {
-            label: "Pedido",
+            label: "Orden de venta",
             value: <Link className="underline" to={`/sales/orders/${document.order_id}`}>{document.order_number}</Link>,
           },
           { label: "Total", value: formatMoney(document.total) },
