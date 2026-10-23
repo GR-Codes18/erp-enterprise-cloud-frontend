@@ -1,5 +1,20 @@
 import type { AppModule } from "@/shared/types/module"
 
+const goalsSectionLabels: Record<string, string> = {
+  definition: "Definición de metas",
+  seller: "Metas por vendedor",
+  team: "Metas por sucursal/equipo",
+  product: "Metas por producto/categoría",
+  progress: "Avance de metas",
+  ranking: "Ranking comercial",
+  alerts: "Alertas de cumplimiento",
+}
+
+const reportsSectionLabels: Record<string, string> = {
+  operational: "Reportes operativos",
+  analytical: "Reportes analíticos",
+}
+
 export interface Breadcrumb {
   moduleLabel: string
   itemLabel?: string
@@ -43,6 +58,18 @@ export function getBreadcrumb(
   const [, secondSegment, ...remainingSegments] = getSegments(pathname)
 
   if (!secondSegment) return { moduleLabel: activeModule.label }
+
+  if (activeModule.id === "goals") {
+    const sectionLabel = goalsSectionLabels[secondSegment]
+    if (!sectionLabel) return { moduleLabel: activeModule.label }
+    return { moduleLabel: activeModule.label, itemLabel: sectionLabel }
+  }
+
+  if (activeModule.id === "reports") {
+    const sectionLabel = reportsSectionLabels[secondSegment]
+    if (!sectionLabel) return { moduleLabel: activeModule.label }
+    return { moduleLabel: activeModule.label, itemLabel: sectionLabel }
+  }
 
   const item = activeModule.sections
     ?.flatMap((section) => section.items)
