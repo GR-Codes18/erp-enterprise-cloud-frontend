@@ -178,7 +178,7 @@ export function ModuleLandingPage({ module }: { module: AppModule }) {
     <section className="space-y-6">
       <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-4">
-          <div className="flex size-12 items-center justify-center rounded-xl border border-cyan-200 bg-cyan-50 text-cyan-700 shadow-sm">
+          <div className="flex size-12 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-700 shadow-sm">
             <module.icon className="size-5" />
           </div>
           <div>
@@ -207,7 +207,7 @@ export function ModuleLandingPage({ module }: { module: AppModule }) {
               onClick={() => setSelectedSection(tab.value)}
               className={`inline-flex items-center rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
                 selectedSection === tab.value
-                  ? "border-cyan-300 bg-cyan-50 text-cyan-700 shadow-sm"
+                  ? "border-blue-300 bg-blue-50 text-blue-700 shadow-sm"
                   : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
               }`}
             >
@@ -224,7 +224,7 @@ export function ModuleLandingPage({ module }: { module: AppModule }) {
           return (
             <div key={section.label ?? "acceso-rapido"} className="space-y-4">
               <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-                <SectionIcon className="size-4 text-cyan-700" />
+                <SectionIcon className="size-4 text-blue-700" />
                 <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
                   {buildSectionLabel(section.label)}
                 </h2>
@@ -239,14 +239,14 @@ export function ModuleLandingPage({ module }: { module: AppModule }) {
                     <Link
                       key={item.path}
                       to={`/${module.basePath}/${item.path}`}
-                      className="group flex min-h-[220px] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-md"
+                      className="group flex min-h-[220px] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
                     >
                       <div className="space-y-4">
                         <div className="flex items-start justify-between gap-3">
-                          <div className="flex size-11 items-center justify-center rounded-xl border border-cyan-200 bg-cyan-50 text-cyan-700 shadow-sm">
+                          <div className="flex size-11 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-700 shadow-sm">
                             <ItemIcon className="size-5" />
                           </div>
-                          <ChevronRight className="size-4 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-cyan-700" />
+                          <ChevronRight className="size-4 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-blue-700" />
                         </div>
 
                         <div>

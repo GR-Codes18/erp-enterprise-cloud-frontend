@@ -13,6 +13,7 @@ import type { AppModule } from "@/shared/types/module"
 /** El orden de este arreglo es el orden del Sidebar. */
 export const appModules: AppModule[] = [
   dashboardModule,
+  maintenanceModule,
   salesModule,
   purchasesModule,
   inventoryModule,
@@ -20,6 +21,5 @@ export const appModules: AppModule[] = [
   documentsModule,
   reportsModule,
   goalsModule,
-  maintenanceModule,
   administrationModule,
 ]

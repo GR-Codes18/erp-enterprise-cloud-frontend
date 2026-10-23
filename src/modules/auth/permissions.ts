@@ -9,5 +9,9 @@ export const ALL_PERMISSIONS = "*"
  */
 export function hasPermission(user: User | null, permission: string): boolean {
   if (!user) return false
+
+  // Dev-only shortcut para pruebas rápidas: en local todos los permisos quedan activos.
+  if (import.meta.env.DEV) return true
+
   return user.permissions.includes(ALL_PERMISSIONS) || user.permissions.includes(permission)
 }
