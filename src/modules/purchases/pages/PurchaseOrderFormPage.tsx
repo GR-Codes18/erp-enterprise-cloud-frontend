@@ -55,10 +55,12 @@ function PurchaseOrderForm({ order, fromRequest }: { order?: PurchaseOrder; from
   const [serverError, setServerError] = useState<string | null>(null)
   const [supplierSearchInput, setSupplierSearchInput] = useState("")
   const supplierSearch = useDebouncedValue(supplierSearchInput.trim(), 300)
+  const [productSearchInput, setProductSearchInput] = useState("")
+  const productSearch = useDebouncedValue(productSearchInput.trim(), 300)
 
   // Regla 4: solo activos para lo nuevo; un borrador antiguo conserva su proveedor o producto inactivo
   const suppliers = useSupplierOptions({ includeInactive: true, search: supplierSearch })
-  const products = useProductOptions()
+  const products = useProductOptions({ search: productSearch })
   const supplierOptions = activeOrSelected(suppliers.data ?? [], order ? [order.supplier_id] : [])
   // Incluye los productos de la orden o de la solicitud que hoy estén inactivos, marcados como tales
   const productOptions = withDocumentProducts(products.data ?? [], [...(order?.items ?? []), ...(fromRequest?.items ?? [])])
@@ -162,6 +164,9 @@ function PurchaseOrderForm({ order, fromRequest }: { order?: PurchaseOrder; from
           products={productOptions}
           priceLabel="Costo unitario (S/)"
           disabled={isPending || products.isPending}
+          onProductSearch={setProductSearchInput}
+          isLoading={products.isPending}
+          errorMessage={products.isError ? getErrorMessage(products.error) : undefined}
         />
 
         <Field id="notes" label="Notas" error={errors.notes?.message}>

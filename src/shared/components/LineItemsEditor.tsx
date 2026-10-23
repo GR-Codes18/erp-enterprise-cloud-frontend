@@ -55,6 +55,10 @@ interface LineItemsEditorProps {
   disabled?: boolean
   /** Al elegir un producto la página propone su precio o costo (editable) */
   warehouseOptionsByProduct?: Record<string, WarehouseOption[]>
+  /** Al escribir en el buscador de producto se filtra el catálogo por servidor (SKU o nombre) */
+  onProductSearch?: (value: string) => void
+  isLoading?: boolean
+  errorMessage?: string
   onProductChange: (index: number, productId: string) => void
   onWarehouseChange?: (index: number, warehouseId: string) => void
   onQuantityChange: (index: number, quantity: number) => void
@@ -85,6 +89,9 @@ export function LineItemsEditor({
   onAdd,
   onRemove,
   lineHint,
+  onProductSearch,
+  isLoading,
+  errorMessage,
 }: LineItemsEditorProps) {
   const totals = previewTotals(lines)
   const describedBy = (id: string, error?: string) => (error ? `${id}-error` : undefined)
@@ -136,6 +143,9 @@ export function LineItemsEditor({
               emptyLabel="No se encontraron productos."
               disabled={disabled}
               limit={5}
+              onSearchChange={onProductSearch}
+              isLoading={isLoading}
+              errorMessage={errorMessage}
               aria-label={`Producto ${index + 1}`}
               aria-invalid={!!lineErrors?.product_id}
               aria-describedby={describedBy(ids.product, lineErrors?.product_id)}

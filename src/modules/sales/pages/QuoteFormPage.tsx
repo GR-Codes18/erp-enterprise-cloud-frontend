@@ -46,10 +46,12 @@ function QuoteForm({ quote }: { quote?: Quote }) {
   const [serverError, setServerError] = useState<string | null>(null)
   const [customerSearchInput, setCustomerSearchInput] = useState("")
   const customerSearch = useDebouncedValue(customerSearchInput.trim(), 300)
+  const [productSearchInput, setProductSearchInput] = useState("")
+  const productSearch = useDebouncedValue(productSearchInput.trim(), 300)
 
   // Regla 4: solo activos para lo nuevo, pero un borrador antiguo conserva su cliente o producto inactivo
   const customers = useCustomerOptions({ includeInactive: true, search: customerSearch })
-  const products = useProductOptions()
+  const products = useProductOptions({ search: productSearch })
   const warehouses = useWarehouseOptions({ includeInactive: true })
   const stock = useStock({ page: 1, size: 200, filters: {} })
   const customerOptions = activeOrSelected(customers.data ?? [], quote ? [quote.customer_id] : [])
@@ -180,6 +182,9 @@ function QuoteForm({ quote }: { quote?: Quote }) {
           })}
           priceLabel="Precio unitario (S/)"
           disabled={isPending || products.isPending}
+          onProductSearch={setProductSearchInput}
+          isLoading={products.isFetching}
+          errorMessage={products.isError ? getErrorMessage(products.error) : undefined}
         />
 
         <Field id="notes" label="Notas" error={errors.notes?.message}>

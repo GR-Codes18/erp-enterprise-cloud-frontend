@@ -87,9 +87,11 @@ function OrderForm({ order }: { order?: Order }) {
   const formLocked = isPending || savedDraftId !== null
   const [customerSearchInput, setCustomerSearchInput] = useState("")
   const customerSearch = useDebouncedValue(customerSearchInput.trim(), 300)
+  const [productSearchInput, setProductSearchInput] = useState("")
+  const productSearch = useDebouncedValue(productSearchInput.trim(), 300)
 
   const customers = useCustomerOptions({ includeInactive: true, search: customerSearch })
-  const products = useProductOptions()
+  const products = useProductOptions({ search: productSearch })
   const warehouses = useWarehouseOptions({ includeInactive: Boolean(order) })
   const stock = useStock({ page: 1, size: 200, filters: {} })
   const customerOptions = activeOrSelected(customers.data ?? [], order ? [order.customer_id] : [])
@@ -535,6 +537,9 @@ function OrderForm({ order }: { order?: Order }) {
                 shouldValidate: form.formState.isSubmitted,
               })
             }
+            onProductSearch={setProductSearchInput}
+            isLoading={products.isPending}
+            errorMessage={products.isError ? getErrorMessage(products.error) : undefined}
           />
         </section>
 
