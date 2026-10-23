@@ -14,15 +14,20 @@ export const administrationModule: AppModule = {
     {
       label: "Seguridad",
       items: [
-        { label: "Usuarios", path: "users", permission: "administration.users:view", page: () => import("./pages/UsersPage") },
-        { label: "Roles", path: "roles", permission: "administration.roles:view", page: () => import("./pages/RolesPage") },
-        { label: "Permisos", path: "permissions", permission: "administration.roles:view", page: () => import("./pages/PermissionsPage") },
-        { label: "Auditoría", path: "audit", permission: "administration.audit:view", page: () => import("./pages/AuditPage") },
+        { label: "Usuarios", path: "users", permission: "administration.users.view" },
+        { label: "Roles", path: "roles", permission: "administration.roles.view" },
+        { label: "Permisos", path: "permissions", permission: "administration.permissions.view" },
+        { label: "Auditoría", path: "audit", permission: "administration.audit.view" },
       ],
     },
     {
       label: "Configuración",
-      items: [{ label: "Parámetros", path: "settings", permission: "administration.settings:view", page: () => import("./pages/SettingsPage") }],
+      items: [
+        { label: "Parámetros Generales", path: "settings", permission: "administration.settings.view" },
+        { label: "Series de Comprobantes", path: "series", permission: "administration.series.view" },
+        { label: "Respaldos de Base de Datos", path: "backups", permission: "administration.backups.view" },
+        { label: "Conexiones e Integraciones", path: "connections", permission: "administration.connections.view" },
+      ],
     },
   ],
-}
+};
