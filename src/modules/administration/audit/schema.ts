@@ -38,7 +38,7 @@ export const ACTION_LABELS: Record<AuditAction, string> = {
 export const MODULE_LABELS: Record<AuditModule, string> = {
   auth: "Acceso",
   administration: "Administración",
-  maintenance: "Mantenimiento",
+  maintenance: "Maestro",
   sales: "Ventas",
   purchases: "Compras",
   inventory: "Inventario",

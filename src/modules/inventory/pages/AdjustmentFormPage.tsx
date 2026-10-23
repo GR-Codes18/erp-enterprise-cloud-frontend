@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select"
 import { getErrorMessage } from "@/shared/lib/api/errors"
+import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
 import { activeOrSelected, withDocumentProducts } from "@/shared/lib/options"
 import { InventoryLineItems } from "../components/InventoryLineItems"
 import { useStockAvailability } from "../stock/hooks"
@@ -46,7 +47,9 @@ function AdjustmentForm({ adjustment }: { adjustment?: NonNullable<ReturnType<ty
   const createAdjustment = useCreateAdjustment()
   const updateAdjustment = useUpdateAdjustment()
   // Regla 4: un borrador antiguo sigue mostrando el producto o almacén que hoy está inactivo
-  const products = useProductOptions()
+  const [productSearchInput, setProductSearchInput] = useState("")
+  const productSearch = useDebouncedValue(productSearchInput.trim(), 300)
+  const products = useProductOptions({ search: productSearch })
   const warehouses = useWarehouseOptions({ includeInactive: true })
   const productOptions = withDocumentProducts(products.data ?? [], adjustment?.items ?? [])
   const warehouseOptions = activeOrSelected(warehouses.data ?? [], adjustment ? [adjustment.warehouse_id] : [])
@@ -196,6 +199,9 @@ function AdjustmentForm({ adjustment }: { adjustment?: NonNullable<ReturnType<ty
           onDirectionChange={(index, value) => setValue(`items.${index}.direction`, value, { shouldValidate: true })}
           onAdd={() => append({ product_id: "", direction: "increase", quantity: 1 })}
           onRemove={remove}
+          onProductSearch={setProductSearchInput}
+          isLoading={products.isPending}
+          errorMessage={products.isError ? getErrorMessage(products.error) : undefined}
         />
 
         <Field id="notes" label="Notas" error={errors.notes?.message}>

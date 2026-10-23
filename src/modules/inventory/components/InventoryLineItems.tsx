@@ -2,6 +2,7 @@ import { Plus, Trash2 } from "lucide-react"
 import { Field } from "@/shared/components/Field"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
+import { EntityPickerDialog } from "@/shared/components/EntityPickerDialog"
 import {
   Select,
   SelectContent,
@@ -31,6 +32,10 @@ interface InventoryLineItemsProps {
   itemErrors: Array<{ product_id?: string; quantity?: string; direction?: string }>
   listError?: string
   disabled?: boolean
+  /** Al escribir en el buscador de producto se filtra el catálogo por servidor (SKU o nombre) */
+  onProductSearch?: (value: string) => void
+  isLoading?: boolean
+  errorMessage?: string
   onProductChange: (index: number, value: string) => void
   onQuantityChange: (index: number, value: number) => void
   onDirectionChange: (index: number, value: AdjustmentDirection) => void
@@ -53,6 +58,9 @@ export function InventoryLineItems({
   onDirectionChange,
   onAdd,
   onRemove,
+  onProductSearch,
+  isLoading,
+  errorMessage,
 }: InventoryLineItemsProps) {
   const isAdjustment = mode === "adjustment"
 
@@ -80,22 +88,22 @@ export function InventoryLineItems({
             }`}
           >
             <Field id={`item-${index}-product`} label="Producto" error={errors?.product_id}>
-              <Select
-                value={line.product_id || undefined}
+              <EntityPickerDialog
+                value={line.product_id}
                 onValueChange={(value) => onProductChange(index, value)}
+                options={products.map((product) => ({ value: product.id, label: `${product.sku} · ${product.name}` }))}
+                placeholder="Selecciona un producto"
+                searchPlaceholder="Buscar producto por SKU o nombre"
+                emptyLabel="No se encontraron productos."
                 disabled={disabled}
-              >
-                <SelectTrigger id={`item-${index}-product`} className="w-full" aria-invalid={!!errors?.product_id}>
-                  <SelectValue placeholder="Selecciona un producto" />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((product) => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.sku} · {product.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onSearchChange={onProductSearch}
+                isLoading={isLoading}
+                errorMessage={errorMessage}
+                aria-label={`Producto ${index + 1}`}
+                aria-invalid={!!errors?.product_id}
+                aria-describedby={errors?.product_id ? `item-${index}-product-error` : undefined}
+                className="w-full"
+              />
             </Field>
 
             {isAdjustment && (

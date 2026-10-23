@@ -3,7 +3,7 @@ import { Plus, Trash2 } from "lucide-react"
 import { Field } from "@/shared/components/Field"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select"
+import { EntityPickerDialog } from "@/shared/components/EntityPickerDialog"
 
 export interface QuantityLine {
   /** Clave estable de la fila (el `id` de useFieldArray), nunca el índice */
@@ -21,6 +21,10 @@ interface QuantityLinesEditorProps {
   listError?: string
   disabled?: boolean
   emptyMessage?: string
+  /** Al escribir en el buscador de producto se filtra el catálogo por servidor (SKU o nombre) */
+  onProductSearch?: (value: string) => void
+  isLoading?: boolean
+  errorMessage?: string
   onProductChange: (index: number, productId: string) => void
   onQuantityChange: (index: number, quantity: number) => void
   onAdd: () => void
@@ -43,6 +47,9 @@ export function QuantityLinesEditor({
   onAdd,
   onRemove,
   quantityHint,
+  onProductSearch,
+  isLoading,
+  errorMessage,
 }: QuantityLinesEditorProps) {
   return (
     <section className="space-y-3" aria-labelledby="quantity-lines-title">
@@ -69,23 +76,22 @@ export function QuantityLinesEditor({
         return (
           <div key={line.key} className="grid gap-3 rounded-md border p-3 md:grid-cols-[minmax(14rem,3fr)_minmax(8rem,1fr)_auto]">
             <Field id={ids.product} label="Producto" error={lineErrors?.product_id}>
-              <Select value={line.product_id || undefined} onValueChange={(value) => onProductChange(index, value)} disabled={disabled}>
-                <SelectTrigger
-                  id={ids.product}
-                  className="w-full"
-                  aria-invalid={!!lineErrors?.product_id}
-                  aria-describedby={lineErrors?.product_id ? `${ids.product}-error` : undefined}
-                >
-                  <SelectValue placeholder="Selecciona un producto" />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((product) => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <EntityPickerDialog
+                value={line.product_id}
+                onValueChange={(value) => onProductChange(index, value)}
+                options={products.map((product) => ({ value: product.id, label: product.label }))}
+                placeholder="Selecciona un producto"
+                searchPlaceholder="Buscar producto por SKU o nombre"
+                emptyLabel="No se encontraron productos."
+                disabled={disabled}
+                onSearchChange={onProductSearch}
+                isLoading={isLoading}
+                errorMessage={errorMessage}
+                aria-label={`Producto ${index + 1}`}
+                aria-invalid={!!lineErrors?.product_id}
+                aria-describedby={lineErrors?.product_id ? `${ids.product}-error` : undefined}
+                className="w-full"
+              />
             </Field>
             <Field id={ids.quantity} label="Cantidad" error={lineErrors?.quantity}>
               <Input

@@ -12,6 +12,48 @@ function findDuplicates(values: string[]): string[] {
 }
 
 describe("appModules", () => {
+  it("mantiene el id técnico y muestra el módulo como Maestro", () => {
+    const maintenance = appModules.find((module) => module.id === "maintenance")
+
+    expect(maintenance).toBeDefined()
+    expect(maintenance?.id).toBe("maintenance")
+    expect(maintenance?.basePath).toBe("maintenance")
+    expect(maintenance?.label).toBe("Maestro")
+  })
+
+  it("expone todos los submódulos principales del maestro", () => {
+    const maintenance = appModules.find((module) => module.id === "maintenance")
+    const labels = maintenance?.sections?.flatMap((section) => section.items.map((item) => item.label)) ?? []
+
+    expect(labels).toEqual(expect.arrayContaining([
+      "Empresas",
+      "Sucursales",
+      "Almacenes",
+      "Productos",
+      "Categorías",
+      "Marcas",
+      "Unidades de medida",
+      "Conversiones de unidades",
+      "Clientes",
+      "Proveedores",
+      "Transportistas",
+      "Vendedores",
+      "Zonas",
+      "Monedas y tipos de cambio",
+      "Impuestos",
+      "Formas de pago",
+      "Listas de precios",
+    ]))
+  })
+
+  it("cada submódulo del maestro tiene una pantalla funcional asociada", () => {
+    const maintenance = appModules.find((module) => module.id === "maintenance")
+    const items = maintenance?.sections?.flatMap((section) => section.items) ?? []
+
+    expect(items.length).toBeGreaterThan(0)
+    expect(items.every((item) => Boolean(item.page))).toBe(true)
+  })
+
   it("no repite el basePath entre módulos", () => {
     expect(findDuplicates(appModules.map((module) => module.basePath))).toEqual([])
   })

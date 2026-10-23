@@ -56,12 +56,12 @@ export default function OrderFormPage() {
   const { id = "" } = useParams()
   const existing = useOrder(id)
 
-  if (id && existing.isPending) return <p role="status">Cargando pedido…</p>
+  if (id && existing.isPending) return <p role="status">Cargando orden de venta…</p>
   if (id && existing.isError) {
     return <ErrorState message={getErrorMessage(existing.error)} onRetry={() => void existing.refetch()} />
   }
   if (id && existing.data?.status !== "draft") {
-    return <ErrorState message="Solo se pueden editar pedidos en borrador." />
+    return <ErrorState message="Solo se pueden editar órdenes de venta en borrador." />
   }
   return <OrderForm order={existing.data} />
 }
@@ -87,9 +87,11 @@ function OrderForm({ order }: { order?: Order }) {
   const formLocked = isPending || savedDraftId !== null
   const [customerSearchInput, setCustomerSearchInput] = useState("")
   const customerSearch = useDebouncedValue(customerSearchInput.trim(), 300)
+  const [productSearchInput, setProductSearchInput] = useState("")
+  const productSearch = useDebouncedValue(productSearchInput.trim(), 300)
 
   const customers = useCustomerOptions({ includeInactive: true, search: customerSearch })
-  const products = useProductOptions()
+  const products = useProductOptions({ search: productSearch })
   const warehouses = useWarehouseOptions({ includeInactive: Boolean(order) })
   const stock = useStock({ page: 1, size: 200, filters: {} })
   const customerOptions = activeOrSelected(customers.data ?? [], order ? [order.customer_id] : [])
@@ -250,7 +252,7 @@ function OrderForm({ order }: { order?: Order }) {
         setSavedDraftId(saved.id)
         handleError(
           error,
-          `${addressSaved ? "La dirección quedó guardada en el perfil del cliente. " : ""}El pedido quedó guardado como borrador, pero no se pudo confirmar: ${getErrorMessage(error)}`,
+          `${addressSaved ? "La dirección quedó guardada en el perfil del cliente. " : ""}La orden de venta quedó guardada como borrador, pero no se pudo confirmar: ${getErrorMessage(error)}`,
         )
       }
     } catch (error) {
@@ -279,7 +281,7 @@ function OrderForm({ order }: { order?: Order }) {
 
   return (
     <RouteFormDialog
-      title={order ? `Editar pedido ${order.number}` : "Nueva venta"}
+      title={order ? `Editar orden de venta ${order.number}` : "Nueva orden de venta"}
       description={
         order?.quote_number
           ? `Creado desde la cotización ${order.quote_number}. Confirmar valida stock y crédito; el inventario se descuenta al emitir el comprobante.`
@@ -535,6 +537,9 @@ function OrderForm({ order }: { order?: Order }) {
                 shouldValidate: form.formState.isSubmitted,
               })
             }
+            onProductSearch={setProductSearchInput}
+            isLoading={products.isPending}
+            errorMessage={products.isError ? getErrorMessage(products.error) : undefined}
           />
         </section>
 
@@ -560,7 +565,7 @@ function OrderForm({ order }: { order?: Order }) {
         {savedDraftId && (
           <p className="text-sm">
             <Link className="underline" to={`/sales/orders/${savedDraftId}`}>
-              Abrir el pedido en borrador
+              Abrir la orden de venta en borrador
             </Link>
           </p>
         )}
@@ -590,8 +595,8 @@ function OrderForm({ order }: { order?: Order }) {
           if (!isPending) setConfirmationOpen(open)
           if (!open && !isPending) setPendingValues(null)
         }}
-        title="Guardar y confirmar pedido"
-        description="Se guardará el pedido y se validarán el cliente, el stock disponible y el límite de crédito."
+        title="Guardar y confirmar orden de venta"
+        description="Se guardará la orden de venta y se validarán el cliente, el stock disponible y el límite de crédito."
         confirmText="Guardar y confirmar"
         isLoading={isPending}
         onConfirm={() => void saveAndConfirm()}
