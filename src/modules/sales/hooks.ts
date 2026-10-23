@@ -60,10 +60,11 @@ export const useRejectQuote = () =>
 export const useConvertQuote = () => useSalesMutation((id: string) => quoteService.convert(id))
 
 // Pedidos
-export const useOrders = (params: PageParams) =>
+export const useOrders = (params: PageParams, enabled = true) =>
   useQuery({
     queryKey: salesKeys.list("orders", params),
     queryFn: ({ signal }) => orderService.list(params, signal),
+    enabled,
     placeholderData: keepPreviousData,
   })
 export const useOrder = (id: string) =>
