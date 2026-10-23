@@ -6,7 +6,8 @@ import type { Product, ProductCreateInput, ProductUpdateInput } from "./schema"
 export const productKeys = {
   all: ["products"] as const,
   list: (params: PageParams) => [...productKeys.all, "list", params] as const,
-  options: (includeInactive: boolean) => [...productKeys.all, "options", { includeInactive }] as const,
+  options: (includeInactive: boolean, search: string) =>
+    [...productKeys.all, "options", { includeInactive, search }] as const,
 }
 
 export function useProducts(params: PageParams) {
@@ -36,14 +37,18 @@ export interface ProductOption {
  * agregan aparte los inactivos que el documento ya usa). includeInactive es para filtros
  * de vistas de solo lectura, como el Kardex.
  */
-export function useProductOptions({ includeInactive = false }: { includeInactive?: boolean } = {}) {
+export function useProductOptions({
+  includeInactive = false,
+  search = "",
+}: { includeInactive?: boolean; search?: string } = {}) {
   const params: PageParams = {
     page: 1,
     size: 100,
+    search: search.trim() || undefined,
     filters: includeInactive ? {} : { status: "active" },
   }
   return useQuery({
-    queryKey: productKeys.options(includeInactive),
+    queryKey: productKeys.options(includeInactive, params.search ?? ""),
     queryFn: ({ signal }) => productService.list(params, signal),
     select: (data): ProductOption[] =>
       data.items.map((p) => ({

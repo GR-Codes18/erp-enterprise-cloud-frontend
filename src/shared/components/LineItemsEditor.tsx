@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import { Plus, Trash2 } from "lucide-react"
 import { Field } from "@/shared/components/Field"
 import { TotalsSummary } from "@/shared/components/TotalsSummary"
+import { EntityPickerDialog } from "@/shared/components/EntityPickerDialog"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import {
@@ -54,6 +55,10 @@ interface LineItemsEditorProps {
   disabled?: boolean
   /** Al elegir un producto la página propone su precio o costo (editable) */
   warehouseOptionsByProduct?: Record<string, WarehouseOption[]>
+  /** Al escribir en el buscador de producto se filtra el catálogo por servidor (SKU o nombre) */
+  onProductSearch?: (value: string) => void
+  isLoading?: boolean
+  errorMessage?: string
   onProductChange: (index: number, productId: string) => void
   onWarehouseChange?: (index: number, warehouseId: string) => void
   onQuantityChange: (index: number, quantity: number) => void
@@ -84,6 +89,9 @@ export function LineItemsEditor({
   onAdd,
   onRemove,
   lineHint,
+  onProductSearch,
+  isLoading,
+  errorMessage,
 }: LineItemsEditorProps) {
   const totals = previewTotals(lines)
   const describedBy = (id: string, error?: string) => (error ? `${id}-error` : undefined)
@@ -126,27 +134,23 @@ export function LineItemsEditor({
             }`}
           >
             <Field id={ids.product} label="Producto" error={lineErrors?.product_id}>
-              <Select
-                value={line.product_id || undefined}
-                onValueChange={(value) => onProductChange(index, value)}
-                disabled={disabled}
-              >
-                <SelectTrigger
-                  id={ids.product}
-                  className="w-full"
-                  aria-invalid={!!lineErrors?.product_id}
-                  aria-describedby={describedBy(ids.product, lineErrors?.product_id)}
-                >
-                  <SelectValue placeholder="Selecciona un producto" />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((product) => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.sku} · {product.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <EntityPickerDialog
+              value={line.product_id}
+              onValueChange={(value) => onProductChange(index, value)}
+              options={products.map((product) => ({ value: product.id, label: `${product.sku} · ${product.name}` }))}
+              placeholder="Selecciona un producto"
+              searchPlaceholder="Buscar producto por SKU o nombre"
+              emptyLabel="No se encontraron productos."
+              disabled={disabled}
+              limit={5}
+              onSearchChange={onProductSearch}
+              isLoading={isLoading}
+              errorMessage={errorMessage}
+              aria-label={`Producto ${index + 1}`}
+              aria-invalid={!!lineErrors?.product_id}
+              aria-describedby={describedBy(ids.product, lineErrors?.product_id)}
+              className="w-full"
+            />
             </Field>
 
             {warehouseOptionsByProduct && onWarehouseChange && (

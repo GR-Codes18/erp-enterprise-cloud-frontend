@@ -8,7 +8,7 @@ import { ErrorState } from "@/shared/components/ErrorState"
 import { FilterSelect } from "@/shared/components/FilterSelect"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
-import { SearchableSelect } from "@/shared/components/SearchableSelect"
+import { EntityPickerDialog } from "@/shared/components/EntityPickerDialog"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
@@ -116,7 +116,7 @@ export default function InvoicesPage() {
           allLabel="Todos los estados"
           options={INVOICE_STATUSES.map((value) => ({ value, label: INVOICE_STATUS_LABELS[value] }))}
         />
-        <SearchableSelect
+        <EntityPickerDialog
           aria-label="Filtrar por cliente"
           value={customerId}
           onValueChange={withReset(setCustomerId)}

@@ -38,8 +38,9 @@ export const useMonthlyReport = (period: Period, enabled = true) =>
     enabled,
   })
 
-export const useTopProducts = (period: Period) =>
+export const useTopProducts = (period: Period, enabled = true) =>
   useQuery({
     queryKey: ["reports", "top-products", period],
     queryFn: ({ signal }) => reportService.topProducts(period, signal),
+    enabled,
   })

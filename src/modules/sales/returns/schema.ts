@@ -27,6 +27,7 @@ export function canTransitionReturn(from: ReturnStatus, to: ReturnStatus): boole
 
 const returnLineSchema = z.object({
   product_id: z.string().min(1, "Selecciona un producto"),
+  condition: z.enum(["good", "damaged"]).default("good"),
   quantity: z
     .number({ message: "Ingresa una cantidad válida" })
     .int("La cantidad debe ser entera")

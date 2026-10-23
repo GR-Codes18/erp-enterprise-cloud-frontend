@@ -10,7 +10,7 @@ import { ErrorState } from "@/shared/components/ErrorState"
 import { Field } from "@/shared/components/Field"
 import { LineItemsEditor } from "@/shared/components/LineItemsEditor"
 import { RouteFormDialog } from "@/shared/components/RouteFormDialog"
-import { SearchableSelect } from "@/shared/components/SearchableSelect"
+import { EntityPickerDialog } from "@/shared/components/EntityPickerDialog"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select"
@@ -87,9 +87,11 @@ function OrderForm({ order }: { order?: Order }) {
   const formLocked = isPending || savedDraftId !== null
   const [customerSearchInput, setCustomerSearchInput] = useState("")
   const customerSearch = useDebouncedValue(customerSearchInput.trim(), 300)
+  const [productSearchInput, setProductSearchInput] = useState("")
+  const productSearch = useDebouncedValue(productSearchInput.trim(), 300)
 
   const customers = useCustomerOptions({ includeInactive: true, search: customerSearch })
-  const products = useProductOptions()
+  const products = useProductOptions({ search: productSearch })
   const warehouses = useWarehouseOptions({ includeInactive: Boolean(order) })
   const stock = useStock({ page: 1, size: 200, filters: {} })
   const customerOptions = activeOrSelected(customers.data ?? [], order ? [order.customer_id] : [])
@@ -308,7 +310,7 @@ function OrderForm({ order }: { order?: Order }) {
               control={control}
               name="customer_id"
               render={({ field }) => (
-                <SearchableSelect
+                <EntityPickerDialog
                   value={field.value}
                   onValueChange={(value) => {
                     field.onChange(value)
@@ -535,6 +537,9 @@ function OrderForm({ order }: { order?: Order }) {
                 shouldValidate: form.formState.isSubmitted,
               })
             }
+            onProductSearch={setProductSearchInput}
+            isLoading={products.isPending}
+            errorMessage={products.isError ? getErrorMessage(products.error) : undefined}
           />
         </section>
 

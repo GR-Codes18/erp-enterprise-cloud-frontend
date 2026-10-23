@@ -11,6 +11,7 @@ import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { Textarea } from "@/shared/components/ui/textarea"
 import { getErrorMessage } from "@/shared/lib/api/errors"
+import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
 import { addDays, todayInLima } from "@/shared/lib/dates"
 import { withDocumentProducts } from "@/shared/lib/options"
 import { requestHooks } from "../hooks"
@@ -32,8 +33,10 @@ function RequestForm({ request }: { request?: PurchaseRequest }) {
   const update = requestHooks.useUpdate()
   const isPending = create.isPending || update.isPending
   const [serverError, setServerError] = useState<string | null>(null)
+  const [productSearchInput, setProductSearchInput] = useState("")
+  const productSearch = useDebouncedValue(productSearchInput.trim(), 300)
 
-  const products = useProductOptions()
+  const products = useProductOptions({ search: productSearch })
   const productOptions = withDocumentProducts(products.data ?? [], request?.items ?? []).map(
     (product) => ({ id: product.id, label: `${product.sku} · ${product.name}` }),
   )
@@ -95,6 +98,9 @@ function RequestForm({ request }: { request?: PurchaseRequest }) {
           onQuantityChange={(index, value) => setValue(`items.${index}.quantity`, value, validate)}
           onAdd={() => append({ product_id: "", quantity: 1 })}
           onRemove={remove}
+          onProductSearch={setProductSearchInput}
+          isLoading={products.isPending}
+          errorMessage={products.isError ? getErrorMessage(products.error) : undefined}
         />
 
         <div className="grid gap-4 md:grid-cols-[12rem_1fr]">

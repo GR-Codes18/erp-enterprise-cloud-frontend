@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select"
 import { getErrorMessage } from "@/shared/lib/api/errors"
+import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue"
 import { activeOrSelected, withDocumentProducts } from "@/shared/lib/options"
 import { useStockAvailability } from "../stock/hooks"
 import { InventoryLineItems } from "../components/InventoryLineItems"
@@ -38,7 +39,9 @@ function TransferForm({ transfer }: { transfer?: NonNullable<ReturnType<typeof u
   const createTransfer = useCreateTransfer()
   const updateTransfer = useUpdateTransfer()
   // Regla 4: un borrador antiguo sigue mostrando el producto o almacén que hoy está inactivo
-  const products = useProductOptions()
+  const [productSearchInput, setProductSearchInput] = useState("")
+  const productSearch = useDebouncedValue(productSearchInput.trim(), 300)
+  const products = useProductOptions({ search: productSearch })
   const warehouses = useWarehouseOptions({ includeInactive: true })
   const productOptions = withDocumentProducts(products.data ?? [], transfer?.items ?? [])
   const warehouseOptions = activeOrSelected(warehouses.data ?? [], transfer ? [transfer.origin_warehouse_id, transfer.destination_warehouse_id] : [])
@@ -176,6 +179,9 @@ function TransferForm({ transfer }: { transfer?: NonNullable<ReturnType<typeof u
           onDirectionChange={() => undefined}
           onAdd={() => append({ product_id: "", quantity: 1 })}
           onRemove={remove}
+          onProductSearch={setProductSearchInput}
+          isLoading={products.isPending}
+          errorMessage={products.isError ? getErrorMessage(products.error) : undefined}
         />
 
         {serverError && <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-text">{serverError}</p>}

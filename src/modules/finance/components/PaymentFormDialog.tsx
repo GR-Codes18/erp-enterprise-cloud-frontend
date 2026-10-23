@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, useWatch, type Resolver } from "react-hook-form"
 import { useSupplierInvoiceOptions } from "@/modules/purchases"
 import { useSalesInvoiceOptions } from "@/modules/sales"
+import { EntityPickerDialog } from "@/shared/components/EntityPickerDialog"
 import { Field } from "@/shared/components/Field"
 import { Button } from "@/shared/components/ui/button"
 import {
@@ -107,22 +108,20 @@ function PaymentForm({ type, document, onDone }: { type: PaymentType; document?:
   return (
     <form noValidate onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
       <Field id="document_id" label={type === "collection" ? "Comprobante" : "Factura del proveedor"} error={errors.document_id?.message}>
-        <Select
-          value={selectedId || undefined}
+        <EntityPickerDialog
+          options={(documents ?? []).map((doc) => ({
+            value: doc.id,
+            label: `${doc.label} · saldo ${formatMoney(doc.balance)}`,
+          }))}
+          value={selectedId ?? ""}
           onValueChange={(value) => setValue("document_id", value, { shouldDirty: true })}
           disabled={create.isPending || documentsQuery.isPending || documentId !== ""}
-        >
-          <SelectTrigger id="document_id" className="w-full" {...invalid("document_id")}>
-            <SelectValue placeholder="Selecciona el documento" />
-          </SelectTrigger>
-          <SelectContent>
-            {(documents ?? []).map((doc) => (
-              <SelectItem key={doc.id} value={doc.id}>
-                {doc.label} · saldo {formatMoney(doc.balance)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          isLoading={documentsQuery.isPending}
+          errorMessage={documentsQuery.isError ? getErrorMessage(documentsQuery.error) : undefined}
+          placeholder="Selecciona el documento"
+          aria-invalid={!!errors.document_id}
+          aria-describedby={errors.document_id ? "document_id-error" : undefined}
+        />
         {documentsQuery.isError && <p className="text-sm text-danger-text">{getErrorMessage(documentsQuery.error)}</p>}
       </Field>
 
@@ -163,23 +162,18 @@ function PaymentForm({ type, document, onDone }: { type: PaymentType; document?:
       {method === "transfer" && (
         <div className="grid gap-4 sm:grid-cols-2">
           <Field id="bank_account_id" label="Cuenta bancaria" error={errors.bank_account_id?.message}>
-            <Select
-              value={bankAccountId || undefined}
+            <EntityPickerDialog
+              options={(bankAccounts.data ?? [])
+                .filter((account) => account.currency === "PEN")
+                .map((account) => ({ value: account.id, label: bankAccountLabel(account) }))}
+              value={bankAccountId ?? ""}
               onValueChange={(value) => setValue("bank_account_id", value, { shouldDirty: true })}
               disabled={create.isPending || bankAccounts.isPending}
-            >
-              <SelectTrigger id="bank_account_id" className="w-full" {...invalid("bank_account_id")}>
-                <SelectValue placeholder="Selecciona la cuenta" />
-              </SelectTrigger>
-              <SelectContent>
-                {/* Los documentos están en soles: solo cuentas en soles */}
-                {(bankAccounts.data ?? []).filter((account) => account.currency === "PEN").map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {bankAccountLabel(account)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              isLoading={bankAccounts.isPending}
+              placeholder="Selecciona la cuenta"
+              aria-invalid={!!errors.bank_account_id}
+              aria-describedby={errors.bank_account_id ? "bank_account_id-error" : undefined}
+            />
           </Field>
           <Field id="operation_number" label="Número de operación" error={errors.operation_number?.message}>
             <Input id="operation_number" disabled={create.isPending} {...invalid("operation_number")} {...register("operation_number")} />
