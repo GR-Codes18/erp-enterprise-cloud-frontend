@@ -109,3 +109,11 @@ export function toProductUpdateInput(product: Product): ProductUpdateInput {
     status: product.status,
   }
 }
+
+/** Margen sobre el precio de venta, en %: (venta - costo) / venta. null si los montos no son válidos o la venta es 0 */
+export function marginPercent(salePrice: string, costPrice: string): number | null {
+  if (!PRICE_PATTERN.test(salePrice.trim()) || !PRICE_PATTERN.test(costPrice.trim())) return null
+  const sale = toCents(salePrice.trim())
+  if (sale === 0) return null
+  return Math.round(((sale - toCents(costPrice.trim())) / sale) * 1000) / 10
+}

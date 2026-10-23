@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  marginPercent,
   EMPTY_PRODUCT,
   isSoldBelowCost,
   productCreateSchema,
@@ -109,5 +110,21 @@ describe("toProductUpdateInput", () => {
       min_stock: 10,
       status: "active",
     })
+  })
+})
+
+describe("marginPercent", () => {
+  it("calcula el margen sobre la venta", () => {
+    expect(marginPercent("100.00", "60.00")).toBe(40)
+    expect(marginPercent("45.50", "30")).toBe(34.1)
+  })
+
+  it("es negativo si se vende bajo el costo", () => {
+    expect(marginPercent("50", "60")).toBe(-20)
+  })
+
+  it("devuelve null con montos inválidos o venta en cero", () => {
+    expect(marginPercent("", "10")).toBeNull()
+    expect(marginPercent("0", "10")).toBeNull()
   })
 })

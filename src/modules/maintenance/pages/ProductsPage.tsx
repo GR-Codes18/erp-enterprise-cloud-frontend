@@ -6,6 +6,7 @@ import { DataTable, type Column } from "@/shared/components/DataTable"
 import { EmptyState } from "@/shared/components/EmptyState"
 import { ErrorState } from "@/shared/components/ErrorState"
 import InUseDialog from "@/shared/components/InUseDialog"
+import { ExportCsvButton } from "@/shared/components/ExportCsvButton"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
@@ -18,8 +19,9 @@ import { useDeleteOrDeactivate } from "@/shared/hooks/useDeleteOrDeactivate"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import { formatMoney } from "@/shared/lib/money"
 import { ProductFormDialog } from "@/modules/maintenance/products/components/ProductFormDialog"
+import { useCategoryOptions } from "@/modules/maintenance/categories/hooks"
 import { useDeleteProduct, usePatchProduct, useProducts } from "@/modules/maintenance/products/hooks"
-import { PRODUCT_STATUSES, STATUS_LABELS, type Product } from "@/modules/maintenance/products/schema"
+import { PRODUCT_STATUSES, STATUS_LABELS, marginPercent, type Product } from "@/modules/maintenance/products/schema"
 
 const PAGE_SIZE = 10
 
@@ -31,6 +33,7 @@ export default function ProductsPage() {
   const canVoid = useHasPermission("maintenance.products:void")
   const [searchInput, setSearchInput] = useState("")
   const [status, setStatus] = useState(FILTER_ALL)
+  const [categoryId, setCategoryId] = useState(FILTER_ALL)
   const search = useDebouncedValue(searchInput.trim(), 300)
 
   const [dialog, setDialog] = useState<{ open: boolean; product: Product | null }>({
@@ -40,7 +43,8 @@ export default function ProductsPage() {
   const [toDelete, setToDelete] = useState<Product | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const products = useProducts({ page, size: PAGE_SIZE, search, filters: pickFilters({ status }) })
+  const products = useProducts({ page, size: PAGE_SIZE, search, filters: pickFilters({ status, category_id: categoryId }) })
+  const categoryOptions = useCategoryOptions({ includeInactive: true })
   const deleteProduct = useDeleteProduct()
   const patchProduct = usePatchProduct()
 
@@ -93,7 +97,7 @@ export default function ProductsPage() {
     },
     {
       key: "sale_price",
-      header: "Precio de venta",
+      header: "Precio",
       className: "text-right",
       cell: (row) => <span className="font-mono">{formatMoney(row.sale_price)}</span>,
     },
@@ -104,6 +108,20 @@ export default function ProductsPage() {
       cell: (row) => <span className="font-mono text-muted-foreground">{formatMoney(row.cost_price)}</span>,
     },
     {
+      key: "margin",
+      header: "Margen",
+      className: "text-right w-20",
+      cell: (row) => {
+        const margin = marginPercent(row.sale_price, row.cost_price)
+        if (margin === null) return <span className="text-muted-foreground">—</span>
+        return (
+          <span className={margin < 0 ? "font-mono text-danger-text" : "font-mono"}>
+            {margin.toFixed(1)}%
+          </span>
+        )
+      },
+    },
+    {
       key: "stock_total",
       header: "Stock total",
       className: "text-right w-32",
@@ -112,9 +130,12 @@ export default function ProductsPage() {
         row.stock_total === 0 ? (
           <StatusBadge tone="danger" label="Sin stock" />
         ) : (
-          <span className="font-mono">
-            {row.stock_total} {row.unit}
-          </span>
+          <div className="flex flex-col items-end gap-1">
+            <span className="font-mono">
+              {row.stock_total} {row.unit}
+            </span>
+            {row.stock_total <= row.min_stock && <StatusBadge tone="warning" label="Stock bajo" />}
+          </div>
         ),
     },
     {
@@ -159,6 +180,25 @@ export default function ProductsPage() {
     },
   ]
 
+  const exportButton = (
+    <ExportCsvButton
+      filename="productos"
+      rows={products.data?.items ?? []}
+      columns={[
+      { header: "SKU", value: (row) => row.sku },
+      { header: "Nombre", value: (row) => row.name },
+      { header: "Categoría", value: (row) => row.category_name || '' },
+      { header: "Unidad", value: (row) => row.unit },
+      { header: "Precio de venta (S/)", value: (row) => row.sale_price },
+      { header: "Costo (S/)", value: (row) => row.cost_price },
+      { header: "Stock total", value: (row) => row.stock_total },
+      { header: "Stock mínimo", value: (row) => row.min_stock },
+      { header: "Margen (%)", value: (row) => marginPercent(row.sale_price, row.cost_price) ?? "" },
+      { header: "Estado", value: (row) => STATUS_LABELS[row.status] },
+      ]}
+    />
+  )
+
   const newProductButton = canCreate && (
     <Button onClick={() => setDialog({ open: true, product: null })}>
       <Plus aria-hidden="true" />
@@ -171,7 +211,7 @@ export default function ProductsPage() {
       <PageHeader
         title="Productos"
         description="Administra el catálogo de productos, sus categorías, precios y existencias."
-        actions={newProductButton}
+        actions={<>{exportButton}{newProductButton}</>}
       />
 
       <div className="mb-4 flex flex-wrap gap-3 rounded-xl border bg-card p-4 shadow-sm">
@@ -197,6 +237,28 @@ export default function ProductsPage() {
           allLabel="Todos los estados"
           options={PRODUCT_STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))}
         />
+        <FilterSelect
+          label="Filtrar por categoría"
+          value={categoryId}
+          onChange={(value) => {
+            setCategoryId(value)
+            setPage(1)
+          }}
+          allLabel="Todas las categorías"
+          options={(categoryOptions.data ?? []).map((category) => ({ value: category.id, label: category.name }))}
+        />
+        {(search || status !== FILTER_ALL || categoryId !== FILTER_ALL) && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              setCategoryId(FILTER_ALL); setSearchInput("")
+              setStatus(FILTER_ALL)
+              setPage(1)
+            }}
+          >
+            Limpiar filtros
+          </Button>
+        )}
       </div>
 
       {actionError && (
@@ -218,7 +280,7 @@ export default function ProductsPage() {
             getRowKey={(row) => row.id}
             isLoading={products.isPending}
             empty={
-              search || status !== FILTER_ALL ? (
+              search || status !== FILTER_ALL || categoryId !== FILTER_ALL ? (
                 <EmptyState
                   title="Sin resultados"
                   description="Ningún producto coincide con tu búsqueda o filtro."

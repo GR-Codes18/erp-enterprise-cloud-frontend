@@ -21,6 +21,8 @@ export interface ModuleItem {
   page?: PageLoader
   /** Permiso para ver la pantalla, ej. "sales.quotes:view". Sin él, la ve cualquiera con sesión */
   permission?: string
+  /** Ícono opcional que se muestra junto al ítem en el Sidebar */
+  icon?: ComponentType<{ className?: string }>
   /** Subrutas no visibles en el Sidebar pero pertenecientes a este ítem */
   subRoutes?: SubRoute[]
 }

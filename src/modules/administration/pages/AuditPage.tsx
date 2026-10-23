@@ -2,19 +2,14 @@ import { useState } from "react"
 import { DataTable, type Column } from "@/shared/components/DataTable"
 import { EmptyState } from "@/shared/components/EmptyState"
 import { ErrorState } from "@/shared/components/ErrorState"
+import { ExportCsvButton } from "@/shared/components/ExportCsvButton"
 import { Field } from "@/shared/components/Field"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select"
+import { FilterSelect } from "@/shared/components/FilterSelect"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import type { PageParams } from "@/shared/lib/api/types"
 import { formatDateTimeLima } from "@/shared/lib/dates"
@@ -34,33 +29,6 @@ import {
 import { useUserOptions } from "../usuarios/users/hooks"
 
 const PAGE_SIZE = 10
-
-interface FilterSelectProps {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  allLabel: string
-  options: { value: string; label: string }[]
-  className?: string
-}
-
-function FilterSelect({ label, value, onChange, allLabel, options, className }: FilterSelectProps) {
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className={className ?? "w-44"} aria-label={label}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={FILTER_ALL}>{allLabel}</SelectItem>
-        {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
-}
 
 const ACTION_OPTIONS = AUDIT_ACTIONS.map((value) => ({ value, label: ACTION_LABELS[value] }))
 const MODULE_OPTIONS = AUDIT_MODULES.map((value) => ({ value, label: MODULE_LABELS[value] }))
@@ -140,6 +108,20 @@ export default function AuditPage() {
       <PageHeader
         title="Auditoría"
         description="Registro de lo que ocurre en el sistema. Solo lectura."
+        actions={
+          <ExportCsvButton
+            filename="auditoria"
+            rows={events.data?.items ?? []}
+            columns={[
+              { header: "Fecha y hora", value: (row) => formatDateTimeLima(row.created_at) },
+              { header: "Usuario", value: (row) => row.user_name },
+              { header: "Acción", value: (row) => ACTION_LABELS[row.action] },
+              { header: "Módulo", value: (row) => MODULE_LABELS[row.module] },
+              { header: "Registro afectado", value: (row) => row.record },
+              { header: "Resultado", value: (row) => RESULT_LABELS[row.result] },
+            ]}
+          />
+        }
       />
 
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4 shadow-sm">

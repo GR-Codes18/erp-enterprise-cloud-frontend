@@ -5,6 +5,7 @@ import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
 import { DataTable, type Column } from "@/shared/components/DataTable"
 import { EmptyState } from "@/shared/components/EmptyState"
 import { ErrorState } from "@/shared/components/ErrorState"
+import { ExportCsvButton } from "@/shared/components/ExportCsvButton"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
@@ -100,6 +101,19 @@ export default function RolesPage() {
     },
   ]
 
+  const exportButton = (
+    <ExportCsvButton
+      filename="roles"
+      rows={roles.data?.items ?? []}
+      columns={[
+        { header: "Rol", value: (row) => row.name },
+        { header: "Descripción", value: (row) => row.description },
+        { header: "Cantidad de permisos", value: (row) => row.permissions.length },
+        { header: "De sistema", value: (row) => (row.is_system ? "Sí" : "No") },
+      ]}
+    />
+  )
+
   const newRoleButton = canCreate && (
     <Button onClick={() => setDialog({ open: true, role: null })}>
       <Plus aria-hidden="true" />
@@ -112,7 +126,7 @@ export default function RolesPage() {
       <PageHeader
         title="Roles"
         description="Define qué puede hacer cada tipo de usuario en el sistema."
-        actions={newRoleButton}
+        actions={<>{exportButton}{newRoleButton}</>}
       />
 
       <div className="mb-4 max-w-sm">

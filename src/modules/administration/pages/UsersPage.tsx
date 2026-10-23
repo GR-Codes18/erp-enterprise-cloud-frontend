@@ -5,6 +5,7 @@ import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
 import { DataTable, type Column } from "@/shared/components/DataTable"
 import { EmptyState } from "@/shared/components/EmptyState"
 import { ErrorState } from "@/shared/components/ErrorState"
+import { ExportCsvButton } from "@/shared/components/ExportCsvButton"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
@@ -152,6 +153,19 @@ export default function UsersPage() {
     },
   ]
 
+  const exportButton = (
+    <ExportCsvButton
+      filename="usuarios"
+      rows={users.data?.items ?? []}
+      columns={[
+        { header: "Usuario", value: (row) => row.name },
+        { header: "Correo", value: (row) => row.email },
+        { header: "Rol", value: (row) => roleNames.get(row.role_id) ?? "" },
+        { header: "Estado", value: (row) => STATUS_LABELS[row.status] },
+      ]}
+    />
+  )
+
   const newUserButton = canCreate && (
     <Button onClick={() => setDialog({ open: true, user: null })}>
       <Plus aria-hidden="true" />
@@ -164,7 +178,7 @@ export default function UsersPage() {
       <PageHeader
         title="Usuarios"
         description="Administra quién accede al sistema y con qué rol."
-        actions={newUserButton}
+        actions={<>{exportButton}{newUserButton}</>}
       />
 
       <div className="mb-4 flex flex-wrap gap-3 rounded-xl border bg-card p-4 shadow-sm">

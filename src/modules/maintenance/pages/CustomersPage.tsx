@@ -6,6 +6,7 @@ import { DataTable, type Column } from "@/shared/components/DataTable"
 import { EmptyState } from "@/shared/components/EmptyState"
 import { ErrorState } from "@/shared/components/ErrorState"
 import InUseDialog from "@/shared/components/InUseDialog"
+import { ExportCsvButton } from "@/shared/components/ExportCsvButton"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
@@ -19,7 +20,7 @@ import { getErrorMessage } from "@/shared/lib/api/errors"
 import { formatMoney } from "@/shared/lib/money"
 import { CustomerFormDialog } from "../customers/components/CustomerFormDialog"
 import { useCustomers, useDeleteCustomer, usePatchCustomer } from "../customers/hooks"
-import { CUSTOMER_STATUSES, STATUS_LABELS, type Customer } from "../customers/schema"
+import { CUSTOMER_STATUSES, DOCUMENT_TYPES, STATUS_LABELS, type Customer } from "../customers/schema"
 
 const PAGE_SIZE = 10
 
@@ -31,6 +32,7 @@ export default function CustomersPage() {
   const canVoid = useHasPermission("maintenance.customers:void")
   const [searchInput, setSearchInput] = useState("")
   const [status, setStatus] = useState(FILTER_ALL)
+  const [documentType, setDocumentType] = useState(FILTER_ALL)
   const search = useDebouncedValue(searchInput.trim(), 300)
 
   const [dialog, setDialog] = useState<{ open: boolean; customer: Customer | null }>({
@@ -40,7 +42,7 @@ export default function CustomersPage() {
   const [toDelete, setToDelete] = useState<Customer | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const customers = useCustomers({ page, size: PAGE_SIZE, search, filters: pickFilters({ status }) })
+  const customers = useCustomers({ page, size: PAGE_SIZE, search, filters: pickFilters({ status, document_type: documentType }) })
   const deleteCustomer = useDeleteCustomer()
   const patchCustomer = usePatchCustomer()
 
@@ -134,6 +136,23 @@ export default function CustomersPage() {
     },
   ]
 
+  const exportButton = (
+    <ExportCsvButton
+      filename="clientes"
+      rows={customers.data?.items ?? []}
+      columns={[
+      { header: "Tipo de documento", value: (row) => row.document_type },
+      { header: "Número de documento", value: (row) => row.document_number },
+      { header: "Nombre", value: (row) => row.name },
+      { header: "Correo", value: (row) => row.email },
+      { header: "Teléfono", value: (row) => row.phone },
+      { header: "Dirección", value: (row) => row.address },
+      { header: "Límite de crédito (S/)", value: (row) => row.credit_limit },
+      { header: "Estado", value: (row) => STATUS_LABELS[row.status] },
+      ]}
+    />
+  )
+
   const newCustomerButton = canCreate && (
     <Button onClick={() => setDialog({ open: true, customer: null })}>
       <Plus aria-hidden="true" />
@@ -146,7 +165,7 @@ export default function CustomersPage() {
       <PageHeader
         title="Clientes"
         description="Administra los clientes de la empresa."
-        actions={newCustomerButton}
+        actions={<>{exportButton}{newCustomerButton}</>}
       />
 
       <div className="mb-4 flex flex-wrap gap-3 rounded-xl border bg-card p-4 shadow-sm">
@@ -172,6 +191,28 @@ export default function CustomersPage() {
           allLabel="Todos los estados"
           options={CUSTOMER_STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))}
         />
+        <FilterSelect
+          label="Filtrar por tipo de documento"
+          value={documentType}
+          onChange={(value) => {
+            setDocumentType(value)
+            setPage(1)
+          }}
+          allLabel="Todos los documentos"
+          options={DOCUMENT_TYPES.map((value) => ({ value, label: value }))}
+        />
+        {(search || status !== FILTER_ALL || documentType !== FILTER_ALL) && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              setDocumentType(FILTER_ALL); setSearchInput("")
+              setStatus(FILTER_ALL)
+              setPage(1)
+            }}
+          >
+            Limpiar filtros
+          </Button>
+        )}
       </div>
 
       {actionError && (
@@ -193,7 +234,7 @@ export default function CustomersPage() {
             getRowKey={(row) => row.id}
             isLoading={customers.isPending}
             empty={
-              search || status !== FILTER_ALL ? (
+              search || status !== FILTER_ALL || documentType !== FILTER_ALL ? (
                 <EmptyState
                   title="Sin resultados"
                   description="Ningún cliente coincide con tu búsqueda o filtro."

@@ -1,5 +1,5 @@
-import { ChevronDown } from "lucide-react"
-import { useEffect, useState } from "react"
+import { ChevronDown, Search, X } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { NavLink, useLocation } from "react-router"
 import { APP_NAME } from "@/config/app"
 import { cn } from "@/shared/lib/utils"
@@ -15,7 +15,7 @@ interface SidebarProps {
 
 function subItemClass({ isActive }: { isActive: boolean }) {
   return cn(
-    "block rounded-md px-3 py-1.5 text-sm transition-colors",
+    "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors",
     isActive
       ? "bg-sidebar-primary text-sidebar-primary-foreground"
       : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -31,9 +31,42 @@ function singleLinkClass({ isActive }: { isActive: boolean }) {
   )
 }
 
-export default function Sidebar({ modules, open, onClose }: SidebarProps) {
+/** Deja solo las pantallas cuyo nombre (o el del módulo) contiene el texto buscado */
+function filterModulesByText(modules: AppModule[], text: string): AppModule[] {
+  const needle = text.trim().toLocaleLowerCase("es")
+  if (!needle) return modules
+  const matches = (label: string) => label.toLocaleLowerCase("es").includes(needle)
+
+  return modules.flatMap((module) => {
+    if (!module.sections) return matches(module.label) ? [module] : []
+    if (matches(module.label)) return [module]
+    const sections = module.sections
+      .map((section) => ({ ...section, items: section.items.filter((item) => matches(item.label)) }))
+      .filter((section) => section.items.length > 0)
+    return sections.length > 0 ? [{ ...module, sections }] : []
+  })
+}
+
+export default function Sidebar({ modules: allModules, open, onClose }: SidebarProps) {
   const { pathname } = useLocation()
-  const activeModuleId = findActiveModule(modules, pathname)?.id ?? null
+  const [query, setQuery] = useState("")
+  const searchRef = useRef<HTMLInputElement>(null)
+  const isSearching = query.trim() !== ""
+  const modules = useMemo(() => filterModulesByText(allModules, query), [allModules, query])
+
+  // Ctrl+K (o Cmd+K) lleva el cursor al buscador del menú
+  useEffect(() => {
+    function handleShortcut(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault()
+        searchRef.current?.focus()
+        searchRef.current?.select()
+      }
+    }
+    window.addEventListener("keydown", handleShortcut)
+    return () => window.removeEventListener("keydown", handleShortcut)
+  }, [])
+  const activeModuleId = findActiveModule(allModules, pathname)?.id ?? null
 
   // Acordeón: solo un módulo abierto a la vez. Por defecto se abre el módulo
   // de la URL actual; si la persona abre o cierra uno a mano, se respeta
@@ -84,10 +117,39 @@ export default function Sidebar({ modules, open, onClose }: SidebarProps) {
           {APP_NAME}
         </div>
 
+        <div className="relative shrink-0 px-3 pt-3">
+          <Search aria-hidden="true" className="pointer-events-none absolute left-6 top-1/2 mt-1.5 size-4 -translate-y-1/2 text-sidebar-muted" />
+          <input
+            ref={searchRef}
+            type="text"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setQuery("")
+            }}
+            placeholder="Buscar… (Ctrl+K)"
+            aria-label="Buscar pantalla del menú"
+            className="h-9 w-full rounded-md border border-sidebar-border bg-transparent pl-8 pr-8 text-sm text-sidebar-foreground placeholder:text-sidebar-muted focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-sidebar-primary"
+          />
+          {isSearching && (
+            <button
+              type="button"
+              aria-label="Borrar búsqueda"
+              onClick={() => setQuery("")}
+              className="absolute right-5 top-1/2 mt-1.5 -translate-y-1/2 rounded p-1 text-sidebar-muted hover:text-sidebar-accent-foreground"
+            >
+              <X aria-hidden="true" className="size-3.5" />
+            </button>
+          )}
+        </div>
+
         <nav
           aria-label="Navegación principal"
           className="flex-1 space-y-1 overflow-y-auto p-3"
         >
+          {isSearching && modules.length === 0 && (
+            <p className="px-3 py-2 text-sm text-sidebar-muted">Ninguna pantalla coincide.</p>
+          )}
           {modules.map((module) => {
             const Icon = module.icon
             const basePath = "/" + module.basePath
@@ -106,7 +168,7 @@ export default function Sidebar({ modules, open, onClose }: SidebarProps) {
               )
             }
 
-            const isOpen = openId === module.id
+            const isOpen = isSearching || openId === module.id
             const isActiveModule = activeModuleId === module.id
             const submenuId = "submenu-" + module.id
 
@@ -120,7 +182,7 @@ export default function Sidebar({ modules, open, onClose }: SidebarProps) {
                   className={cn(
                     "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                     isActiveModule
-                      ? "text-sidebar-accent-foreground"
+                      ? "bg-sidebar-accent/40 text-sidebar-accent-foreground"
                       : "text-sidebar-foreground",
                   )}
                 >
@@ -153,6 +215,7 @@ export default function Sidebar({ modules, open, onClose }: SidebarProps) {
                             onClick={onClose}
                             className={subItemClass}
                           >
+                            {item.icon && <item.icon className="size-4 shrink-0" />}
                             {item.label}
                           </NavLink>
                         ))}

@@ -6,6 +6,7 @@ import { DataTable, type Column } from "@/shared/components/DataTable"
 import { EmptyState } from "@/shared/components/EmptyState"
 import { ErrorState } from "@/shared/components/ErrorState"
 import InUseDialog from "@/shared/components/InUseDialog"
+import { ExportCsvButton } from "@/shared/components/ExportCsvButton"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
@@ -18,7 +19,7 @@ import { useDeleteOrDeactivate } from "@/shared/hooks/useDeleteOrDeactivate"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import { SupplierFormDialog } from "../suppliers/components/SupplierFormDialog"
 import { useDeleteSupplier, usePatchSupplier, useSuppliers } from "../suppliers/hooks"
-import { SUPPLIER_STATUSES, STATUS_LABELS, type Supplier } from "../suppliers/schema"
+import { DOCUMENT_TYPES, SUPPLIER_STATUSES, STATUS_LABELS, type Supplier } from "../suppliers/schema"
 
 const PAGE_SIZE = 10
 
@@ -30,6 +31,7 @@ export default function SuppliersPage() {
   const canVoid = useHasPermission("maintenance.suppliers:void")
   const [searchInput, setSearchInput] = useState("")
   const [status, setStatus] = useState(FILTER_ALL)
+  const [documentType, setDocumentType] = useState(FILTER_ALL)
   const search = useDebouncedValue(searchInput.trim(), 300)
 
   const [dialog, setDialog] = useState<{ open: boolean; supplier: Supplier | null }>({
@@ -39,7 +41,7 @@ export default function SuppliersPage() {
   const [toDelete, setToDelete] = useState<Supplier | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const suppliers = useSuppliers({ page, size: PAGE_SIZE, search, filters: pickFilters({ status }) })
+  const suppliers = useSuppliers({ page, size: PAGE_SIZE, search, filters: pickFilters({ status, document_type: documentType }) })
   const deleteSupplier = useDeleteSupplier()
   const patchSupplier = usePatchSupplier()
 
@@ -133,6 +135,22 @@ export default function SuppliersPage() {
     },
   ]
 
+  const exportButton = (
+    <ExportCsvButton
+      filename="proveedores"
+      rows={suppliers.data?.items ?? []}
+      columns={[
+      { header: "Tipo de documento", value: (row) => row.document_type },
+      { header: "Número de documento", value: (row) => row.document_number },
+      { header: "Nombre", value: (row) => row.name },
+      { header: "Correo", value: (row) => row.email },
+      { header: "Teléfono", value: (row) => row.phone },
+      { header: "Días de crédito", value: (row) => row.credit_days },
+      { header: "Estado", value: (row) => STATUS_LABELS[row.status] },
+      ]}
+    />
+  )
+
   const newSupplierButton = canCreate && (
     <Button onClick={() => setDialog({ open: true, supplier: null })}>
       <Plus aria-hidden="true" />
@@ -145,7 +163,7 @@ export default function SuppliersPage() {
       <PageHeader
         title="Proveedores"
         description="Administra los proveedores de la empresa."
-        actions={newSupplierButton}
+        actions={<>{exportButton}{newSupplierButton}</>}
       />
 
       <div className="mb-4 flex flex-wrap gap-3 rounded-xl border bg-card p-4 shadow-sm">
@@ -171,6 +189,28 @@ export default function SuppliersPage() {
           allLabel="Todos los estados"
           options={SUPPLIER_STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))}
         />
+        <FilterSelect
+          label="Filtrar por tipo de documento"
+          value={documentType}
+          onChange={(value) => {
+            setDocumentType(value)
+            setPage(1)
+          }}
+          allLabel="Todos los documentos"
+          options={DOCUMENT_TYPES.map((value) => ({ value, label: value }))}
+        />
+        {(search || status !== FILTER_ALL || documentType !== FILTER_ALL) && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              setDocumentType(FILTER_ALL); setSearchInput("")
+              setStatus(FILTER_ALL)
+              setPage(1)
+            }}
+          >
+            Limpiar filtros
+          </Button>
+        )}
       </div>
 
       {actionError && (
@@ -192,7 +232,7 @@ export default function SuppliersPage() {
             getRowKey={(row) => row.id}
             isLoading={suppliers.isPending}
             empty={
-              search || status !== FILTER_ALL ? (
+              search || status !== FILTER_ALL || documentType !== FILTER_ALL ? (
                 <EmptyState
                   title="Sin resultados"
                   description="Ningún proveedor coincide con tu búsqueda o filtro."

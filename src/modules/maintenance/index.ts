@@ -1,4 +1,4 @@
-import { Database } from "lucide-react"
+import { Boxes, Database, FolderTree, Truck, Users, Warehouse } from "lucide-react"
 import type { AppModule } from "@/shared/types/module"
 
 // Lo que este módulo publica para otros (regla 0.5): solo tipos y hooks de consulta
@@ -22,11 +22,11 @@ export const maintenanceModule: AppModule = {
   sections: [
     {
       items: [
-        { label: "Clientes", path: "customers", permission: "maintenance.customers:view", page: () => import("./pages/CustomersPage") },
-        { label: "Proveedores", path: "suppliers", permission: "maintenance.suppliers:view", page: () => import("./pages/SuppliersPage") },
-        { label: "Productos", path: "products", permission: "maintenance.products:view", page: () => import("./pages/ProductsPage") },
-        { label: "Categorías", path: "categories", permission: "maintenance.categories:view", page: () => import("./pages/CategoriesPage") },
-        { label: "Almacenes", path: "warehouses", permission: "maintenance.warehouses:view", page: () => import("./pages/WarehousesPage") },
+        { label: "Clientes", icon: Users, path: "customers", permission: "maintenance.customers:view", page: () => import("./pages/CustomersPage") },
+        { label: "Proveedores", icon: Truck, path: "suppliers", permission: "maintenance.suppliers:view", page: () => import("./pages/SuppliersPage") },
+        { label: "Productos", icon: Boxes, path: "products", permission: "maintenance.products:view", page: () => import("./pages/ProductsPage") },
+        { label: "Categorías", icon: FolderTree, path: "categories", permission: "maintenance.categories:view", page: () => import("./pages/CategoriesPage") },
+        { label: "Almacenes", icon: Warehouse, path: "warehouses", permission: "maintenance.warehouses:view", page: () => import("./pages/WarehousesPage") },
       ],
     },
   ],

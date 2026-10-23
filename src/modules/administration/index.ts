@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react"
+import { ClipboardList, KeyRound, Settings, ShieldCheck, UserCog, Users } from "lucide-react"
 import type { AppModule } from "@/shared/types/module"
 
 // Lo que este módulo publica para otros (regla 0.5): solo tipos y hooks de consulta
@@ -14,15 +14,15 @@ export const administrationModule: AppModule = {
     {
       label: "Seguridad",
       items: [
-        { label: "Usuarios", path: "users", permission: "administration.users:view", page: () => import("./pages/UsersPage") },
-        { label: "Roles", path: "roles", permission: "administration.roles:view", page: () => import("./pages/RolesPage") },
-        { label: "Permisos", path: "permissions", permission: "administration.roles:view", page: () => import("./pages/PermissionsPage") },
-        { label: "Auditoría", path: "audit", permission: "administration.audit:view", page: () => import("./pages/AuditPage") },
+        { label: "Usuarios", icon: Users, path: "users", permission: "administration.users:view", page: () => import("./pages/UsersPage") },
+        { label: "Roles", icon: UserCog, path: "roles", permission: "administration.roles:view", page: () => import("./pages/RolesPage") },
+        { label: "Permisos", icon: KeyRound, path: "permissions", permission: "administration.roles:view", page: () => import("./pages/PermissionsPage") },
+        { label: "Auditoría", icon: ClipboardList, path: "audit", permission: "administration.audit:view", page: () => import("./pages/AuditPage") },
       ],
     },
     {
       label: "Configuración",
-      items: [{ label: "Parámetros", path: "settings", permission: "administration.settings:view", page: () => import("./pages/SettingsPage") }],
+      items: [{ label: "Parámetros", icon: Settings, path: "settings", permission: "administration.settings:view", page: () => import("./pages/SettingsPage") }],
     },
   ],
 }

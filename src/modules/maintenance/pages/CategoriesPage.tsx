@@ -6,6 +6,7 @@ import { DataTable, type Column } from "@/shared/components/DataTable"
 import { EmptyState } from "@/shared/components/EmptyState"
 import { ErrorState } from "@/shared/components/ErrorState"
 import InUseDialog from "@/shared/components/InUseDialog"
+import { ExportCsvButton } from "@/shared/components/ExportCsvButton"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
@@ -120,6 +121,17 @@ export default function CategoriesPage() {
     },
   ]
 
+  const exportButton = (
+    <ExportCsvButton
+      filename="categorias"
+      rows={categories.data?.items ?? []}
+      columns={[
+      { header: "Categoría", value: (row) => row.name },
+      { header: "Estado", value: (row) => STATUS_LABELS[row.status] },
+      ]}
+    />
+  )
+
   const newCategoryButton = canCreate && (
     <Button onClick={() => setDialog({ open: true, category: null })}>
       <Plus aria-hidden="true" />
@@ -132,7 +144,7 @@ export default function CategoriesPage() {
       <PageHeader
         title="Categorías"
         description="Administra las categorías de productos de la empresa."
-        actions={newCategoryButton}
+        actions={<>{exportButton}{newCategoryButton}</>}
       />
 
       <div className="mb-4 flex flex-wrap gap-3 rounded-xl border bg-card p-4 shadow-sm">
@@ -158,6 +170,18 @@ export default function CategoriesPage() {
           allLabel="Todas los estados"
           options={CATEGORY_STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))}
         />
+        {(search || status !== FILTER_ALL) && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSearchInput("")
+              setStatus(FILTER_ALL)
+              setPage(1)
+            }}
+          >
+            Limpiar filtros
+          </Button>
+        )}
       </div>
 
       {actionError && (

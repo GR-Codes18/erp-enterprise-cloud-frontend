@@ -6,6 +6,7 @@ import { DataTable, type Column } from "@/shared/components/DataTable"
 import { EmptyState } from "@/shared/components/EmptyState"
 import { ErrorState } from "@/shared/components/ErrorState"
 import InUseDialog from "@/shared/components/InUseDialog"
+import { ExportCsvButton } from "@/shared/components/ExportCsvButton"
 import { PageHeader } from "@/shared/components/PageHeader"
 import { Pagination } from "@/shared/components/Pagination"
 import { StatusBadge } from "@/shared/components/StatusBadge"
@@ -132,6 +133,19 @@ export default function WarehousesPage() {
     },
   ]
 
+  const exportButton = (
+    <ExportCsvButton
+      filename="almacenes"
+      rows={warehouses.data?.items ?? []}
+      columns={[
+      { header: "Código", value: (row) => row.code },
+      { header: "Nombre", value: (row) => row.name },
+      { header: "Dirección", value: (row) => row.address },
+      { header: "Estado", value: (row) => STATUS_LABELS[row.status] },
+      ]}
+    />
+  )
+
   const newWarehouseButton = canCreate && (
     <Button onClick={() => setDialog({ open: true, warehouse: null })}>
       <Plus aria-hidden="true" />
@@ -144,7 +158,7 @@ export default function WarehousesPage() {
       <PageHeader
         title="Almacenes"
         description="Administra los almacenes y puntos de depósito de la empresa."
-        actions={newWarehouseButton}
+        actions={<>{exportButton}{newWarehouseButton}</>}
       />
 
       <div className="mb-4 flex flex-wrap gap-3 rounded-xl border bg-card p-4 shadow-sm">
@@ -170,6 +184,18 @@ export default function WarehousesPage() {
           allLabel="Todos los estados"
           options={WAREHOUSE_STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))}
         />
+        {(search || status !== FILTER_ALL) && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSearchInput("")
+              setStatus(FILTER_ALL)
+              setPage(1)
+            }}
+          >
+            Limpiar filtros
+          </Button>
+        )}
       </div>
 
       {actionError && (
