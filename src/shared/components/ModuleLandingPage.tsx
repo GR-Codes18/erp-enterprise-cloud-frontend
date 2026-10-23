@@ -13,21 +13,95 @@ const sectionIcons: Record<string, typeof FolderOpen> = {
   default: FolderOpen,
 }
 
-function buildItemDescription(item: ModuleItem, moduleLabel: string): string {
+const MASTER_SUBMODULE_DATA: Record<string, { description: string; fields: string[] }> = {
+  Empresas: {
+    description: "Razones sociales y parámetros generales de la empresa.",
+    fields: ["RUC", "razón_social", "dirección_fiscal", "logo", "moneda_base", "estado"],
+  },
+  Sucursales: {
+    description: "Sedes de la empresa con ubicación y coordinación operativa.",
+    fields: ["código", "nombre", "dirección", "empresa_id", "teléfono", "estado"],
+  },
+  Almacenes: {
+    description: "Depósitos y ubicaciones para controlar stock y recepciones.",
+    fields: ["código", "nombre", "dirección", "sucursal_id", "responsable_id", "tipo", "estado"],
+  },
+  Productos: {
+    description: "Catálogo base de productos y referencias del negocio.",
+    fields: ["SKU", "nombre", "descripción", "categoría_id", "marca_id", "UM_base", "peso", "código_barras", "estado"],
+  },
+  Categorías: {
+    description: "Jerarquía de clasificación para catalogar productos.",
+    fields: ["código", "nombre", "padre_id", "nivel", "estado"],
+  },
+  Marcas: {
+    description: "Fabricantes o marcas comerciales asociadas a los productos.",
+    fields: ["código", "nombre", "país_origen", "contacto", "estado"],
+  },
+  "Unidades de medida": {
+    description: "Unidades y abreviaturas usadas para medir y operar inventario.",
+    fields: ["código", "nombre", "abreviatura", "precisión", "estado"],
+  },
+  "Conversiones de unidades": {
+    description: "Equivalencias entre unidades para conversiones de inventario.",
+    fields: ["producto_id", "UM_origen", "UM_destino", "factor", "vigencia"],
+  },
+  Clientes: {
+    description: "Cartera de clientes con condiciones comerciales y contacto.",
+    fields: ["tipo_documento", "número_documento", "razón_social", "dirección", "lista_precio_id", "límite_crédito", "condición_pago", "estado"],
+  },
+  Proveedores: {
+    description: "Cartera de proveedores y condiciones de compra asociadas.",
+    fields: ["RUC", "razón_social", "dirección", "contacto", "condición_compra", "plazo_entrega", "moneda_preferida", "estado"],
+  },
+  Transportistas: {
+    description: "Empresas o personas encargadas del transporte y coordinación logística.",
+    fields: ["documento", "razón_social", "licencia", "vehículos", "conductores", "contacto", "estado"],
+  },
+  Vendedores: {
+    description: "Fuerza de ventas con comisiones, metas y asignación de zona.",
+    fields: ["código", "nombre", "comisión_pct", "meta_mensual", "zona_id", "usuario_id", "estado"],
+  },
+  Zonas: {
+    description: "Zonas geográficas comerciales para asignación de rutas y vendedores.",
+    fields: ["código", "nombre", "ruta_id", "vendedor_id", "estado"],
+  },
+  "Monedas y tipos de cambio": {
+    description: "Divisas y tipos de cambio aplicables a operaciones comerciales.",
+    fields: ["código_ISO", "nombre", "símbolo", "fecha", "tipo_compra", "tipo_venta"],
+  },
+  Impuestos: {
+    description: "Tributos configurables para compras, ventas y operación fiscal.",
+    fields: ["código", "nombre", "porcentaje", "tipo", "vigencia", "estado"],
+  },
+  "Formas de pago": {
+    description: "Condiciones y medios de pago del negocio.",
+    fields: ["código", "nombre", "días_crédito", "tipo", "estado"],
+  },
+  "Listas de precios": {
+    description: "Precios por cliente o volumen para ventas y cotizaciones.",
+    fields: ["código", "nombre", "moneda_id", "vigencia_inicio", "vigencia_fin", "estado"],
+  },
+}
+
+function buildItemInfo(item: ModuleItem, moduleLabel: string): { description: string; fields: string[] } {
   const text = item.label.toLowerCase()
   const base = `${moduleLabel.toLowerCase()} · ${text}`
 
-  if (text.includes("cliente")) return `Gestión de clientes y cartera para registrar datos, contacto y condiciones del negocio.`
-  if (text.includes("proveedor")) return `Registra proveedores, condiciones de compra y contacto principal para operaciones de abastecimiento.`
-  if (text.includes("producto")) return `Administra el catálogo base de productos, categorías y referencias para el negocio.`
-  if (text.includes("categor")) return `Organiza y clasifica los productos para mantener consistencia en el catálogo.`
-  if (text.includes("almac")) return `Define las sedes de almacenamiento y la coordinación operativa de inventario.`
-  if (text.includes("venta")) return `Controla la información comercial de clientes, pedidos y seguimiento del proceso de venta.`
-  if (text.includes("compra")) return `Gestiona solicitudes, órdenes y documentos relacionados con la compra de bienes y servicios.`
-  if (text.includes("invent")) return `Mantiene la trazabilidad y disponibilidad del stock para la operación diaria.`
-  if (text.includes("finanza")) return `Centraliza documentos financieros y condiciones de cobro y pago del negocio.`
+  if (MASTER_SUBMODULE_DATA[item.label]) {
+    return MASTER_SUBMODULE_DATA[item.label]
+  }
 
-  return `Acceso directo a ${base}.`
+  const fallbackFields = [
+    "código",
+    "nombre",
+    "estado",
+  ]
+
+  return {
+    description: `Acceso directo a ${base}.`,
+    fields: fallbackFields,
+  }
 }
 
 function buildSectionLabel(label?: string): string {
@@ -159,6 +233,7 @@ export function ModuleLandingPage({ module }: { module: AppModule }) {
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {section.items.map((item) => {
                   const ItemIcon = getItemIcon(item)
+                  const info = buildItemInfo(item, module.label)
 
                   return (
                     <Link
@@ -176,9 +251,15 @@ export function ModuleLandingPage({ module }: { module: AppModule }) {
 
                         <div>
                           <h3 className="text-[1.05rem] font-semibold text-slate-900">{item.label}</h3>
-                          <p className="mt-2 text-sm leading-6 text-slate-600">
-                            {buildItemDescription(item, module.label)}
-                          </p>
+                          <p className="mt-2 text-sm leading-6 text-slate-600">{info.description}</p>
+                          <div className="mt-3 border-t border-slate-200 pt-2">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              Campos clave
+                            </p>
+                            <p className="mt-1 text-[11px] leading-5 text-slate-600">
+                              {info.fields.slice(0, 4).join(" · ")}
+                            </p>
+                          </div>
                         </div>
                       </div>
 
