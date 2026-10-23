@@ -2,6 +2,7 @@ import { delay, http, HttpResponse, type RequestHandler } from "msw"
 import { env } from "@/config/env"
 import type { ApiErrorBody, Paginated } from "@/shared/lib/api/types"
 import { applyListFilters } from "@/mocks/utils/filters"
+import { newId } from "@/shared/lib/id"
 
 /** Rechazo de una regla de negocio simulada (lo que respondería el backend) */
 export interface MockRuleError extends ApiErrorBody {
@@ -198,7 +199,7 @@ export function createCrudHandlers<T extends { id: string }>({
         ...data,
         ...prepareCreate?.(data),
         ...createdFields,
-        id: crypto.randomUUID(),
+        id: newId(),
       } as unknown as T
       const rejected = check({ action: "create", next: created, items, request })
       if (rejected) return ruleErrorResponse(rejected)

@@ -3,6 +3,7 @@ import { Link } from "react-router"
 import { useProductOptions, useWarehouseOptions } from "@/modules/maintenance"
 import { DataTable, type Column } from "@/shared/components/DataTable"
 import { EmptyState } from "@/shared/components/EmptyState"
+import { EntityPickerDialog } from "@/shared/components/EntityPickerDialog"
 import { ErrorState } from "@/shared/components/ErrorState"
 import { Field } from "@/shared/components/Field"
 import { PageHeader } from "@/shared/components/PageHeader"
@@ -158,19 +159,22 @@ export function KardexReport({ commercialOnly = false }: { commercialOnly?: bool
 
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4 shadow-sm">
         <Field id="product_id" label={commercialOnly ? "Producto (opcional)" : "Producto"}>
-          <Select value={productId} onValueChange={withReset(setProductId)}>
-            <SelectTrigger id="product_id" className="w-80" aria-label="Producto">
-              <SelectValue placeholder={commercialOnly ? "Todos los productos" : "Selecciona un producto"} />
-            </SelectTrigger>
-            <SelectContent>
-              {commercialOnly && <SelectItem value={FILTER_ALL}>Todos los productos</SelectItem>}
-              {(products.data ?? []).map((product) => (
-                <SelectItem key={product.id} value={product.id}>
-                  {product.sku} · {product.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <EntityPickerDialog
+            value={productId}
+            onValueChange={withReset(setProductId)}
+            options={(products.data ?? []).map((product) => ({
+              value: product.id,
+              label: `${product.sku} · ${product.name}`,
+            }))}
+            placeholder={commercialOnly ? "Todos los productos" : "Selecciona un producto"}
+            searchPlaceholder="Buscar por SKU o nombre"
+            allOption={commercialOnly ? { value: FILTER_ALL, label: "Todos los productos" } : undefined}
+            disabled={products.isPending}
+            isLoading={products.isFetching}
+            errorMessage={products.isError ? getErrorMessage(products.error) : undefined}
+            aria-label="Producto"
+            className="w-80"
+          />
         </Field>
 
         <Field id="warehouse_id" label="Almacén (opcional)">

@@ -5,7 +5,7 @@ import { Link, useNavigate, useSearchParams } from "react-router"
 import { useSupplierOptions } from "@/modules/maintenance"
 import { Field } from "@/shared/components/Field"
 import { RouteFormDialog } from "@/shared/components/RouteFormDialog"
-import { SearchableSelect } from "@/shared/components/SearchableSelect"
+import { EntityPickerDialog } from "@/shared/components/EntityPickerDialog"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select"
@@ -113,7 +113,7 @@ export default function SupplierInvoiceFormPage() {
       <form noValidate onSubmit={handleSubmit(onSubmit)} className="max-w-3xl space-y-6">
         <div className="grid gap-4 md:grid-cols-2">
           <Field id="supplier_id" label="Proveedor" error={errors.supplier_id?.message}>
-            <SearchableSelect
+            <EntityPickerDialog
               value={supplierId}
               onValueChange={(value) => {
                 setValue("supplier_id", value, { shouldDirty: true })

@@ -7,7 +7,7 @@ import type { Column } from "@/shared/components/DataTable"
 import { DateRangeFilter } from "@/shared/components/DateRangeFilter"
 import { FilterSelect } from "@/shared/components/FilterSelect"
 import { ListPageLayout } from "@/shared/components/ListPageLayout"
-import { SearchableSelect } from "@/shared/components/SearchableSelect"
+import { EntityPickerDialog } from "@/shared/components/EntityPickerDialog"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
@@ -172,7 +172,7 @@ export default function PurchaseOrdersPage() {
             allLabel="Todos los estados"
             options={PURCHASE_ORDER_STATUSES.map((value) => ({ value, label: PURCHASE_ORDER_STATUS_LABELS[value] }))}
           />
-          <SearchableSelect
+          <EntityPickerDialog
             aria-label="Filtrar por proveedor"
             value={list.values.supplier_id}
             onValueChange={list.setFilter("supplier_id")}

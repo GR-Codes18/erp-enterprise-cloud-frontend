@@ -62,7 +62,7 @@ function ReturnForm({ salesReturn }: { salesReturn?: SalesReturn }) {
     defaultValues: salesReturn
       ? {
           invoice_id: salesReturn.invoice_id,
-          items: salesReturn.items.map(({ product_id, quantity }) => ({ product_id, quantity })),
+          items: salesReturn.items.map(({ product_id, quantity, condition }) => ({ product_id, quantity, condition: condition ?? "good" })),
           reason: salesReturn.reason,
         }
       : { ...EMPTY_RETURN, invoice_id: searchParams.get("invoice") ?? "" },
@@ -152,7 +152,7 @@ function ReturnForm({ salesReturn }: { salesReturn?: SalesReturn }) {
                 variant="outline"
                 size="sm"
                 disabled={isPending || invoice.isPending || fields.length >= invoiceLines.length}
-                onClick={() => append({ product_id: "", quantity: 1 })}
+                onClick={() => append({ product_id: "", quantity: 1, condition: "good" })}
               >
                 <Plus aria-hidden="true" />
                 Agregar producto
@@ -172,9 +172,9 @@ function ReturnForm({ salesReturn }: { salesReturn?: SalesReturn }) {
               const productId = items[index]?.product_id ?? ""
               const line = invoiceLines.find((candidate) => candidate.product_id === productId)
               const lineErrors = errors.items?.[index]
-              const ids = { product: `return-${index}-product`, quantity: `return-${index}-quantity` }
+              const ids = { product: `return-${index}-product`, condition: `return-${index}-condition`, quantity: `return-${index}-quantity` }
               return (
-                <div key={field.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-[minmax(14rem,3fr)_minmax(8rem,1fr)_auto]">
+                <div key={field.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-[minmax(14rem,2fr)_minmax(9rem,1fr)_minmax(8rem,1fr)_auto]">
                   <Field id={ids.product} label="Producto" error={lineErrors?.product_id?.message}>
                     <Select
                       value={productId || undefined}
@@ -190,6 +190,21 @@ function ReturnForm({ salesReturn }: { salesReturn?: SalesReturn }) {
                             {option.product_name}
                           </SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+<Field id={ids.condition} label="Estado" error={lineErrors?.condition?.message}>
+                    <Select
+                      value={items[index]?.condition || "good"}
+                      onValueChange={(value) => setValue(`items.${index}.condition`, value as "good" | "damaged", { shouldDirty: true })}
+                      disabled={isPending}
+                    >
+                      <SelectTrigger id={ids.condition} className="w-full" aria-invalid={!!lineErrors?.condition}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="good">Buen estado</SelectItem>
+                        <SelectItem value="damaged">Dañado</SelectItem>
                       </SelectContent>
                     </Select>
                   </Field>

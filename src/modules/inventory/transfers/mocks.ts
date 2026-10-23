@@ -1,5 +1,5 @@
 import { createDocumentHandlers, nextNumber } from "@/mocks/utils/documents"
-import { applyInventoryMovement } from "@/modules/inventory/state"
+import { applyInventoryMovement, getAvailableQuantity } from "@/modules/inventory/state"
 import { PRODUCTS, WAREHOUSES, productRef, warehouseRef } from "../mockRefs"
 import type { Transfer, TransferInput } from "./schema"
 import { transferInputSchema } from "./schema"
@@ -77,6 +77,18 @@ export const { handlers: transferHandlers } = createDocumentHandlers<Transfer, T
       action: "send",
       from: ["draft"],
       to: "in_transit",
+      check: (transfer) => {
+        const shortages = transfer.items.flatMap((item) => {
+          const available = getAvailableQuantity(item.product_id, transfer.origin_warehouse_id)
+          return item.quantity > available
+            ? [`${productName(item.product_id)} (disponible ${available}, transferencia ${item.quantity})`]
+            : []
+        })
+        if (shortages.length > 0) {
+          return { status: 409, code: "INSUFFICIENT_STOCK", message: `Stock insuficiente en origen: ${shortages.join("; ")}.` }
+        }
+        return undefined
+      },
       respond: (transfer) => {
         transfer.items.forEach((item) => {
           applyInventoryMovement({

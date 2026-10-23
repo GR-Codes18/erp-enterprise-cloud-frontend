@@ -6,6 +6,7 @@ import { previewTotals } from "@/shared/lib/lines"
 import { fromCents } from "@/shared/lib/money"
 import { reasonSchema } from "@/shared/lib/reasonSchema"
 import { applyListFilters } from "@/mocks/utils/filters"
+import { newId } from "@/shared/lib/id"
 import type { MockRuleError } from "@/mocks/utils/crud"
 
 type Body = Record<string, unknown>
@@ -178,7 +179,7 @@ export function createDocumentHandlers<T extends { id: string; status: S }, I, S
         if (!body) return invalidBody()
         const parsed = inputSchema.safeParse(body)
         if (!parsed.success) return validationError(parsed.error.issues)
-        const record = createRecord(parsed.data, crypto.randomUUID(), new Date().toISOString(), items, request)
+        const record = createRecord(parsed.data, newId(), new Date().toISOString(), items, request)
         if (isRuleError(record)) return ruleError(record)
         return HttpResponse.json(store.insert(record), { status: 201 })
       }),
