@@ -12,6 +12,15 @@ function findDuplicates(values: string[]): string[] {
 }
 
 describe("appModules", () => {
+  it("mantiene el id técnico y muestra el módulo como Maestro", () => {
+    const maintenance = appModules.find((module) => module.id === "maintenance")
+
+    expect(maintenance).toBeDefined()
+    expect(maintenance?.id).toBe("maintenance")
+    expect(maintenance?.basePath).toBe("maintenance")
+    expect(maintenance?.label).toBe("Maestro")
+  })
+
   it("no repite el basePath entre módulos", () => {
     expect(findDuplicates(appModules.map((module) => module.basePath))).toEqual([])
   })

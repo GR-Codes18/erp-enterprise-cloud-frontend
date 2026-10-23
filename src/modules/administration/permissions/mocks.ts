@@ -45,11 +45,11 @@ export const permissionSeed: PermissionScreen[] = [
 
   screen(21, "documents", "Documentos", "documents.files", "Archivos", ["view", "create", "void"]),
 
-  screen(22, "maintenance", "Mantenimiento", "maintenance.customers", "Clientes", CRUD),
-  screen(23, "maintenance", "Mantenimiento", "maintenance.suppliers", "Proveedores", CRUD),
-  screen(24, "maintenance", "Mantenimiento", "maintenance.products", "Productos", CRUD),
-  screen(25, "maintenance", "Mantenimiento", "maintenance.categories", "Categorías", CRUD),
-  screen(26, "maintenance", "Mantenimiento", "maintenance.warehouses", "Almacenes", CRUD),
+  screen(22, "maintenance", "Maestro", "maintenance.customers", "Clientes", CRUD),
+  screen(23, "maintenance", "Maestro", "maintenance.suppliers", "Proveedores", CRUD),
+  screen(24, "maintenance", "Maestro", "maintenance.products", "Productos", CRUD),
+  screen(25, "maintenance", "Maestro", "maintenance.categories", "Categorías", CRUD),
+  screen(26, "maintenance", "Maestro", "maintenance.warehouses", "Almacenes", CRUD),
 
   screen(27, "administration", "Administración", "administration.users", "Usuarios", ["view", "create", "edit"]),
   screen(28, "administration", "Administración", "administration.roles", "Roles", CRUD),
