@@ -8,6 +8,11 @@ import ForbiddenPage from "@/shared/pages/ForbiddenPage";
 import NotFoundPage from "@/shared/pages/NotFoundPage";
 import ProtectedRoute from "@/modules/auth/components/ProtectedRoute";
 import LoginPage from "@/modules/auth/pages/LoginPage";
+import { GoalsSectionPage } from "@/modules/goals/pages/GoalsOverviewPage";
+import GoalsOverviewPage from "@/modules/goals/pages/GoalsOverviewPage";
+import AnalyticalReportsPage from "@/modules/reports/pages/AnalyticalReportsPage";
+import OperationalReportsPage from "@/modules/reports/pages/OperationalReportsPage";
+import ReportsBusinessIntelligencePage from "@/modules/reports/pages/ReportsBusinessIntelligencePage";
 import type { AppModule, PageLoader } from "@/shared/types/module";
 
 function toRoute(path: string, label: string, page?: PageLoader, permission?: string): RouteObject {
@@ -60,6 +65,33 @@ function moduleToRoute(module: AppModule): RouteObject {
   };
 }
 
+const goalsRoutes: RouteObject[] = [
+  {
+    path: "goals",
+    children: [
+      { index: true, element: <GoalsOverviewPage /> },
+      { path: "definition", element: <GoalsSectionPage sectionId="definition" /> },
+      { path: "seller", element: <GoalsSectionPage sectionId="seller" /> },
+      { path: "team", element: <GoalsSectionPage sectionId="team" /> },
+      { path: "product", element: <GoalsSectionPage sectionId="product" /> },
+      { path: "progress", element: <GoalsSectionPage sectionId="progress" /> },
+      { path: "ranking", element: <GoalsSectionPage sectionId="ranking" /> },
+      { path: "alerts", element: <GoalsSectionPage sectionId="alerts" /> },
+    ],
+  },
+]
+
+const reportsRoutes: RouteObject[] = [
+  {
+    path: "reports",
+    children: [
+      { index: true, element: <ReportsBusinessIntelligencePage /> },
+      { path: "operational", element: <OperationalReportsPage /> },
+      { path: "analytical", element: <AnalyticalReportsPage /> },
+    ],
+  },
+]
+
 const routes: RouteObject[] = [
   {
     path: "/login",
@@ -74,7 +106,9 @@ const routes: RouteObject[] = [
     ),
     children: [
       { index: true, element: <HomeRedirect modules={appModules} /> },
-      ...appModules.map(moduleToRoute),
+      ...appModules.filter((module) => !["goals", "reports"].includes(module.id)).map(moduleToRoute),
+      ...reportsRoutes,
+      ...goalsRoutes,
       { path: "403", element: <ForbiddenPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
