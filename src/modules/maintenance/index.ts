@@ -16,7 +16,7 @@ export type { ProductOption } from "./products/hooks"
 
 export const maintenanceModule: AppModule = {
   id: "maintenance",
-  label: "Mantenimiento",
+  label: "Maestro",
   icon: Database,
   basePath: "maintenance",
   sections: [
