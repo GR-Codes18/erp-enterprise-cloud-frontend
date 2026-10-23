@@ -78,6 +78,9 @@ export const useUpdateOrder = () =>
   useSalesMutation(({ id, input }: { id: string; input: OrderInput }) => orderService.update(id, input))
 export const useDeleteOrder = () => useSalesMutation((id: string) => orderService.remove(id))
 export const useConfirmOrder = () => useSalesMutation((id: string) => orderService.confirm(id))
+export const useReserveOrder = () =>
+  useSalesMutation(({ id, expires_at }: { id: string; expires_at: string }) => orderService.reserve(id, expires_at))
+export const useReleaseReservation = () => useSalesMutation((id: string) => orderService.release(id))
 export const useCancelOrder = () =>
   useSalesMutation(({ id, reason }: { id: string; reason: string }) => orderService.cancel(id, reason))
 export const useUpdateDeliveryStatus = () =>

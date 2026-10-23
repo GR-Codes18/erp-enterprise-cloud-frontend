@@ -3,12 +3,13 @@ import type { StatusTone } from "@/shared/components/StatusBadge"
 import { EMPTY_LINE } from "@/shared/lib/lines"
 import { notesSchema } from "@/shared/lib/schemas"
 
-export const ORDER_STATUSES = ["draft", "confirmed", "invoiced", "cancelled"] as const
+export const ORDER_STATUSES = ["draft", "reserved", "confirmed", "invoiced", "cancelled"] as const
 export type OrderStatus = (typeof ORDER_STATUSES)[number]
 
 /** En v1 un pedido genera un solo comprobante: al emitirlo pasa a "invoiced". Cancelar solo antes */
 export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  draft: ["confirmed", "cancelled"],
+  draft: ["reserved", "confirmed", "cancelled"],
+  reserved: ["confirmed", "invoiced", "cancelled"],
   confirmed: ["invoiced", "cancelled"],
   invoiced: [],
   cancelled: [],
@@ -16,6 +17,7 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   draft: "Borrador",
+  reserved: "Reservado",
   confirmed: "Confirmado",
   invoiced: "Facturado",
   cancelled: "Cancelado",
@@ -23,6 +25,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 
 export const ORDER_STATUS_TONES: Record<OrderStatus, StatusTone> = {
   draft: "neutral",
+  reserved: "warning",
   confirmed: "warning",
   invoiced: "success",
   cancelled: "danger",
@@ -217,6 +220,7 @@ export const orderSchema = z.object({
   credit_days: z.number(),
   notes: z.string(),
   status: z.enum(ORDER_STATUSES),
+  reservation_expires_at: z.string().default(""),
   subtotal: z.string(),
   igv: z.string(),
   total: z.string(),
