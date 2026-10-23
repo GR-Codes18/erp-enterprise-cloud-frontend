@@ -21,7 +21,7 @@ export const permissionSeed: PermissionScreen[] = [
   screen(1, "dashboard", "Dashboard", "dashboard.summary", "Indicadores", V),
 
   screen(2, "sales", "Ventas", "sales.quotes", "Cotizaciones", CRUD),
-  screen(3, "sales", "Ventas", "sales.orders", "Pedidos", [...CRUD, "approve"]),
+  screen(3, "sales", "Ventas", "sales.orders", "Orden de venta", [...CRUD, "approve"]),
   screen(4, "sales", "Ventas", "sales.invoices", "Comprobantes", ["view", "create", "void"]),
   screen(5, "sales", "Ventas", "sales.returns", "Devoluciones", ["view", "create", "void", "approve"]),
 
@@ -45,19 +45,31 @@ export const permissionSeed: PermissionScreen[] = [
 
   screen(21, "documents", "Documentos", "documents.files", "Archivos", ["view", "create", "void"]),
 
-  screen(22, "maintenance", "Mantenimiento", "maintenance.customers", "Clientes", CRUD),
-  screen(23, "maintenance", "Mantenimiento", "maintenance.suppliers", "Proveedores", CRUD),
-  screen(24, "maintenance", "Mantenimiento", "maintenance.products", "Productos", CRUD),
-  screen(25, "maintenance", "Mantenimiento", "maintenance.categories", "Categorías", CRUD),
-  screen(26, "maintenance", "Mantenimiento", "maintenance.warehouses", "Almacenes", CRUD),
+  screen(22, "maintenance", "Maestro", "maintenance.companies", "Empresas", CRUD),
+  screen(23, "maintenance", "Maestro", "maintenance.branches", "Sucursales", CRUD),
+  screen(24, "maintenance", "Maestro", "maintenance.warehouses", "Almacenes", CRUD),
+  screen(25, "maintenance", "Maestro", "maintenance.products", "Productos", CRUD),
+  screen(26, "maintenance", "Maestro", "maintenance.categories", "Categorías", CRUD),
+  screen(27, "maintenance", "Maestro", "maintenance.brands", "Marcas", CRUD),
+  screen(28, "maintenance", "Maestro", "maintenance.units", "Unidades de medida", CRUD),
+  screen(29, "maintenance", "Maestro", "maintenance.unit-conversions", "Conversiones de unidades", CRUD),
+  screen(30, "maintenance", "Maestro", "maintenance.customers", "Clientes", CRUD),
+  screen(31, "maintenance", "Maestro", "maintenance.suppliers", "Proveedores", CRUD),
+  screen(32, "maintenance", "Maestro", "maintenance.transporters", "Transportistas", CRUD),
+  screen(33, "maintenance", "Maestro", "maintenance.sellers", "Vendedores", CRUD),
+  screen(34, "maintenance", "Maestro", "maintenance.zones", "Zonas", CRUD),
+  screen(35, "maintenance", "Maestro", "maintenance.currencies", "Monedas y tipos de cambio", CRUD),
+  screen(36, "maintenance", "Maestro", "maintenance.taxes", "Impuestos", CRUD),
+  screen(37, "maintenance", "Maestro", "maintenance.payment-methods", "Formas de pago", CRUD),
+  screen(38, "maintenance", "Maestro", "maintenance.price-lists", "Listas de precios", CRUD),
 
-  screen(27, "administration", "Administración", "administration.users", "Usuarios", ["view", "create", "edit"]),
-  screen(28, "administration", "Administración", "administration.roles", "Roles", CRUD),
-  screen(29, "administration", "Administración", "administration.audit", "Auditoría", V),
-  screen(30, "administration", "Administración", "administration.settings", "Parámetros", ["view", "edit"]),
+  screen(39, "administration", "Administración", "administration.users", "Usuarios", ["view", "create", "edit"]),
+  screen(40, "administration", "Administración", "administration.roles", "Roles", CRUD),
+  screen(41, "administration", "Administración", "administration.audit", "Auditoría", V),
+  screen(42, "administration", "Administración", "administration.settings", "Parámetros", ["view", "edit"]),
 
-  screen(31, "reports", "Reportes", "reports.operational", "Operativos", V),
-  screen(32, "reports", "Reportes", "reports.analytics", "Analíticos", V),
+  screen(43, "reports", "Reportes", "reports.operational", "Operativos", V),
+  screen(44, "reports", "Reportes", "reports.analytics", "Analíticos", V),
 ]
 
 export const permissionHandlers = createCrudHandlers<PermissionScreen>({

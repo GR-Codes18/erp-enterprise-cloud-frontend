@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { appModules } from "@/config/modules"
 import { filterModulesByPermission, findActiveModule, firstPath, getBreadcrumb } from "./navigation"
 import type { AppModule } from "@/shared/types/module"
 
@@ -30,7 +31,7 @@ const mockModules: AppModule[] = [
           },
           {
             path: "orders",
-            label: "Pedidos",
+            label: "Orden de venta",
           },
         ],
       },
@@ -146,5 +147,35 @@ describe("firstPath", () => {
     expect(firstPath(mockModules)).toBe("/dashboard")
     expect(firstPath(mockModules.slice(1))).toBe("/sales/quotes")
     expect(firstPath([])).toBeUndefined()
+  })
+})
+
+describe("goals module", () => {
+  it("incluye el módulo de Metas y Objetivos como entrada única del sidebar", () => {
+    expect(appModules.some((module) => module.id === "goals")).toBe(true)
+    expect(appModules.find((module) => module.id === "goals")?.label).toBe("Metas y Objetivos")
+    expect(appModules.find((module) => module.id === "goals")?.sections).toBeUndefined()
+  })
+
+  it("genera breadcrumb para rutas internas del módulo sin submenús", () => {
+    expect(getBreadcrumb(appModules, "/goals/definition")).toEqual({
+      moduleLabel: "Metas y Objetivos",
+      itemLabel: "Definición de metas",
+    })
+  })
+})
+
+describe("reports module", () => {
+  it("incluye el módulo de Reportes e Inteligencia de Negocios como entrada única del sidebar", () => {
+    expect(appModules.some((module) => module.id === "reports")).toBe(true)
+    expect(appModules.find((module) => module.id === "reports")?.label).toBe("Reportes e Inteligencia de Negocios")
+    expect(appModules.find((module) => module.id === "reports")?.sections).toBeUndefined()
+  })
+
+  it("genera breadcrumb para rutas internas del módulo sin submenús", () => {
+    expect(getBreadcrumb(appModules, "/reports/operational")).toEqual({
+      moduleLabel: "Reportes e Inteligencia de Negocios",
+      itemLabel: "Reportes operativos",
+    })
   })
 })

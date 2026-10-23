@@ -1,14 +1,22 @@
+
 import { createBrowserRouter, type RouteObject } from "react-router";
 import { AuthorizedLayout } from "@/app/AuthorizedLayout";
 import { HomeRedirect } from "@/app/HomeRedirect";
 import { RequirePermission } from "@/app/RequirePermission";
 import { appModules } from "@/config/modules";
+import { ModuleLandingPage } from "@/shared/components/ModuleLandingPage";
 import PlaceholderPage from "@/shared/components/PlaceholderPage";
 import ForbiddenPage from "@/shared/pages/ForbiddenPage";
 import NotFoundPage from "@/shared/pages/NotFoundPage";
 import ProtectedRoute from "@/modules/auth/components/ProtectedRoute";
 import LoginPage from "@/modules/auth/pages/LoginPage";
+import { GoalsSectionPage } from "@/modules/goals/pages/GoalsOverviewPage";
+import GoalsOverviewPage from "@/modules/goals/pages/GoalsOverviewPage";
+import AnalyticalReportsPage from "@/modules/reports/pages/AnalyticalReportsPage";
+import OperationalReportsPage from "@/modules/reports/pages/OperationalReportsPage";
+import ReportsBusinessIntelligencePage from "@/modules/reports/pages/ReportsBusinessIntelligencePage";
 import type { AppModule, PageLoader } from "@/shared/types/module";
+
 
 function toRoute(path: string, label: string, page?: PageLoader, permission?: string): RouteObject {
   const route: RouteObject = page
@@ -31,25 +39,25 @@ function subRoutePermission(itemPermission: string | undefined, subPath: string)
 
 function moduleToRoute(module: AppModule): RouteObject {
   if (!module.sections) {
-    return toRoute(module.basePath, module.label, module.page, module.permission);
+    return toRoute(module.basePath, module.label, module.page, module.permission)
   }
 
-  const items = module.sections.flatMap((section) => section.items);
-  const childRoutes: RouteObject[] = [];
-
-  if (items.length > 0) {
-    // La raíz del módulo lleva a su primera pantalla permitida
-    childRoutes.push({ index: true, element: <HomeRedirect modules={[module]} /> });
-  }
+  const items = module.sections.flatMap((section) => section.items)
+  const childRoutes: RouteObject[] = [
+    {
+      index: true,
+      element: <ModuleLandingPage module={module} />,
+    },
+  ]
 
   for (const item of items) {
-    childRoutes.push(toRoute(item.path, item.label, item.page, item.permission));
+    childRoutes.push(toRoute(item.path, item.label, item.page, item.permission))
 
     if (item.subRoutes) {
       for (const sub of item.subRoutes) {
-        const fullSubPath = `${item.path}/${sub.path}`;
-        const permission = sub.permission ?? subRoutePermission(item.permission, sub.path);
-        childRoutes.push(toRoute(fullSubPath, sub.label, sub.page, permission));
+        const fullSubPath = `${item.path}/${sub.path}`
+        const permission = sub.permission ?? subRoutePermission(item.permission, sub.path)
+        childRoutes.push(toRoute(fullSubPath, sub.label, sub.page, permission))
       }
     }
   }
@@ -57,8 +65,35 @@ function moduleToRoute(module: AppModule): RouteObject {
   return {
     path: module.basePath,
     children: childRoutes,
-  };
+  }
 }
+
+const goalsRoutes: RouteObject[] = [
+  {
+    path: "goals",
+    children: [
+      { index: true, element: <GoalsOverviewPage /> },
+      { path: "definition", element: <GoalsSectionPage sectionId="definition" /> },
+      { path: "seller", element: <GoalsSectionPage sectionId="seller" /> },
+      { path: "team", element: <GoalsSectionPage sectionId="team" /> },
+      { path: "product", element: <GoalsSectionPage sectionId="product" /> },
+      { path: "progress", element: <GoalsSectionPage sectionId="progress" /> },
+      { path: "ranking", element: <GoalsSectionPage sectionId="ranking" /> },
+      { path: "alerts", element: <GoalsSectionPage sectionId="alerts" /> },
+    ],
+  },
+]
+
+const reportsRoutes: RouteObject[] = [
+  {
+    path: "reports",
+    children: [
+      { index: true, element: <ReportsBusinessIntelligencePage /> },
+      { path: "operational", element: <OperationalReportsPage /> },
+      { path: "analytical", element: <AnalyticalReportsPage /> },
+    ],
+  },
+]
 
 const routes: RouteObject[] = [
   {
@@ -74,11 +109,13 @@ const routes: RouteObject[] = [
     ),
     children: [
       { index: true, element: <HomeRedirect modules={appModules} /> },
-      ...appModules.map(moduleToRoute),
+      ...appModules.filter((module) => !["goals", "reports"].includes(module.id)).map(moduleToRoute),
+      ...reportsRoutes,
+      ...goalsRoutes,
       { path: "403", element: <ForbiddenPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },
-];
+]
 
-export const router = createBrowserRouter(routes);
+export const router = createBrowserRouter(routes)

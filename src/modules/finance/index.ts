@@ -7,7 +7,7 @@ export type { Payment } from "./payments/schema"
 
 export const financeModule: AppModule = {
   id: "finance",
-  label: "Finanzas",
+  label: "Tesorería",
   icon: Wallet,
   basePath: "finance",
   sections: [

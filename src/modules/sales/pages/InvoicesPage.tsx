@@ -89,14 +89,14 @@ export default function InvoicesPage() {
     <>
       <PageHeader
         title="Comprobantes"
-        description="Facturas y boletas emitidas desde pedidos confirmados. No se editan: se anulan con motivo."
+        description="Facturas y boletas emitidas desde órdenes de venta confirmadas. No se editan: se anulan con motivo."
       />
 
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4 shadow-sm">
         <Input
           type="search"
           className="max-w-xs"
-          placeholder="Buscar por número, cliente o pedido"
+          placeholder="Buscar por número, cliente u orden de venta"
           aria-label="Buscar comprobantes"
           value={searchInput}
           onChange={(event) => withReset(setSearchInput)(event.target.value)}
@@ -154,7 +154,7 @@ export default function InvoicesPage() {
               hasFilters ? (
                 <EmptyState title="Sin resultados" description="Ningún comprobante coincide con la búsqueda o los filtros." />
               ) : (
-                <EmptyState title="Aún no hay comprobantes" description="Los comprobantes se emiten desde un pedido confirmado." />
+                <EmptyState title="Aún no hay comprobantes" description="Los comprobantes se emiten desde una orden de venta confirmada." />
               )
             }
           />
