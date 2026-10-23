@@ -4,6 +4,7 @@ import { AuthorizedLayout } from "@/app/AuthorizedLayout";
 import { HomeRedirect } from "@/app/HomeRedirect";
 import { RequirePermission } from "@/app/RequirePermission";
 import { appModules } from "@/config/modules";
+import { ModuleLandingPage } from "@/shared/components/ModuleLandingPage";
 import PlaceholderPage from "@/shared/components/PlaceholderPage";
 import ForbiddenPage from "@/shared/pages/ForbiddenPage";
 import NotFoundPage from "@/shared/pages/NotFoundPage";
