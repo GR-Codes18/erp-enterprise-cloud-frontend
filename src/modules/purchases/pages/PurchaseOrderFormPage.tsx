@@ -7,7 +7,7 @@ import { ErrorState } from "@/shared/components/ErrorState"
 import { Field } from "@/shared/components/Field"
 import { LineItemsEditor } from "@/shared/components/LineItemsEditor"
 import { RouteFormDialog } from "@/shared/components/RouteFormDialog"
-import { SearchableSelect } from "@/shared/components/SearchableSelect"
+import { EntityPickerDialog } from "@/shared/components/EntityPickerDialog"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { Textarea } from "@/shared/components/ui/textarea"
@@ -125,7 +125,7 @@ function PurchaseOrderForm({ order, fromRequest }: { order?: PurchaseOrder; from
               control={control}
               name="supplier_id"
               render={({ field }) => (
-                <SearchableSelect
+                <EntityPickerDialog
                   value={field.value}
                   onValueChange={field.onChange}
                   options={supplierOptions.map((supplier) => ({

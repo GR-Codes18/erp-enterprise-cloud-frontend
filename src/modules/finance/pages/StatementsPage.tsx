@@ -4,7 +4,7 @@ import { useCustomerOptions, useSupplierOptions } from "@/modules/maintenance"
 import { ErrorState } from "@/shared/components/ErrorState"
 import { Field } from "@/shared/components/Field"
 import { PageHeader } from "@/shared/components/PageHeader"
-import { SearchableSelect } from "@/shared/components/SearchableSelect"
+import { EntityPickerDialog } from "@/shared/components/EntityPickerDialog"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select"
@@ -103,7 +103,7 @@ export default function StatementsPage() {
           </Select>
         </Field>
         <Field id="party_id" label={PARTY_TYPE_LABELS[partyType]} error={errors.party_id}>
-          <SearchableSelect
+          <EntityPickerDialog
             value={partyId}
             onValueChange={setPartyId}
             onSearchChange={setPartySearchInput}

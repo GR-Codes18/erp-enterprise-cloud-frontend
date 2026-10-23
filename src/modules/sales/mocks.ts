@@ -5,6 +5,7 @@ import { createDocumentHandlers, nextNumber, totalsOf } from "@/mocks/utils/docu
 import { applyInventoryMovement, getAvailableQuantity } from "@/modules/inventory/state"
 import { getMockCustomer } from "@/modules/maintenance/customers/mocks"
 import { addDays, todayInLima } from "@/shared/lib/dates"
+import { newId } from "@/shared/lib/id"
 import { fromCents, toCents } from "@/shared/lib/money"
 import { canIssueAs, issueInvoiceSchema, type Invoice } from "./invoices/schema"
 import {
@@ -222,8 +223,8 @@ function buildReturn(
 }
 
 const returnSeed: SalesReturn[] = [
-  makeReturn(1, { invoice_id: invoiceId(2), items: [{ product_id: productRef(6), quantity: 1 }], reason: "Talla equivocada." }, "confirmed", "2026-09-30T15:00:00Z"),
-  makeReturn(2, { invoice_id: invoiceId(1), items: [{ product_id: productRef(3), quantity: 2 }], reason: "Bolsas de cemento rotas en el transporte." }, "draft", "2026-10-07T15:00:00Z"),
+  makeReturn(1, { invoice_id: invoiceId(2), items: [{ product_id: productRef(6), quantity: 1, condition: "good" }], reason: "Talla equivocada." }, "confirmed", "2026-09-30T15:00:00Z"),
+  makeReturn(2, { invoice_id: invoiceId(1), items: [{ product_id: productRef(3), quantity: 2, condition: "good" }], reason: "Bolsas de cemento rotas en el transporte." }, "draft", "2026-10-07T15:00:00Z"),
 ]
 
 // ---------------------------------------------------------------- Handlers
@@ -276,7 +277,7 @@ const quotes = createDocumentHandlers<Quote, QuoteInput, Quote["status"]>({
             notes: quote.notes,
           },
           "draft",
-          { id: crypto.randomUUID(), quote_number: quote.number, created_at: new Date().toISOString() },
+          { id: newId(), quote_number: quote.number, created_at: new Date().toISOString() },
         )
         orders.store.insert(order)
         quotes.store.update(quote.id, { order_id: order.id })
@@ -400,7 +401,7 @@ const orders = createDocumentHandlers<Order, OrderInput, Order["status"]>({
         })
         invoiceCounters[type] += 1
         const invoice = makeInvoice(0, order, type, String(invoiceCounters[type]).padStart(8, "0"), todayInLima(), "0.00", "issued", {
-          id: crypto.randomUUID(),
+          id: newId(),
           created_at: new Date().toISOString(),
         })
         invoices.store.insert(invoice)
@@ -549,14 +550,17 @@ const returns = createDocumentHandlers<SalesReturn, ReturnInput, SalesReturn["st
         const order = invoice ? orders.store.find(invoice.order_id) : undefined
         salesReturn.items.forEach((item) => {
           const orderLine = order?.items.find((candidate) => candidate.product_id === item.product_id)
-          applyInventoryMovement({
-            product_id: item.product_id,
-            warehouse_id: orderLine?.warehouse_id,
-            quantity: item.quantity,
-            direction: "in",
-            type: "return",
-            reference: salesReturn.number,
-          })
+          // Solo los productos en buen estado vuelven al stock disponible; los dañados se registran manualmente.
+          if (item.condition !== "damaged") {
+            applyInventoryMovement({
+              product_id: item.product_id,
+              warehouse_id: orderLine?.warehouse_id,
+              quantity: item.quantity,
+              direction: "in",
+              type: "return",
+              reference: salesReturn.number,
+            })
+          }
         })
         if (invoice) {
           invoices.store.update(invoice.id, {

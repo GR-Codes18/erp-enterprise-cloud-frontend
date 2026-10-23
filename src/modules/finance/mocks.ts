@@ -17,6 +17,7 @@ import {
 } from "@/modules/purchases/mocks"
 import type { ApiErrorBody, Paginated } from "@/shared/lib/api/types"
 import { todayInLima } from "@/shared/lib/dates"
+import { newId } from "@/shared/lib/id"
 import { fromCents, toCents } from "@/shared/lib/money"
 import { reasonSchema } from "@/shared/lib/reasonSchema"
 import type { AccountStatus, Payable, Receivable } from "./accounts/schema"
@@ -248,7 +249,7 @@ const accountLabel = (accountId: string) => {
   return account ? bankAccountLabel(account) : ""
 }
 function addBankMovement(accountId: string, type: BankMovement["type"], concept: string, amount: string, date: string, source: BankMovement["source"]) {
-  const movement: BankMovement = { id: crypto.randomUUID(), account_id: accountId, type, concept, amount, movement_date: date, source, reconciled: false }
+  const movement: BankMovement = { id: newId(), account_id: accountId, type, concept, amount, movement_date: date, source, reconciled: false }
   bankMovements = [movement, ...bankMovements]
   const delta = type === "income" ? toCents(amount) : -toCents(amount)
   bankAccounts = bankAccounts.map((account) =>
@@ -329,7 +330,7 @@ const openSessionOf = (registerId: string) => cashSessions.find((s) => s.registe
 function addCashMovement(sessionId: string, type: CashMovement["type"], concept: string, amount: string, source: CashMovement["source"]) {
   cashSessions = cashSessions.map((session) => {
     if (session.id !== sessionId) return session
-    const movements = [...session.movements, { id: crypto.randomUUID(), type, concept, amount, source, created_at: new Date().toISOString() }]
+    const movements = [...session.movements, { id: newId(), type, concept, amount, source, created_at: new Date().toISOString() }]
     return { ...session, movements, expected_amount: expectedOf(session.opening_amount, movements) }
   })
   return cashSessions.find((session) => session.id === sessionId)
@@ -476,7 +477,7 @@ export const financeHandlers: RequestHandler[] = [
     paymentCounters[input.type] += 1
     const created: Payment = {
       ...input,
-      id: crypto.randomUUID(),
+      id: newId(),
       number: nextNumber(input.type === "collection" ? "CB" : "PG", paymentCounters[input.type]),
       document_code: target.code,
       party_id: target.party_id,
@@ -554,7 +555,7 @@ export const financeHandlers: RequestHandler[] = [
     if (openSessionOf(register.id)) return errorResponse(409, "SESSION_ALREADY_OPEN", "Esta caja ya tiene una sesión abierta.")
     cashCounter += 1
     const session: CashSession = {
-      id: crypto.randomUUID(),
+      id: newId(),
       number: nextNumber("CAJA", cashCounter),
       register_id: register.id,
       register_name: register.name,

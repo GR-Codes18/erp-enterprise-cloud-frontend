@@ -10,7 +10,7 @@ import { ErrorState } from "@/shared/components/ErrorState"
 import { Field } from "@/shared/components/Field"
 import { LineItemsEditor } from "@/shared/components/LineItemsEditor"
 import { RouteFormDialog } from "@/shared/components/RouteFormDialog"
-import { SearchableSelect } from "@/shared/components/SearchableSelect"
+import { EntityPickerDialog } from "@/shared/components/EntityPickerDialog"
 import { Button } from "@/shared/components/ui/button"
 import { Input } from "@/shared/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select"
@@ -308,7 +308,7 @@ function OrderForm({ order }: { order?: Order }) {
               control={control}
               name="customer_id"
               render={({ field }) => (
-                <SearchableSelect
+                <EntityPickerDialog
                   value={field.value}
                   onValueChange={(value) => {
                     field.onChange(value)
