@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { ArrowDownToLine, ArrowRight, ArrowUpRight, Banknote, Boxes, CalendarDays, CheckCircle2, ClipboardList, Package, Plus, Search, ShoppingCart, WalletCards } from "lucide-react"
 import { Link } from "react-router"
 import { useHasPermission } from "@/modules/auth"
@@ -64,7 +64,7 @@ export default function DashboardPage() {
   const monthly = useMonthlyReport(period, canSeeAnalytics)
   const orders = useOrders({ page: 1, size: 7, search: search.trim() }, canSeeOrders)
   const lowStock = dashboard.data?.alerts.low_stock ?? []
-  const visibleLowStock = useMemo(() => lowStock.slice(0, 4), [lowStock])
+  const visibleLowStock = lowStock.slice(0, 4)
 
   const exportSummary = () => {
     if (!dashboard.data) return

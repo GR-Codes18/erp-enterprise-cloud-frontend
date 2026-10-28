@@ -16,7 +16,9 @@ import {
   ACCOUNT_STATUSES,
   ACCOUNT_STATUS_LABELS,
   ACCOUNT_STATUS_TONES,
+  agingBucket,
   canRegisterPayment,
+  daysOverdue,
   type Receivable,
 } from "../accounts/schema"
 import { PaymentFormDialog, type PaymentDocument } from "../components/PaymentFormDialog"
@@ -26,7 +28,7 @@ export default function ReceivablesPage() {
   const list = useListFilters(["customer_id", "status"] as const)
   const receivables = useReceivables(list.params)
   const customers = useCustomerOptions({ includeInactive: true })
-  const canCollect = useHasPermission("finance.payments:create")
+  const canCollect = useHasPermission("finance.collections:create")
   const canSeeInvoices = useHasPermission("sales.invoices:view")
   const [collectFor, setCollectFor] = useState<PaymentDocument | null>(null)
 
@@ -48,6 +50,8 @@ export default function ReceivablesPage() {
     { key: "total", header: "Total", className: "text-right", cell: (row) => <span className="font-mono">{formatMoney(row.total)}</span> },
     { key: "paid", header: "Cobrado", className: "text-right", cell: (row) => <span className="font-mono">{formatMoney(row.paid)}</span> },
     { key: "balance", header: "Saldo", className: "text-right", cell: (row) => <span className="font-mono font-medium">{formatMoney(row.balance)}</span> },
+    { key: "days_overdue", header: "Días de mora", cell: (row) => daysOverdue(row.due_date, row.balance) },
+    { key: "aging", header: "Tramo de mora", cell: (row) => agingBucket(daysOverdue(row.due_date, row.balance)) },
     {
       key: "status",
       header: "Estado",
@@ -59,7 +63,7 @@ export default function ReceivablesPage() {
       header: "Acciones",
       cell: (row) =>
         canCollect && canRegisterPayment(row) ? (
-          <Button variant="outline" size="sm" onClick={() => setCollectFor({ id: row.invoice_id, label: `${row.invoice_code} · ${row.customer_name}`, balance: row.balance })}>
+          <Button variant="outline" size="sm" onClick={() => setCollectFor({ id: row.invoice_id, label: `${row.invoice_code} · ${row.customer_name}`, balance: row.balance, partyId: row.customer_id })}>
             Registrar cobro
           </Button>
         ) : null,

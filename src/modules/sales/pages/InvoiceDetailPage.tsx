@@ -29,7 +29,7 @@ export default function InvoiceDetailPage() {
   const voidInvoice = useVoidInvoice()
   const canVoid = useHasPermission("sales.invoices:void")
   const canReturn = useHasPermission("sales.returns:create")
-  const canSeeFinance = useHasPermission("finance.payments:view")
+  const canSeeFinance = useHasPermission("finance.collections:view")
   const canAttach = useHasPermission("documents.files:create")
   const payments = useDocumentPayments(id, { enabled: canSeeFinance })
   const [voidOpen, setVoidOpen] = useState(false)
@@ -115,7 +115,7 @@ export default function InvoiceDetailPage() {
           </div>
           {canSeeFinance && (
             <Button variant="outline" size="sm" asChild>
-              <Link to={`/finance/payments?document_id=${document.id}`}>Ver en Finanzas</Link>
+              <Link to={`/finance/collections?document_id=${document.id}`}>Ver en Tesorería</Link>
             </Button>
           )}
         </div>
@@ -133,11 +133,12 @@ export default function InvoiceDetailPage() {
               <li key={payment.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
                 <span>
                   <span className="font-mono">{payment.number}</span> · {formatBusinessDate(payment.payment_date)}
-                  {payment.status === "void" && (
-                    <span className="ml-2">
-                      <StatusBadge tone="danger" label="Anulado" />
-                    </span>
-                  )}
+                  <span className="ml-2">
+                    <StatusBadge
+                      tone={payment.status === "void" ? "danger" : payment.status === "executed" ? "success" : "warning"}
+                      label={payment.status === "void" ? "Anulado" : payment.status === "executed" ? "Ejecutado" : payment.status === "approved" ? "Aprobado" : "Registrado"}
+                    />
+                  </span>
                 </span>
                 <span className="font-mono">{formatMoney(payment.amount)}</span>
               </li>

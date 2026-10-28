@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest"
 import { PAYMENT_TRANSITIONS, emptyPayment, paymentInputSchema } from "./schema"
 
 const today = "2026-10-08"
-const schema = paymentInputSchema({ balance: "500.00", today })
+const documentId = "00000000-0000-4000-8042-000000000001"
+const schema = paymentInputSchema({ balances: { [documentId]: "500.00" }, today })
 const valid = {
-  ...emptyPayment("collection", "sales_invoice", "00000000-0000-4000-8042-000000000001", today),
-  amount: "150.00",
+  ...emptyPayment("collection", "sales_invoice", today),
+  applications: [{ document_id: documentId, amount: "150.00" }],
 }
 
 const invalidFields = (input: unknown) => {
@@ -18,11 +19,11 @@ describe("paymentInputSchema", () => {
     expect(schema.safeParse(valid).success).toBe(true)
   })
 
-  it("el monto es > 0 y <= saldo (el saldo exacto se acepta)", () => {
-    expect(invalidFields({ ...valid, amount: "0" })).toEqual(["amount"])
-    expect(invalidFields({ ...valid, amount: "500.01" })).toEqual(["amount"])
-    expect(invalidFields({ ...valid, amount: "500.00" })).toEqual([])
-    expect(invalidFields({ ...valid, amount: "abc" })).toEqual(["amount"])
+  it("cada aplicación debe ser > 0 y <= saldo (el saldo exacto se acepta)", () => {
+    expect(invalidFields({ ...valid, applications: [{ document_id: documentId, amount: "0" }] })).toEqual(["applications"])
+    expect(invalidFields({ ...valid, applications: [{ document_id: documentId, amount: "500.01" }] })).toEqual(["applications"])
+    expect(invalidFields({ ...valid, applications: [{ document_id: documentId, amount: "500.00" }] })).toEqual([])
+    expect(invalidFields({ ...valid, applications: [{ document_id: documentId, amount: "abc" }] })).toEqual(["applications"])
   })
 
   it("la fecha no puede ser futura (hoy sí)", () => {
@@ -37,13 +38,30 @@ describe("paymentInputSchema", () => {
   })
 
   it("exige el documento", () => {
-    expect(invalidFields({ ...valid, document_id: "" })).toContain("document_id")
+    expect(invalidFields({ ...valid, applications: [] })).toContain("applications")
+  })
+
+  it("no permite aplicar un comprobante a un pago de proveedor", () => {
+    expect(invalidFields({ ...valid, type: "payment" })).toContain("document_type")
+  })
+
+  it("no permite aplicar dos veces al mismo documento", () => {
+    const duplicated = {
+      ...valid,
+      applications: [
+        { document_id: documentId, amount: "100.00" },
+        { document_id: documentId, amount: "100.00" },
+      ],
+    }
+    expect(invalidFields(duplicated)).toEqual(["applications"])
   })
 })
 
 describe("PAYMENT_TRANSITIONS", () => {
-  it("un pago vigente solo se anula; anulado es definitivo", () => {
-    expect(PAYMENT_TRANSITIONS.active).toEqual(["void"])
+  it("separa registro, aprobación y ejecución; anulado es definitivo", () => {
+    expect(PAYMENT_TRANSITIONS.registered).toEqual(["approved", "void"])
+    expect(PAYMENT_TRANSITIONS.approved).toEqual(["executed", "void"])
+    expect(PAYMENT_TRANSITIONS.executed).toEqual(["void"])
     expect(PAYMENT_TRANSITIONS.void).toEqual([])
   })
 })

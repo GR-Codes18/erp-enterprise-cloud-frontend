@@ -1,8 +1,13 @@
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { useLocation } from "react-router"
 import { Pencil, Plus, Trash2 } from "lucide-react"
-import { DataTable, type Column } from "@/shared/components/DataTable"
-import { PageHeader } from "@/shared/components/PageHeader"
+import { useHasPermission } from "@/modules/auth"
+import type { Column } from "@/shared/components/DataTable"
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
+import { Field } from "@/shared/components/Field"
+import { FilterSelect } from "@/shared/components/FilterSelect"
+import InUseDialog from "@/shared/components/InUseDialog"
+import { ListPageLayout } from "@/shared/components/ListPageLayout"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { Button } from "@/shared/components/ui/button"
 import {
@@ -14,351 +19,337 @@ import {
   DialogTitle,
 } from "@/shared/components/ui/dialog"
 import { Input } from "@/shared/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select"
+import { useListFilters } from "@/shared/hooks/useListFilters"
+import { useDeleteOrDeactivate } from "@/shared/hooks/useDeleteOrDeactivate"
+import { getErrorMessage } from "@/shared/lib/api/errors"
+import {
+  useCreateMasterCatalog,
+  useDeleteMasterCatalog,
+  useMasterCatalog,
+  usePatchMasterCatalog,
+  useUpdateMasterCatalog,
+} from "../catalogs/hooks"
+import {
+  EMPTY_MASTER_CATALOG,
+  MASTER_CATALOG_LABELS,
+  MASTER_CATALOG_RESOURCES,
+  masterCatalogInputSchema,
+  type MasterCatalogInput,
+  type MasterCatalogRecord,
+  type MasterCatalogResource,
+} from "../catalogs/schema"
 
-type MasterStatus = "active" | "inactive"
+const isCatalogResource = (value: string): value is MasterCatalogResource =>
+  MASTER_CATALOG_RESOURCES.some((resource) => resource === value)
 
-type MasterRow = {
-  id: string
-  code: string
-  name: string
-  detail: string
-  status: MasterStatus
-}
-
-interface MasterConfig {
-  title: string
-  description: string
-  singular: string
-  rows: MasterRow[]
-}
-
-const MASTER_CONFIG: Record<string, MasterConfig> = {
-  companies: {
-    title: "Empresas",
-    description: "Administra las empresas del sistema y sus datos base.",
-    singular: "empresa",
-    rows: [
-      { id: "c1", code: "EMP-001", name: "ERP Holding SAC", detail: "Lima · RUC 20602485071", status: "active" },
-      { id: "c2", code: "EMP-002", name: "Logística Norte SRL", detail: "Arequipa · RUC 20546821301", status: "active" },
-      { id: "c3", code: "EMP-003", name: "Plaza del Sur EIRL", detail: "Cusco · RUC 20457862130", status: "inactive" },
-    ],
-  },
-  branches: {
-    title: "Sucursales",
-    description: "Controla sedes, ubicaciones y coordinación operativa por filial.",
-    singular: "sucursal",
-    rows: [
-      { id: "b1", code: "SUC-001", name: "Sucursal Central", detail: "Lima · Av. Principal 245", status: "active" },
-      { id: "b2", code: "SUC-002", name: "Sucursal Norte", detail: "Trujillo · Calle 11, zona industrial", status: "active" },
-      { id: "b3", code: "SUC-003", name: "Sucursal Sur", detail: "Cusco · Av. Real 89", status: "inactive" },
-    ],
-  },
-  brands: {
-    title: "Marcas",
-    description: "Mantén los fabricantes o marcas asociadas al catálogo.",
-    singular: "marca",
-    rows: [
-      { id: "m1", code: "MAR-001", name: "Samsung", detail: "Electrónica · soporte técnico", status: "active" },
-      { id: "m2", code: "MAR-002", name: "Nike", detail: "Calzado · accesorios corporativos", status: "active" },
-      { id: "m3", code: "MAR-003", name: "Bosch", detail: "Herramientas · importación", status: "inactive" },
-    ],
-  },
-  units: {
-    title: "Unidades de medida",
-    description: "Define las unidades base y abreviaturas del inventario.",
-    singular: "unidad",
-    rows: [
-      { id: "u1", code: "UND-001", name: "Unidad", detail: "UND · pieza individual", status: "active" },
-      { id: "u2", code: "UND-002", name: "Kilogramo", detail: "KG · peso bruto", status: "active" },
-      { id: "u3", code: "UND-003", name: "Litro", detail: "LTR · volumen", status: "active" },
-    ],
-  },
-  "unit-conversions": {
-    title: "Conversiones de unidades",
-    description: "Registra equivalencias entre unidades para el sistema de inventario.",
-    singular: "conversión",
-    rows: [
-      { id: "uc1", code: "CON-001", name: "Caja a Und", detail: "1 caja = 12 unidades", status: "active" },
-      { id: "uc2", code: "CON-002", name: "Kilogramo a Libra", detail: "1 kg = 2.20462 lb", status: "active" },
-      { id: "uc3", code: "CON-003", name: "Litro a Mililitro", detail: "1 litro = 1000 ml", status: "inactive" },
-    ],
-  },
-  transporters: {
-    title: "Transportistas",
-    description: "Gestiona empresas y personas de transporte y reparto.",
-    singular: "transportista",
-    rows: [
-      { id: "t1", code: "TRA-001", name: "Mundo Express", detail: "RUC 20123344081 · rutas nacionales", status: "active" },
-      { id: "t2", code: "TRA-002", name: "Cargomax S.A.C.", detail: "RUC 20190023122 · logística de frío", status: "active" },
-      { id: "t3", code: "TRA-003", name: "Velocidad Plus", detail: "RUC 20443311091 · reparto local", status: "inactive" },
-    ],
-  },
-  sellers: {
-    title: "Vendedores",
-    description: "Mantén a la fuerza de ventas y sus metas por zona.",
-    singular: "vendedor",
-    rows: [
-      { id: "s1", code: "VEN-001", name: "Ana Torres", detail: "Zona sur · comisión 6%", status: "active" },
-      { id: "s2", code: "VEN-002", name: "Luis Rojas", detail: "Zona centro · comisión 5%", status: "active" },
-      { id: "s3", code: "VEN-003", name: "Marta Sifuentes", detail: "Zona norte · comisión 7%", status: "inactive" },
-    ],
-  },
-  zones: {
-    title: "Zonas",
-    description: "Agrupa distritos o regiones para cobertura comercial.",
-    singular: "zona",
-    rows: [
-      { id: "z1", code: "ZON-001", name: "Lima Centro", detail: "Cobertura urbana central", status: "active" },
-      { id: "z2", code: "ZON-002", name: "Costa Norte", detail: "Trujillo y Chiclayo", status: "active" },
-      { id: "z3", code: "ZON-003", name: "Andes Sur", detail: "Cusco y Arequipa", status: "inactive" },
-    ],
-  },
-  currencies: {
-    title: "Monedas y tipos de cambio",
-    description: "Configura divisas y sus tipos de cambio vigentes.",
-    singular: "moneda",
-    rows: [
-      { id: "cr1", code: "CUR-001", name: "Sol", detail: "PEN · tipo base 1.00", status: "active" },
-      { id: "cr2", code: "CUR-002", name: "Dólar", detail: "USD · tipo 3.72", status: "active" },
-      { id: "cr3", code: "CUR-003", name: "Euro", detail: "EUR · tipo 4.10", status: "inactive" },
-    ],
-  },
-  taxes: {
-    title: "Impuestos",
-    description: "Registra tributos vigentes y sus porcentajes.",
-    singular: "impuesto",
-    rows: [
-      { id: "tx1", code: "TAX-001", name: "IGV", detail: "18% · ventas y compras", status: "active" },
-      { id: "tx2", code: "TAX-002", name: "ISC", detail: "4% · algunos bienes", status: "active" },
-      { id: "tx3", code: "TAX-003", name: "Percepción", detail: "2% · servicios selectos", status: "inactive" },
-    ],
-  },
-  "payment-methods": {
-    title: "Formas de pago",
-    description: "Define medios de pago y condiciones del negocio.",
-    singular: "forma de pago",
-    rows: [
-      { id: "pm1", code: "PAY-001", name: "Efectivo", detail: "Pago al contado", status: "active" },
-      { id: "pm2", code: "PAY-002", name: "Tarjeta", detail: "Visa y Mastercard", status: "active" },
-      { id: "pm3", code: "PAY-003", name: "Crédito", detail: "14 días · con documento", status: "inactive" },
-    ],
-  },
-  "price-lists": {
-    title: "Listas de precios",
-    description: "Mantén escalas de precios por cartera y vigencia.",
-    singular: "lista de precios",
-    rows: [
-      { id: "pl1", code: "PRI-001", name: "Lista General", detail: "Vigente 2026 · PEN", status: "active" },
-      { id: "pl2", code: "PRI-002", name: "Distribuidores", detail: "Descuento por volumen", status: "active" },
-      { id: "pl3", code: "PRI-003", name: "Mayoristas", detail: "Precios corporativos", status: "inactive" },
-    ],
-  },
-}
-
-const EMPTY_FORM = { code: "", name: "", detail: "", status: "active" as MasterStatus }
+const errorText = (error: unknown) =>
+  error && typeof error === "object" && "issues" in error && Array.isArray(error.issues)
+    ? String(error.issues[0]?.message ?? "Revisa los datos ingresados.")
+    : null
 
 export default function MasterCatalogPage() {
   const location = useLocation()
   const routeKey = location.pathname.split("/").filter(Boolean).at(-1) ?? "companies"
-  const config = MASTER_CONFIG[routeKey] ?? MASTER_CONFIG.companies
-
-  const [rows, setRows] = useState<MasterRow[]>(config.rows)
-  const [query, setQuery] = useState("")
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState(EMPTY_FORM)
-
-  const filteredRows = useMemo(() => {
-    const term = query.trim().toLowerCase()
-    if (!term) return rows
-
-    return rows.filter((row) => {
-      return [row.code, row.name, row.detail].some((value) => value.toLowerCase().includes(term))
-    })
-  }, [query, rows])
+  const resource = isCatalogResource(routeKey) ? routeKey : "companies"
+  const config = MASTER_CATALOG_LABELS[resource]
+  const list = useListFilters(["status"] as const)
+  const query = useMasterCatalog(resource, list.params)
+  const create = useCreateMasterCatalog()
+  const update = useUpdateMasterCatalog()
+  const patch = usePatchMasterCatalog()
+  const remove = useDeleteMasterCatalog()
+  const canCreate = useHasPermission(`maintenance.${resource}:create`)
+  const canEdit = useHasPermission(`maintenance.${resource}:edit`)
+  const canDelete = useHasPermission(`maintenance.${resource}:delete`)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editing, setEditing] = useState<MasterCatalogRecord | null>(null)
+  const [toDelete, setToDelete] = useState<MasterCatalogRecord | null>(null)
+  const [form, setForm] = useState<MasterCatalogInput>(EMPTY_MASTER_CATALOG)
+  const [validationError, setValidationError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const isPending = create.isPending || update.isPending
+  const deletion = useDeleteOrDeactivate<MasterCatalogRecord>({
+    resourceName: config.singular,
+    onDelete: async (record) => {
+      await remove.mutateAsync({ resource, id: record.id })
+    },
+    onDeactivate: async (record) => {
+      await patch.mutateAsync({ resource, id: record.id, input: { status: "inactive" } })
+    },
+    onError: setActionError,
+    onSuccess: () => setActionError(null),
+  })
 
   const openCreate = () => {
-    setEditingId(null)
-    setForm(EMPTY_FORM)
-    setIsDialogOpen(true)
+    setEditing(null)
+    setForm({ ...EMPTY_MASTER_CATALOG })
+    setValidationError(null)
+    setActionError(null)
+    setDialogOpen(true)
   }
 
-  const openEdit = (row: MasterRow) => {
-    setEditingId(row.id)
-    setForm({ code: row.code, name: row.name, detail: row.detail, status: row.status })
-    setIsDialogOpen(true)
+  const openEdit = (record: MasterCatalogRecord) => {
+    setEditing(record)
+    setForm({
+      code: record.code,
+      name: record.name,
+      detail: record.detail,
+      status: record.status,
+      value: record.value,
+    })
+    setValidationError(null)
+    setActionError(null)
+    setDialogOpen(true)
   }
 
-  const saveForm = () => {
-    const nextCode = form.code.trim()
-    const nextName = form.name.trim()
-    const nextDetail = form.detail.trim()
-
-    if (!nextCode || !nextName) return
-
-    if (editingId) {
-      setRows((current) =>
-        current.map((row) =>
-          row.id === editingId ? { ...row, code: nextCode, name: nextName, detail: nextDetail, status: form.status } : row,
-        ),
-      )
-    } else {
-      setRows((current) => [
-        {
-          id: `${Date.now()}`,
-          code: nextCode,
-          name: nextName,
-          detail: nextDetail || "Sin información adicional",
-          status: form.status,
-        },
-        ...current,
-      ])
+  const save = () => {
+    setValidationError(null)
+    setActionError(null)
+    const parsed = masterCatalogInputSchema.safeParse(form)
+    if (!parsed.success) {
+      setValidationError(errorText(parsed.error))
+      return
+    }
+    if (
+      (resource === "currencies" || resource === "units" || resource === "payment-methods") &&
+      !parsed.data.value.trim()
+    ) {
+      setValidationError("Ingresa el valor que utilizarán los módulos relacionados.")
+      return
     }
 
-    setIsDialogOpen(false)
-    setEditingId(null)
-    setForm(EMPTY_FORM)
+    const callbacks = {
+      onSuccess: () => setDialogOpen(false),
+      onError: (error: unknown) => setActionError(getErrorMessage(error)),
+    }
+    if (editing) update.mutate({ resource, id: editing.id, input: parsed.data }, callbacks)
+    else create.mutate({ resource, input: parsed.data }, callbacks)
   }
 
-  const toggleStatus = (row: MasterRow) => {
-    setRows((current) =>
-      current.map((item) =>
-        item.id === row.id ? { ...item, status: item.status === "active" ? "inactive" : "active" } : item,
-      ),
+  const toggleStatus = (record: MasterCatalogRecord) => {
+    setActionError(null)
+    patch.mutate(
+      { resource, id: record.id, input: { status: record.status === "active" ? "inactive" : "active" } },
+      { onError: (error) => setActionError(getErrorMessage(error)) },
     )
   }
 
-  const deleteRow = (row: MasterRow) => {
-    setRows((current) => current.filter((item) => item.id !== row.id))
+  const deleteRecord = (record: MasterCatalogRecord) => {
+    setActionError(null)
+    setToDelete(record)
   }
 
-  const columns: Column<MasterRow>[] = [
+  const confirmDelete = async () => {
+    if (!toDelete) return
+    const target = toDelete
+    setToDelete(null)
+    await deletion.handleDelete(target)
+  }
+
+  const columns: Column<MasterCatalogRecord>[] = [
     { key: "code", header: "Código", cell: (row) => <span className="font-mono text-sm font-medium">{row.code}</span> },
     { key: "name", header: "Nombre", cell: (row) => <span className="font-medium">{row.name}</span> },
     { key: "detail", header: "Detalle", cell: (row) => row.detail || "—" },
+    ...(query.data?.items.some((row) => row.value) ? [
+      { key: "value", header: "Valor usado en módulos", cell: (row: MasterCatalogRecord) => row.value || "—" },
+    ] : []),
     {
       key: "status",
       header: "Estado",
-      cell: (row) => <StatusBadge tone={row.status === "active" ? "success" : "neutral"} label={row.status === "active" ? "Activo" : "Inactivo"} />,
+      cell: (row) => (
+        <StatusBadge tone={row.status === "active" ? "success" : "neutral"} label={row.status === "active" ? "Activo" : "Inactivo"} />
+      ),
     },
     {
       key: "actions",
       header: "Acciones",
-      className: "w-24",
+      className: "w-28",
       cell: (row) => (
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" aria-label={`Editar ${row.name}`} onClick={() => openEdit(row)}>
-            <Pencil aria-hidden="true" />
-          </Button>
-          <Button variant="ghost" size="icon" aria-label={`Cambiar estado de ${row.name}`} onClick={() => toggleStatus(row)}>
-            <span className="text-xs font-semibold">{row.status === "active" ? "Off" : "On"}</span>
-          </Button>
-          <Button variant="ghost" size="icon" aria-label={`Eliminar ${row.name}`} onClick={() => deleteRow(row)}>
-            <Trash2 aria-hidden="true" />
-          </Button>
+          {canEdit && (
+            <>
+              <Button variant="ghost" size="icon" aria-label={`Editar ${row.name}`} onClick={() => openEdit(row)}>
+                <Pencil aria-hidden="true" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`Cambiar estado de ${row.name}`}
+                disabled={patch.isPending}
+                onClick={() => toggleStatus(row)}
+              >
+                <span className="text-xs font-semibold">{row.status === "active" ? "Off" : "On"}</span>
+              </Button>
+            </>
+          )}
+          {canDelete && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Eliminar ${row.name}`}
+              disabled={deletion.isDeleting || remove.isPending}
+              onClick={() => deleteRecord(row)}
+            >
+              <Trash2 aria-hidden="true" />
+            </Button>
+          )}
         </div>
       ),
     },
   ]
 
+  const actions = canCreate && (
+    <Button onClick={openCreate}>
+      <Plus aria-hidden="true" />
+      Nueva {config.singular}
+    </Button>
+  )
+
   return (
     <>
-      <PageHeader
+      <ListPageLayout
         title={config.title}
         description={config.description}
-        actions={
-          <Button onClick={openCreate}>
-            <Plus aria-hidden="true" />
-            Nuevo {config.singular}
-          </Button>
-        }
-      />
-
-      <div className="mb-4 rounded-xl border bg-card p-4 shadow-sm">
-        <Input
-          type="search"
-          placeholder="Buscar por código, nombre o detalle"
-          aria-label="Buscar registros"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </div>
-
-      <DataTable
+        actions={actions}
+        query={query}
         columns={columns}
-        rows={filteredRows}
         getRowKey={(row) => row.id}
-        empty={
-          <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-            No hay registros para mostrar.
-          </div>
+        hasFilters={list.hasFilters}
+        onClearFilters={list.clear}
+        onPageChange={list.setPage}
+        empty={{
+          title: `Aún no hay ${config.title.toLocaleLowerCase()}`,
+          description: "Crea un registro para que esté disponible en los módulos que lo utilizan.",
+          action: actions,
+        }}
+        toolbar={
+          <>
+            <Input
+              type="search"
+              className="max-w-xs"
+              placeholder="Buscar por código, nombre o detalle"
+              aria-label={`Buscar ${config.title.toLocaleLowerCase()}`}
+              value={list.searchInput}
+              onChange={(event) => list.setSearchInput(event.target.value)}
+            />
+            <FilterSelect
+              label="Filtrar por estado"
+              value={list.values.status}
+              onChange={list.setFilter("status")}
+              allLabel="Todos los estados"
+              options={[
+                { value: "active", label: "Activo" },
+                { value: "inactive", label: "Inactivo" },
+              ]}
+            />
+          </>
         }
       />
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      {actionError && (
+        <p role="alert" className="mt-3 rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-text">
+          {actionError}
+        </p>
+      )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingId ? `Editar ${config.singular}` : `Nuevo ${config.singular}`}</DialogTitle>
+            <DialogTitle>{editing ? `Editar ${config.singular}` : `Nueva ${config.singular}`}</DialogTitle>
             <DialogDescription>
-              {editingId ? "Actualiza la información del registro." : "Crea un nuevo registro para esta entidad."}
+              {editing ? "Actualiza el registro compartido con los demás módulos." : "Crea un registro disponible para los módulos que lo consumen."}
             </DialogDescription>
           </DialogHeader>
-
           <div className="grid gap-4 py-2">
-            <div className="grid gap-2">
-              <label htmlFor="master-code" className="text-sm font-medium">Código</label>
+            <Field id="master-code" label="Código">
               <Input
                 id="master-code"
+                disabled={isPending}
                 value={form.code}
                 onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))}
                 placeholder="Ej. COD-001"
               />
-            </div>
-
-            <div className="grid gap-2">
-              <label htmlFor="master-name" className="text-sm font-medium">Nombre</label>
+            </Field>
+            <Field id="master-name" label="Nombre">
               <Input
                 id="master-name"
+                disabled={isPending}
                 value={form.name}
                 onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                placeholder="Ej. Nombre del registro"
+                placeholder="Nombre del registro"
               />
-            </div>
-
-            <div className="grid gap-2">
-              <label htmlFor="master-detail" className="text-sm font-medium">Detalle</label>
+            </Field>
+            <Field id="master-detail" label="Detalle">
               <Input
                 id="master-detail"
+                disabled={isPending}
                 value={form.detail}
                 onChange={(event) => setForm((current) => ({ ...current, detail: event.target.value }))}
-                placeholder="Ej. Dirección, contacto, referencia o descripción"
+                placeholder="Descripción o información adicional"
               />
-            </div>
-
-            <div className="grid gap-2">
-              <label htmlFor="master-status" className="text-sm font-medium">Estado</label>
-              <select
-                id="master-status"
+            </Field>
+            <Field
+              id="master-value"
+              label={`Valor de integración${["currencies", "units", "payment-methods"].includes(resource) ? "" : " (opcional)"}`}
+            >
+              <Input
+                id="master-value"
+                disabled={isPending}
+                value={form.value}
+                onChange={(event) => setForm((current) => ({ ...current, value: event.target.value }))}
+                placeholder="Ej. USD, cash, UND"
+              />
+            </Field>
+            <Field id="master-status" label="Estado">
+              <Select
                 value={form.status}
-                onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as MasterStatus }))}
-                className="h-10 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onValueChange={(value) => setForm((current) => ({ ...current, status: value as MasterCatalogInput["status"] }))}
+                disabled={isPending}
               >
-                <option value="active">Activo</option>
-                <option value="inactive">Inactivo</option>
-              </select>
-            </div>
+                <SelectTrigger id="master-status" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Activo</SelectItem>
+                  <SelectItem value="inactive">Inactivo</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            {(validationError || actionError) && (
+              <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-text">
+                {validationError ?? actionError}
+              </p>
+            )}
           </div>
-
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+            <Button type="button" variant="outline" disabled={isPending} onClick={() => setDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button type="button" onClick={saveForm} disabled={!form.code.trim() || !form.name.trim()}>
-              {editingId ? "Guardar cambios" : "Crear registro"}
+            <Button type="button" disabled={isPending} onClick={save}>
+              {isPending ? "Guardando..." : editing ? "Guardar cambios" : "Crear registro"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog
+        open={toDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setToDelete(null)
+        }}
+        title={`Eliminar ${config.singular}`}
+        description={`¿Seguro que quieres eliminar "${toDelete?.name ?? ""}"? Si otros módulos lo utilizan, podrás desactivarlo en lugar de borrarlo.`}
+        isLoading={deletion.isDeleting}
+        onConfirm={() => void confirmDelete()}
+      />
+      <InUseDialog
+        open={deletion.isInUseDialogOpen}
+        onOpenChange={deletion.setIsInUseDialogOpen}
+        resourceName={config.singular}
+        message={deletion.inUseMessage}
+        isPending={deletion.isDeactivating}
+        onDeactivate={() => void deletion.handleConfirmDeactivate()}
+      />
     </>
   )
 }

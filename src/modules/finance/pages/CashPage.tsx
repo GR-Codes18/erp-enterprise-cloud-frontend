@@ -23,6 +23,7 @@ import { Input } from "@/shared/components/ui/input"
 import { useListFilters } from "@/shared/hooks/useListFilters"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import { formatDateTimeLima } from "@/shared/lib/dates"
+import { CASH_MOVEMENT_CONCEPTS } from "../cash/schema"
 import { formatCents, formatMoney } from "@/shared/lib/money"
 import {
   CASH_SESSION_STATUSES,
@@ -98,12 +99,21 @@ function OpenSessionDialog({ register, onClose }: { register: CashRegister | nul
   )
 }
 
-export default function CashPage() {
+export function CashPage({ kind = "general" }: { kind?: "petty" | "general" }) {
   const registers = useCashRegisters()
   const list = useListFilters(["status", "register_id"] as const)
-  const sessions = useCashSessions(list.params)
-  const canOpen = useHasPermission("finance.cash:create")
+  const registersOfKind = (registers.data ?? []).filter((register) => register.kind === kind)
+  const defaultRegisterId = registersOfKind[0]?.id ?? ""
+  const selectedRegisterId = registersOfKind.some((register) => register.id === list.values.register_id)
+    ? list.values.register_id
+    : defaultRegisterId
+  const sessions = useCashSessions({
+    ...list.params,
+    filters: { ...list.params.filters, ...(selectedRegisterId ? { register_id: selectedRegisterId } : {}) },
+  })
+  const canOpen = useHasPermission(kind === "petty" ? "finance.cash_small:create" : "finance.cash:create")
   const [toOpen, setToOpen] = useState<CashRegister | null>(null)
+  const title = kind === "petty" ? "Caja chica" : "Caja general"
 
   const columns: Column<CashSession>[] = [
     { key: "number", header: "Sesión", cell: (row) => <span className="font-mono text-sm">{row.number}</span> },
@@ -142,7 +152,7 @@ export default function CashPage() {
         {registers.isError ? (
           <ErrorState message={getErrorMessage(registers.error)} onRetry={() => void registers.refetch()} />
         ) : (
-          (registers.data ?? []).map((register) => (
+          registersOfKind.map((register) => (
             <div key={register.id} className="flex items-center justify-between gap-3 rounded-md border p-4">
               <div>
                 <p className="font-medium">{register.name}</p>
@@ -164,8 +174,8 @@ export default function CashPage() {
       </section>
 
       <ListPageLayout
-        title="Sesiones de caja"
-        description="Cada sesión va de la apertura al cierre. Una sesión cerrada es solo lectura."
+        title={`${title} · sesiones`}
+        description="Cada sesión va de la apertura al cierre. Una sesión cerrada es solo lectura; los conceptos frecuentes se administran desde el catálogo local."
         query={sessions}
         columns={columns}
         getRowKey={(row) => row.id}
@@ -187,14 +197,27 @@ export default function CashPage() {
               value={list.values.register_id}
               onChange={list.setFilter("register_id")}
               allLabel="Todas las cajas"
-              options={(registers.data ?? []).map((register) => ({ value: register.id, label: register.name }))}
+              options={registersOfKind.map((register) => ({ value: register.id, label: register.name }))}
             />
             <DateRangeFilter from={list.dateFrom} to={list.dateTo} onFromChange={list.setDateFrom} onToChange={list.setDateTo} />
           </>
         }
       />
 
+      <section className="mt-4 rounded-xl border bg-card p-4" aria-label="Catálogo de conceptos de caja">
+        <h2 className="text-sm font-semibold">Catálogo de conceptos</h2>
+        <ul className="mt-2 flex flex-wrap gap-2">
+          {CASH_MOVEMENT_CONCEPTS.map((concept) => (
+            <li key={concept} className="rounded-full border px-3 py-1 text-xs text-muted-foreground">{concept}</li>
+          ))}
+        </ul>
+      </section>
+
       <OpenSessionDialog register={toOpen} onClose={() => setToOpen(null)} />
     </>
   )
+}
+
+export default function CashGeneralPage() {
+  return <CashPage />
 }

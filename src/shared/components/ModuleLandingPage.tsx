@@ -99,8 +99,8 @@ function buildItemInfo(item: ModuleItem, moduleLabel: string): { description: st
   ]
 
   return {
-    description: `Acceso directo a ${base}.`,
-    fields: fallbackFields,
+    description: item.description ?? `Acceso directo a ${base}.`,
+    fields: item.keyFields ?? fallbackFields,
   }
 }
 
@@ -137,7 +137,7 @@ export function ModuleLandingPage({ module }: { module: AppModule }) {
         .map((section) => ({
           ...section,
           items: section.items.filter(
-            (item) => item.permission === undefined || hasPermission(user, item.permission),
+            (item) =>             !item.hidden && (item.permission === undefined || hasPermission(user, item.permission)),
           ),
         }))
         .filter((section) => section.items.length > 0),
@@ -185,7 +185,7 @@ export function ModuleLandingPage({ module }: { module: AppModule }) {
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Inicio</p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">{module.label}</h1>
             <p className="mt-1 text-sm text-slate-500">
-              {module.sections?.flatMap((section) => section.items).length ?? 0} submódulos · Acceso directo a los datos del ERP
+              {visibleSections.flatMap((section) => section.items).length} submódulos · Acceso directo a los datos del ERP
             </p>
           </div>
         </div>

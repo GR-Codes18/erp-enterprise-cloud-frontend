@@ -123,11 +123,12 @@ export default function SupplierInvoiceDetailPage() {
               <li key={payment.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
                 <span>
                   <span className="font-mono">{payment.number}</span> · {formatBusinessDate(payment.payment_date)}
-                  {payment.status === "void" && (
-                    <span className="ml-2">
-                      <StatusBadge tone="danger" label="Anulado" />
-                    </span>
-                  )}
+                  <span className="ml-2">
+                    <StatusBadge
+                      tone={payment.status === "void" ? "danger" : payment.status === "executed" ? "success" : "warning"}
+                      label={payment.status === "void" ? "Anulado" : payment.status === "executed" ? "Ejecutado" : payment.status === "approved" ? "Aprobado" : "Registrado"}
+                    />
+                  </span>
                 </span>
                 <span className="font-mono">{formatMoney(payment.amount)}</span>
               </li>

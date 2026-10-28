@@ -25,22 +25,28 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   card: "Tarjeta",
 }
 
-export const PAYMENT_STATUSES = ["active", "void"] as const
+export const PAYMENT_STATUSES = ["registered", "approved", "executed", "void"] as const
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number]
 
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
-  active: "Vigente",
+  registered: "Registrado",
+  approved: "Aprobado",
+  executed: "Ejecutado",
   void: "Anulado",
 }
 
 export const PAYMENT_STATUS_TONES: Record<PaymentStatus, StatusTone> = {
-  active: "success",
+  registered: "warning",
+  approved: "success",
+  executed: "success",
   void: "danger",
 }
 
-/** Un pago no se edita: se anula con motivo y el saldo del documento se restituye */
+/** Registro → aprobación → ejecución. Un pago ejecutado solo se anula con motivo. */
 export const PAYMENT_TRANSITIONS: Record<PaymentStatus, PaymentStatus[]> = {
-  active: ["void"],
+  registered: ["approved", "void"],
+  approved: ["executed", "void"],
+  executed: ["void"],
   void: [],
 }
 
@@ -49,20 +55,22 @@ export function canTransitionPayment(from: PaymentStatus, to: PaymentStatus): bo
 }
 
 const AMOUNT_PATTERN = /^\d+(\.\d{1,2})?$/
+const paymentApplicationSchema = z.object({
+  document_id: z.string().min(1, "Selecciona el documento"),
+  amount: z.string().trim().regex(AMOUNT_PATTERN, "Monto no válido, ejemplo: 150.00"),
+})
 
 /**
- * Reglas del formulario de cobro/pago. `balance` (saldo del documento) y `today` vienen de la
- * pantalla: el monto debe ser > 0 y <= saldo, y la fecha no puede ser futura. El backend
- * vuelve a validar todo (y que haya caja abierta para efectivo).
+ * Reglas del formulario de cobro/pago. `balances` y `today` vienen de la pantalla; el backend
+ * vuelve a validar saldo disponible, documentos duplicados, destino y fecha.
  */
-export function paymentInputSchema({ balance, today }: { balance: string; today: string }) {
+export function paymentInputSchema({ balances, today }: { balances: Record<string, string>; today: string }) {
   return z
     .object({
       type: z.enum(PAYMENT_TYPES),
       document_type: z.enum(PAYMENT_DOCUMENT_TYPES),
-      document_id: z.string().min(1, "Selecciona el documento"),
+      applications: z.array(paymentApplicationSchema).min(1, "Agrega al menos una aplicación"),
       method: z.enum(PAYMENT_METHODS),
-      amount: z.string().trim().regex(AMOUNT_PATTERN, "Monto no válido, ejemplo: 150.00"),
       payment_date: z.string().refine(isBusinessDate, "Ingresa la fecha del pago"),
       /** Transferencia: cuenta bancaria y número de operación obligatorios */
       bank_account_id: z.string(),
@@ -70,13 +78,27 @@ export function paymentInputSchema({ balance, today }: { balance: string; today:
       reference: notesSchema,
     })
     .superRefine((payment, ctx) => {
-      if (AMOUNT_PATTERN.test(payment.amount)) {
-        const amount = toCents(payment.amount)
-        if (amount <= 0) ctx.addIssue({ code: "custom", path: ["amount"], message: "El monto debe ser mayor que cero" })
-        else if (amount > toCents(balance)) {
-          ctx.addIssue({ code: "custom", path: ["amount"], message: "El monto no puede superar el saldo del documento" })
-        }
+      if (
+        (payment.type === "collection" && payment.document_type !== "sales_invoice") ||
+        (payment.type === "payment" && payment.document_type !== "supplier_invoice")
+      ) {
+        ctx.addIssue({ code: "custom", path: ["document_type"], message: "El documento no corresponde al tipo de operación" })
       }
+      const appliedDocuments = new Set<string>()
+      payment.applications.forEach((application, index) => {
+        if (appliedDocuments.has(application.document_id)) {
+          ctx.addIssue({ code: "custom", path: ["applications", index, "document_id"], message: "No repitas un documento en las aplicaciones" })
+        }
+        appliedDocuments.add(application.document_id)
+        if (AMOUNT_PATTERN.test(application.amount)) {
+          const amount = toCents(application.amount)
+          if (amount <= 0) {
+            ctx.addIssue({ code: "custom", path: ["applications", index, "amount"], message: "El monto debe ser mayor que cero" })
+          } else if (amount > toCents(balances[application.document_id] ?? "0.00")) {
+            ctx.addIssue({ code: "custom", path: ["applications", index, "amount"], message: "El monto no puede superar el saldo disponible" })
+          }
+        }
+      })
       if (isBusinessDate(payment.payment_date) && payment.payment_date > today) {
         ctx.addIssue({ code: "custom", path: ["payment_date"], message: "La fecha no puede ser futura" })
       }
@@ -101,6 +123,7 @@ export const paymentSchema = z.object({
   document_type: z.enum(PAYMENT_DOCUMENT_TYPES),
   document_id: z.string(),
   document_code: z.string(),
+  applications: z.array(paymentApplicationSchema.extend({ document_code: z.string() })),
   /** Cliente (cobro) o proveedor (pago) */
   party_id: z.string(),
   party_name: z.string(),
@@ -121,15 +144,13 @@ export type Payment = z.infer<typeof paymentSchema>
 export function emptyPayment(
   type: PaymentType,
   documentType: PaymentDocumentType,
-  documentId: string,
   today: string,
 ): PaymentInput {
   return {
     type,
     document_type: documentType,
-    document_id: documentId,
+    applications: [],
     method: "cash",
-    amount: "",
     payment_date: today,
     bank_account_id: "",
     operation_number: "",
