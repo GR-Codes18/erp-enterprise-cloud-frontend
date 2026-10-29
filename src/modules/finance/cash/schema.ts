@@ -32,10 +32,23 @@ export const CASH_SESSION_STATUS_TONES: Record<CashSessionStatus, StatusTone> = 
 export const cashRegisterSchema = z.object({
   id: z.string(),
   name: z.string(),
+  kind: z.enum(["petty", "general"]),
+  branch_id: z.string(),
+  responsible_id: z.string(),
+  assigned_fund: z.string(),
   /** Sesión abierta de la caja ("" si no hay): solo puede haber una */
   open_session_id: z.string(),
 })
 export type CashRegister = z.infer<typeof cashRegisterSchema>
+
+export const CASH_MOVEMENT_CONCEPTS = [
+  "Venta / cobro",
+  "Compra de suministros",
+  "Movilidad",
+  "Servicios",
+  "Depósito bancario",
+  "Otros",
+] as const
 
 export const openSessionSchema = z.object({
   register_id: z.string().min(1, "Selecciona la caja"),

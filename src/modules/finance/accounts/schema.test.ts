@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest"
-import { ACCOUNT_STATUSES, ACCOUNT_STATUS_LABELS, ACCOUNT_STATUS_TONES, canRegisterPayment, receivableSchema } from "./schema"
+import {
+  ACCOUNT_STATUSES,
+  ACCOUNT_STATUS_LABELS,
+  ACCOUNT_STATUS_TONES,
+  agingBucket,
+  canRegisterPayment,
+  daysOverdue,
+  receivableSchema,
+} from "./schema"
 
 describe("cuentas por cobrar y pagar", () => {
   it("solo admiten cobros o pagos mientras quede saldo", () => {
@@ -32,5 +40,23 @@ describe("cuentas por cobrar y pagar", () => {
     }
     expect(receivableSchema.safeParse(row).success).toBe(true)
     expect(receivableSchema.safeParse({ ...row, balance: 918.94 }).success).toBe(false)
+  })
+
+  it("calcula días de mora solo sobre saldos pendientes", () => {
+    expect(daysOverdue("2026-10-01", "10.00", "2026-10-08")).toBe(7)
+    expect(daysOverdue("2026-10-01", "0.00", "2026-10-08")).toBe(0)
+    expect(daysOverdue("2026-10-09", "10.00", "2026-10-08")).toBe(0)
+  })
+
+  it("clasifica los tramos de mora y sus límites", () => {
+    expect([0, 30, 31, 60, 61, 90, 91].map(agingBucket)).toEqual([
+      "Al día",
+      "1-30 días",
+      "31-60 días",
+      "31-60 días",
+      "61-90 días",
+      "61-90 días",
+      "Más de 90 días",
+    ])
   })
 })

@@ -16,7 +16,9 @@ import {
   ACCOUNT_STATUSES,
   ACCOUNT_STATUS_LABELS,
   ACCOUNT_STATUS_TONES,
+  agingBucket,
   canRegisterPayment,
+  daysOverdue,
   type Payable,
 } from "../accounts/schema"
 import { PaymentFormDialog, type PaymentDocument } from "../components/PaymentFormDialog"
@@ -48,6 +50,8 @@ export default function PayablesPage() {
     { key: "total", header: "Total", className: "text-right", cell: (row) => <span className="font-mono">{formatMoney(row.total)}</span> },
     { key: "paid", header: "Pagado", className: "text-right", cell: (row) => <span className="font-mono">{formatMoney(row.paid)}</span> },
     { key: "balance", header: "Saldo", className: "text-right", cell: (row) => <span className="font-mono font-medium">{formatMoney(row.balance)}</span> },
+    { key: "days_overdue", header: "Días de mora", cell: (row) => daysOverdue(row.due_date, row.balance) },
+    { key: "aging", header: "Tramo de mora", cell: (row) => agingBucket(daysOverdue(row.due_date, row.balance)) },
     {
       key: "status",
       header: "Estado",
@@ -58,7 +62,7 @@ export default function PayablesPage() {
       header: "Acciones",
       cell: (row) =>
         canPay && canRegisterPayment(row) ? (
-          <Button variant="outline" size="sm" onClick={() => setPayFor({ id: row.invoice_id, label: `${row.invoice_code} · ${row.supplier_name}`, balance: row.balance })}>
+          <Button variant="outline" size="sm" onClick={() => setPayFor({ id: row.invoice_id, label: `${row.invoice_code} · ${row.supplier_name}`, balance: row.balance, partyId: row.supplier_id })}>
             Registrar pago
           </Button>
         ) : null,

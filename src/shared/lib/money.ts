@@ -1,5 +1,5 @@
-/** Monedas soportadas. Para agregar una, solo se añade su código aquí. */
-export type CurrencyCode = "PEN" | "USD"
+/** Código ISO 4217 configurado desde Maestro. */
+export type CurrencyCode = string
 
 export const DEFAULT_CURRENCY: CurrencyCode = "PEN"
 
@@ -40,7 +40,7 @@ export function fromCents(cents: number): string {
 }
 
 // Crear un Intl.NumberFormat es costoso; se reutiliza uno por moneda
-const formatters = new Map<CurrencyCode, Intl.NumberFormat>()
+const formatters = new Map<string, Intl.NumberFormat>()
 
 function getFormatter(currency: CurrencyCode): Intl.NumberFormat {
   let formatter = formatters.get(currency)

@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { Link } from "react-router"
 import { useHasPermission } from "@/modules/auth"
+import { useMasterCatalog, useMasterCatalogOptions } from "@/modules/maintenance"
 import type { Column } from "@/shared/components/DataTable"
 import { Field } from "@/shared/components/Field"
 import { FilterSelect } from "@/shared/components/FilterSelect"
@@ -25,7 +26,6 @@ import { formatMoney } from "@/shared/lib/money"
 import {
   BANK_ACCOUNT_STATUSES,
   BANK_ACCOUNT_STATUS_LABELS,
-  CURRENCIES,
   CURRENCY_LABELS,
   EMPTY_BANK_ACCOUNT,
   bankAccountInputSchema,
@@ -38,6 +38,11 @@ function BankAccountForm({ account, onDone }: { account: BankAccount | null; onD
   const create = useCreateBankAccount()
   const update = useUpdateBankAccount()
   const isPending = create.isPending || update.isPending
+  const currencies = useMasterCatalogOptions("currencies")
+  const branches = useMasterCatalogOptions("branches")
+  const hasCurrencies = currencies.data?.some((item) => item.value) ?? false
+  const currenciesUnavailable =
+    currencies.isPending || currencies.isError || !hasCurrencies
   const [serverError, setServerError] = useState<string | null>(null)
   const {
     control,
@@ -48,7 +53,7 @@ function BankAccountForm({ account, onDone }: { account: BankAccount | null; onD
   } = useForm<BankAccountInput>({
     resolver: zodResolver(bankAccountInputSchema),
     defaultValues: account
-      ? { bank: account.bank, number: account.number, currency: account.currency, status: account.status }
+      ? { bank: account.bank, number: account.number, currency: account.currency, branch_id: account.branch_id ?? "", status: account.status }
       : EMPTY_BANK_ACCOUNT,
   })
 
@@ -83,26 +88,68 @@ function BankAccountForm({ account, onDone }: { account: BankAccount | null; onD
           {...register("number")}
         />
       </Field>
+      <Field id="branch_id" label="Sucursal (opcional)" error={errors.branch_id?.message}>
+        <Controller
+          control={control}
+          name="branch_id"
+          render={({ field }) => (
+            <Select
+              value={field.value || "none"}
+              onValueChange={(value) => field.onChange(value === "none" ? "" : value)}
+              disabled={isPending || branches.isPending || branches.isError}
+            >
+              <SelectTrigger id="branch_id" className="w-full">
+                <SelectValue placeholder="Sin sucursal" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin sucursal</SelectItem>
+                {account?.branch_id && !branches.data?.some((item) => item.id === account.branch_id) && (
+                  <SelectItem value={account.branch_id}>{account.branch_id} (no disponible)</SelectItem>
+                )}
+                {(branches.data ?? []).map((branch) => (
+                  <SelectItem key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+        {branches.isError && <p role="alert" className="text-sm text-danger-text">{getErrorMessage(branches.error)}</p>}
+      </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field id="currency" label="Moneda">
           <Controller
             control={control}
             name="currency"
             render={({ field }) => (
-              <Select value={field.value} onValueChange={field.onChange} disabled={isPending || !!account}>
+              <Select
+                value={field.value}
+                onValueChange={field.onChange}
+                disabled={isPending || currenciesUnavailable || !!account}
+              >
                 <SelectTrigger id="currency" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CURRENCIES.map((value) => (
-                    <SelectItem key={value} value={value}>
-                      {CURRENCY_LABELS[value]}
+                  {account?.currency && !currencies.data?.some((item) => item.value === account.currency) && (
+                    <SelectItem value={account.currency}>
+                      {CURRENCY_LABELS[account.currency] ?? `${account.currency} (inactiva)`}
+                    </SelectItem>
+                  )}
+                  {(currencies.data ?? []).filter((item) => item.value).map((item) => (
+                    <SelectItem key={item.id} value={item.value}>
+                      {item.name} ({item.value})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
           />
+          {currencies.isError && <p role="alert" className="text-sm text-danger-text">{getErrorMessage(currencies.error)}</p>}
+          {!currencies.isError && !currencies.isPending && !account && !hasCurrencies && (
+            <p role="alert" className="text-sm text-danger-text">No hay monedas activas configuradas en Maestro.</p>
+          )}
         </Field>
         <Field id="status" label="Estado">
           <Controller
@@ -134,7 +181,10 @@ function BankAccountForm({ account, onDone }: { account: BankAccount | null; onD
         <Button type="button" variant="outline" disabled={isPending} onClick={onDone}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={isPending}>
+        <Button
+          type="submit"
+          disabled={isPending || (!account && currenciesUnavailable)}
+        >
           {isPending ? "Guardando..." : account ? "Guardar cambios" : "Crear cuenta"}
         </Button>
       </DialogFooter>
@@ -145,6 +195,8 @@ function BankAccountForm({ account, onDone }: { account: BankAccount | null; onD
 export default function BanksPage() {
   const list = useListFilters(["status", "currency"] as const)
   const accounts = useBankAccounts(list.params)
+  const currencies = useMasterCatalogOptions("currencies")
+  const branches = useMasterCatalog("branches", { page: 1, size: 100 })
   const canCreate = useHasPermission("finance.banks:create")
   const canEdit = useHasPermission("finance.banks:edit")
   // account se conserva al cerrar para que el título no cambie durante la animación
@@ -153,6 +205,11 @@ export default function BanksPage() {
   const columns: Column<BankAccount>[] = [
     { key: "bank", header: "Banco", cell: (row) => <span className="font-medium">{row.bank}</span> },
     { key: "number", header: "Número", cell: (row) => <span className="font-mono text-sm">{row.number}</span> },
+    {
+      key: "branch_id",
+      header: "Sucursal",
+      cell: (row) => branches.data?.items.find((branch) => branch.id === row.branch_id)?.name ?? (row.branch_id || "—"),
+    },
     { key: "currency", header: "Moneda", cell: (row) => row.currency },
     {
       key: "balance",
@@ -220,8 +277,13 @@ export default function BanksPage() {
               value={list.values.currency}
               onChange={list.setFilter("currency")}
               allLabel="Todas las monedas"
-              options={CURRENCIES.map((value) => ({ value, label: CURRENCY_LABELS[value] }))}
+              options={(currencies.data ?? []).filter((item) => item.value).map((item) => ({
+                value: item.value,
+                label: `${item.name} (${item.value})`,
+              }))}
             />
+            {currencies.isError && <p role="alert" className="text-sm text-danger-text">{getErrorMessage(currencies.error)}</p>}
+            {branches.isError && <p role="alert" className="text-sm text-danger-text">{getErrorMessage(branches.error)}</p>}
           </>
         }
       />

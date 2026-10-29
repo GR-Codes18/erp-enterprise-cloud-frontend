@@ -22,18 +22,23 @@ const json = (method: string, body: unknown) => ({
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify(body),
 })
-const collection = (amount: string, extra: object = {}) => ({
-  type: "collection",
-  document_type: "sales_invoice",
-  document_id: id("8042", 3), // F001-00000102, a crédito y sin cobros
-  method: "cash",
-  amount,
-  payment_date: "2026-10-08",
-  bank_account_id: "",
-  operation_number: "",
-  reference: "",
-  ...extra,
-})
+const collection = (
+  amount: string,
+  extra: { document_id?: string; method?: string; bank_account_id?: string; operation_number?: string } = {},
+) => {
+  const { document_id = id("8042", 3), ...overrides } = extra
+  return {
+    type: "collection",
+    document_type: "sales_invoice",
+    applications: [{ document_id, amount }],
+    method: "cash",
+    payment_date: "2026-10-08",
+    bank_account_id: "",
+    operation_number: "",
+    reference: "",
+    ...overrides,
+  }
+}
 
 describe("mocks de Finanzas", () => {
   const server = setupServer(...salesHandlers, ...purchaseHandlers, ...financeHandlers)
@@ -56,12 +61,16 @@ describe("mocks de Finanzas", () => {
     expect(noBank.status).toBe(422)
   })
 
-  it("un cobro reduce el saldo y su anulación lo restituye", async () => {
+  it("un cobro solo afecta saldo al ejecutarse y al anularse lo restituye", async () => {
     const created = await (await fetch(`${API}/payments`, json("POST", collection("100.00")))).json()
     const balanceOf = async () =>
       (await (await fetch(`${API}/receivables?search=F001-00000102`)).json()).items[0]
-    const before = await balanceOf()
-    expect(before.paid).toBe("100.00")
+    expect((await balanceOf()).paid).toBe("0.00")
+    expect((await fetch(`${API}/payments/${created.id}/execute`, json("POST", {}))).status).toBe(409)
+    expect((await fetch(`${API}/payments/${created.id}/approve`, json("POST", {}))).status).toBe(200)
+    expect((await balanceOf()).paid).toBe("0.00")
+    expect((await fetch(`${API}/payments/${created.id}/execute`, json("POST", {}))).status).toBe(200)
+    expect((await balanceOf()).paid).toBe("100.00")
 
     await fetch(`${API}/payments/${created.id}/void`, json("POST", { reason: "Monto mal digitado" }))
     expect((await balanceOf()).paid).toBe("0.00")
@@ -105,15 +114,29 @@ describe("mocks de Finanzas", () => {
 
     const collectionResponse = await fetch(
       `${API}/payments`,
-      json("POST", collection(salesInvoice.total, {
-        document_id: salesInvoice.id,
+      json("POST", {
+        type: "collection",
+        document_type: "sales_invoice",
+        applications: [
+          { document_id: id("8042", 1), amount: "100.00" },
+          { document_id: salesInvoice.id, amount: salesInvoice.total },
+        ],
         method: "transfer",
+        payment_date: "2026-10-08",
         bank_account_id: id("8066", 1),
         operation_number: "SALE-001",
-      })),
+        reference: "",
+      }),
     )
     expect(collectionResponse.status).toBe(201)
     const collectionPayment = await collectionResponse.json()
+    expect((await (await fetch(`${API}/receivables?search=${salesInvoice.series}-${salesInvoice.number}`)).json()).items[0])
+      .toMatchObject({ paid: "0.00", balance: salesInvoice.total })
+    expect((await (await fetch(`${API}/receivables?search=F001-00000101`)).json()).items[0].paid).toBe("300.00")
+    expect((await fetch(`${API}/payments/${collectionPayment.id}/approve`, json("POST", {}))).status).toBe(200)
+    expect((await fetch(`${API}/payments/${collectionPayment.id}/execute`, json("POST", {}))).status).toBe(200)
+    expect(collectionPayment.applications).toHaveLength(2)
+    expect((await (await fetch(`${API}/receivables?search=F001-00000101`)).json()).items[0].paid).toBe("400.00")
     expect((await (await fetch(`${API}/receivables?search=${salesInvoice.series}-${salesInvoice.number}`)).json()).items[0])
       .toMatchObject({ paid: salesInvoice.total, balance: "0.00", status: "paid" })
     expect((await (await fetch(`${SALES_API}/invoices/${salesInvoice.id}`)).json()))
@@ -124,6 +147,7 @@ describe("mocks de Finanzas", () => {
       .toMatchObject({ paid: "0.00", balance: salesInvoice.total, status: "pending" })
     expect((await (await fetch(`${SALES_API}/invoices/${salesInvoice.id}`)).json()))
       .toMatchObject({ paid: "0.00", balance: salesInvoice.total, status: "issued" })
+    expect((await (await fetch(`${API}/receivables?search=F001-00000101`)).json()).items[0].paid).toBe("300.00")
 
     const supplierInvoiceResponse = await fetch(
       `${PURCHASES_API}/invoices`,
@@ -147,9 +171,8 @@ describe("mocks de Finanzas", () => {
       json("POST", {
         type: "payment",
         document_type: "supplier_invoice",
-        document_id: supplierInvoice.id,
+        applications: [{ document_id: supplierInvoice.id, amount: "1.00" }],
         method: "transfer",
-        amount: "1.00",
         payment_date: "2026-10-08",
         bank_account_id: id("8066", 1),
         operation_number: "PURCHASE-001",
@@ -158,6 +181,8 @@ describe("mocks de Finanzas", () => {
     )
     expect(paymentResponse.status).toBe(201)
     const supplierPayment = await paymentResponse.json()
+    expect((await fetch(`${API}/payments/${supplierPayment.id}/approve`, json("POST", {}))).status).toBe(200)
+    expect((await fetch(`${API}/payments/${supplierPayment.id}/execute`, json("POST", {}))).status).toBe(200)
     expect((await (await fetch(`${API}/payables?search=F009-99001234`)).json()).items[0])
       .toMatchObject({ paid: "1.00", balance: "0.00", status: "paid" })
     expect((await (await fetch(`${PURCHASES_API}/invoices/${supplierInvoice.id}`)).json()))
@@ -186,9 +211,11 @@ describe("mocks de Finanzas", () => {
     ).json()
     expect(closed).toMatchObject({ status: "closed", difference: "0.00" })
 
-    const cash = await fetch(`${API}/payments`, json("POST", collection("10.00")))
-    expect(cash.status).toBe(409)
-    expect((await cash.json()).code).toBe("CASH_CLOSED")
+    const cash = await (await fetch(`${API}/payments`, json("POST", collection("10.00")))).json()
+    expect((await fetch(`${API}/payments/${cash.id}/approve`, json("POST", {}))).status).toBe(200)
+    const execution = await fetch(`${API}/payments/${cash.id}/execute`, json("POST", {}))
+    expect(execution.status).toBe(409)
+    expect((await execution.json()).code).toBe("CASH_CLOSED")
   })
 
   it("el estado de cuenta acumula el saldo y respeta el saldo inicial", async () => {
@@ -200,5 +227,38 @@ describe("mocks de Finanzas", () => {
     expect(statement.opening_balance).not.toBe("0.00") // el comprobante de septiembre queda antes del rango
     const last = statement.lines.at(-1)
     expect(last.balance).toBe(statement.closing_balance)
+  })
+
+  it("los registros mock de instrumentos y tributos permiten alta y cambio de estado", async () => {
+    const instrumentResponse = await fetch(
+      `${API}/instruments`,
+      json("POST", {
+        type: "promissory_note",
+        number: "PN-TEST-001",
+        third_party: "Cliente de prueba",
+        amount: "250.00",
+        issue_date: "2026-10-01",
+        due_date: "2026-11-01",
+      }),
+    )
+    expect(instrumentResponse.status).toBe(201)
+    const instrument = await instrumentResponse.json()
+    expect(instrument.status).toBe("pending")
+    expect((await fetch(`${API}/instruments/${instrument.id}/status`, json("PATCH", { status: "paid" }))).status).toBe(200)
+
+    const taxResponse = await fetch(
+      `${API}/taxes`,
+      json("POST", {
+        tax_type: "IGV",
+        period: "2026-10",
+        base: "1000.00",
+        amount: "180.00",
+        document_origin: "REG-TEST-2026-10",
+      }),
+    )
+    expect(taxResponse.status).toBe(201)
+    const tax = await taxResponse.json()
+    expect((await fetch(`${API}/taxes/${tax.id}/status`, json("PATCH", { status: "paid" }))).status).toBe(200)
+    expect((await fetch(`${API}/taxes/${tax.id}/status`, json("PATCH", { status: "paid" }))).status).toBe(409)
   })
 })

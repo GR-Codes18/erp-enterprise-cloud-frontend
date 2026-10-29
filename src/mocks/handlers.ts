@@ -11,6 +11,7 @@ import { supplierHandlers } from "@/modules/maintenance/suppliers/mocks"
 import { categoryHandlers } from "@/modules/maintenance/categories/mocks"
 import { warehouseHandlers } from "@/modules/maintenance/warehouses/mocks"
 import { productHandlers } from "@/modules/maintenance/products/mocks"
+import { masterCatalogHandlers } from "@/modules/maintenance/catalogs/mocks"
 import { stockHandlers } from "@/modules/inventory/stock/mocks"
 import { kardexHandlers } from "@/modules/inventory/kardex/mocks"
 import { transferHandlers } from "@/modules/inventory/transfers/mocks"
@@ -27,6 +28,7 @@ export const handlers: RequestHandler[] = [
   ...categoryHandlers,
   ...warehouseHandlers,
   ...productHandlers,
+  ...masterCatalogHandlers,
   ...roleHandlers,
   ...userHandlers,
   ...auditHandlers,

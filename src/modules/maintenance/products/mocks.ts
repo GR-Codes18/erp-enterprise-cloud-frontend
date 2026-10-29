@@ -62,6 +62,9 @@ const seed: Product[] = [
   product(11, "PROD-011", "Reflector LED Industrial 100W", 8, "UND", "89.90", "60.00", 10, 20),
   product(12, "PROD-012", "Silicona Multiuso Transparente 300ml", 9, "UND", "16.50", "10.00", 5, 0, "inactive"),
 ]
+let currentProducts = new Map(seed.map((item) => [item.id, item]))
+export const isProductUnitInUse = (unit: string) =>
+  [...currentProducts.values()].some((item) => item.unit === unit)
 
 /** Productos 1 y 2 tienen movimientos: no se borran ni cambian de unidad (409) */
 const WITH_MOVEMENTS = [uuid(1), uuid(2)]
@@ -69,6 +72,9 @@ const WITH_MOVEMENTS = [uuid(1), uuid(2)]
 export const productHandlers = createCrudHandlers<Product>({
   resource: "products",
   seed,
+  onChange: (items) => {
+    currentProducts = new Map(items.map((item) => [item.id, item]))
+  },
   // Un registro nuevo aparece primero en el listado
   insertAt: "start",
   searchFields: ["sku", "name"],

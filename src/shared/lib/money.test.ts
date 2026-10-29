@@ -58,6 +58,7 @@ describe("formatMoney y formatCents", () => {
   it("acepta otra moneda", () => {
     // Solo se comprueba el número: el símbolo (USD, US$) depende de los datos de idioma del entorno
     expect(formatMoney("5000.00", "USD")).toContain("5,000.00")
+    expect(formatMoney("5000.00", "EUR")).toContain("5,000.00")
   })
 
   it("devuelve un guion si el dato es inválido, sin lanzar error", () => {

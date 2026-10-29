@@ -39,10 +39,11 @@ describe("productCreateSchema", () => {
     expect(invalidFields({ ...valid, sku: "PROD#100" })).toContain("sku")
   })
 
-  it("exige nombre, categoría y una unidad conocida", () => {
+  it("exige nombre, categoría y una unidad configurada en Maestro", () => {
     expect(invalidFields({ ...valid, name: "A" })).toContain("name")
     expect(invalidFields({ ...valid, category_id: "" })).toContain("category_id")
-    expect(invalidFields({ ...valid, unit: "TONELADA" })).toContain("unit")
+    expect(invalidFields({ ...valid, unit: "" })).toContain("unit")
+    expect(invalidFields({ ...valid, unit: "TON" })).not.toContain("unit")
   })
 
   it("los precios son texto decimal >= 0 con máximo 2 decimales", () => {

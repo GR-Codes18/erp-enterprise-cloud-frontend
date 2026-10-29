@@ -1,5 +1,7 @@
 import { z } from "zod"
 import type { StatusTone } from "@/shared/components/StatusBadge"
+import { todayInLima } from "@/shared/lib/dates"
+import { toCents } from "@/shared/lib/money"
 
 /**
  * Cuentas por cobrar y por pagar: nacen solas de los comprobantes a crédito (venta o compra).
@@ -52,3 +54,21 @@ export type Payable = z.infer<typeof payableSchema>
 
 /** Se puede registrar un cobro o pago mientras quede saldo */
 export const canRegisterPayment = (account: Pick<Receivable, "status">) => account.status !== "paid"
+
+export function daysOverdue(dueDate: string, balance: string, today = todayInLima()): number {
+  if (toCents(balance) <= 0) return 0
+  const [dueYear, dueMonth, dueDay] = dueDate.split("-").map(Number)
+  const [todayYear, todayMonth, todayDay] = today.split("-").map(Number)
+  const due = Date.UTC(dueYear, dueMonth - 1, dueDay)
+  const current = Date.UTC(todayYear, todayMonth - 1, todayDay)
+  if (!Number.isFinite(due) || !Number.isFinite(current)) return 0
+  return Math.max(0, Math.floor((current - due) / 86_400_000))
+}
+
+export function agingBucket(days: number): string {
+  if (days <= 0) return "Al día"
+  if (days <= 30) return "1-30 días"
+  if (days <= 60) return "31-60 días"
+  if (days <= 90) return "61-90 días"
+  return "Más de 90 días"
+}

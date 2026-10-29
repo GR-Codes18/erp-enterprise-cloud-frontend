@@ -70,11 +70,12 @@ export const roleSeed: Role[] = [
     ...viewOnly("maintenance.warehouses", "maintenance.products"),
   ]),
   role(8, "Cajero", "Registra cobros en caja.", [
-    ...viewOnly("finance.receivables", "sales.invoices"),
+    ...viewOnly("finance.receivables", "finance.collections", "finance.cash_small", "sales.invoices"),
     "finance.cash:create",
     "finance.cash:view",
-    "finance.payments:create",
     "finance.payments:view",
+    "finance.collections:create",
+    "finance.cash_small:create",
   ]),
   role(9, "Asistente de Compras", "Registra solicitudes de compra.", [
     "purchases.requests:create",
