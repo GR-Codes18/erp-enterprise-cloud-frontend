@@ -1,6 +1,7 @@
 import { createCrudHandlers, type MockRuleError } from "@/mocks/utils/crud"
 import { calculateCommission } from "./calculation"
 import { commissionInputSchema, commissionSchema, type Commission } from "./schema"
+import { commissionOperationHandlers } from "./operationsMocks"
 
 const commissionId = (number: number) => `00000000-0000-4000-8021-${String(number).padStart(12, "0")}`
 
@@ -50,7 +51,7 @@ function calculatedFields(body: Record<string, unknown>) {
   }
 }
 
-export const commissionHandlers = createCrudHandlers<Commission>({
+const generatedCommissionHandlers = createCrudHandlers<Commission>({
   resource: "commissions",
   seed: commissionSeed,
   searchFields: ["seller_name", "period"],
@@ -60,3 +61,5 @@ export const commissionHandlers = createCrudHandlers<Commission>({
   prepareUpdate: (_current, body) => calculatedFields(body),
   validate: ({ next }) => (next ? validationError(next) : undefined),
 })
+
+export const commissionHandlers = [...generatedCommissionHandlers, ...commissionOperationHandlers]
