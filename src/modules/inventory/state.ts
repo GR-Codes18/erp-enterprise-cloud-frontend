@@ -53,6 +53,109 @@ const kardexSeed: KardexRow[] = [
 let stockItems = [...stockSeed]
 let kardexItems = [...kardexSeed]
 
+type ReservationItem = {
+  id: string
+  order_id: string
+  product_id: string
+  warehouse_id: string
+  quantity: number
+  expires_at: string
+}
+
+let reservationItems: ReservationItem[] = []
+
+function expireReservations(referenceTime = new Date()) {
+  const now = referenceTime.toISOString()
+  const expired = reservationItems.filter((item) => item.expires_at && item.expires_at <= now)
+  if (expired.length === 0) return
+
+  for (const reservation of expired) {
+    const targetWarehouse = reservation.warehouse_id || preferredWarehouseForProduct(reservation.product_id)
+    const currentQty = findMatchingStockRow(reservation.product_id, targetWarehouse)?.quantity ?? 0
+    upsertStockRow(reservation.product_id, targetWarehouse, currentQty + reservation.quantity)
+    appendKardexEntry({
+      product_id: reservation.product_id,
+      warehouse_id: targetWarehouse,
+      reference: `RES-${reservation.order_id}`,
+      type: "adjustment",
+      quantity_in: reservation.quantity,
+      quantity_out: 0,
+      occurred_at: reservation.expires_at,
+    })
+  }
+
+  reservationItems = reservationItems.filter((item) => !expired.some((expiredItem) => expiredItem.id === item.id))
+}
+
+export function reserveStockForOrder({
+  order_id,
+  items,
+  expires_at,
+}: {
+  order_id: string
+  items: { product_id: string; warehouse_id: string; quantity: number }[]
+  expires_at: string
+}) {
+  const expiresAt = expires_at || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
+
+  for (const item of items) {
+    const targetWarehouse = item.warehouse_id || preferredWarehouseForProduct(item.product_id)
+    const current = findMatchingStockRow(item.product_id, targetWarehouse)
+    const currentQty = current?.quantity ?? 0
+    if (item.quantity <= 0 || currentQty < item.quantity) {
+      return { ok: false, code: "INSUFFICIENT_STOCK", message: "No hay stock suficiente para reservar." }
+    }
+
+    const nextQty = Math.max(0, currentQty - item.quantity)
+    upsertStockRow(item.product_id, targetWarehouse, nextQty)
+    appendKardexEntry({
+      product_id: item.product_id,
+      warehouse_id: targetWarehouse,
+      reference: `RES-${order_id}`,
+      type: "adjustment",
+      quantity_in: 0,
+      quantity_out: item.quantity,
+      occurred_at: new Date().toISOString(),
+    })
+
+    reservationItems = [
+      ...reservationItems,
+      {
+        id: `res-${order_id}-${item.product_id}-${targetWarehouse}`,
+        order_id,
+        product_id: item.product_id,
+        warehouse_id: targetWarehouse,
+        quantity: item.quantity,
+        expires_at: expiresAt,
+      },
+    ]
+  }
+
+  return { ok: true, reservation_expires_at: expiresAt }
+}
+
+export function releaseReservationForOrder(order_id: string) {
+  const active = reservationItems.filter((item) => item.order_id === order_id)
+  if (active.length === 0) return false
+
+  for (const reservation of active) {
+    const currentQty = findMatchingStockRow(reservation.product_id, reservation.warehouse_id)?.quantity ?? 0
+    upsertStockRow(reservation.product_id, reservation.warehouse_id, currentQty + reservation.quantity)
+    appendKardexEntry({
+      product_id: reservation.product_id,
+      warehouse_id: reservation.warehouse_id,
+      reference: `RES-${order_id}`,
+      type: "adjustment",
+      quantity_in: reservation.quantity,
+      quantity_out: 0,
+      occurred_at: new Date().toISOString(),
+    })
+  }
+
+  reservationItems = reservationItems.filter((item) => item.order_id !== order_id)
+  return true
+}
+
 function normalizeStatus(quantity: number, minStock: number): StockStatus {
   if (quantity === 0) return "out"
   return quantity <= minStock ? "low" : "normal"
@@ -151,6 +254,7 @@ export function getKardexEntries() {
 }
 
 export function getAvailableQuantity(productId: string, warehouseId?: string) {
+  expireReservations()
   return stockItems
     .filter((row) => row.product_id === productId && (!warehouseId || row.warehouse_id === warehouseId))
     .reduce((sum, row) => sum + row.quantity, 0)
@@ -197,4 +301,5 @@ export function applyInventoryMovement({
 export function resetInventoryState() {
   stockItems = [...stockSeed]
   kardexItems = [...kardexSeed]
+  reservationItems = []
 }

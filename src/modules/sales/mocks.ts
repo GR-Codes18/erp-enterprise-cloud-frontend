@@ -2,7 +2,7 @@ import { delay, http, HttpResponse, type RequestHandler } from "msw"
 import { env } from "@/config/env"
 import { PRODUCTS, customerRef, findCustomer, productName, productRef, warehouseRef } from "@/mocks/refs"
 import { createDocumentHandlers, nextNumber, totalsOf } from "@/mocks/utils/documents"
-import { applyInventoryMovement, getAvailableQuantity } from "@/modules/inventory/state"
+import { applyInventoryMovement, getAvailableQuantity, releaseReservationForOrder, reserveStockForOrder } from "@/modules/inventory/state"
 import { getMockCustomer } from "@/modules/maintenance/customers/mocks"
 import { addDays, todayInLima } from "@/shared/lib/dates"
 import { newId } from "@/shared/lib/id"
@@ -113,6 +113,7 @@ function makeOrder(n: number, input: OrderSeedInput, status: Order["status"], ex
     quote_number: "",
     items: withNames(input.items),
     status,
+    reservation_expires_at: extra.reservation_expires_at ?? "",
     ...totalsOf(input.items),
     delivery_status: delivery_method === "none" ? "not_required" : "pending",
     delivery_address: delivery_method === "shipping" ? customer?.address ?? "" : "",
@@ -365,15 +366,60 @@ const orders = createDocumentHandlers<Order, OrderInput, Order["status"]>({
   },
   actions: [
     {
-      action: "confirm",
+      action: "reserve",
       from: ["draft"],
+      to: "reserved",
+      check: (order, body) => {
+        const expires_at = typeof body.expires_at === "string" ? String(body.expires_at).trim() : ""
+        if (!expires_at) {
+          return { status: 422, code: "VALIDATION_ERROR", message: "La reserva requiere una fecha límite." }
+        }
+        return checkOrderStock(order)
+      },
+      apply: (_order, body) => ({
+        reservation_expires_at: typeof body.expires_at === "string" ? String(body.expires_at).trim() : "",
+      }),
+      respond: (order, body) => {
+        const expires_at = typeof body.expires_at === "string" ? String(body.expires_at).trim() : new Date(Date.now() + 3 * 86400000).toISOString()
+        const result = reserveStockForOrder({
+          order_id: order.id,
+          items: order.items.map(({ product_id, warehouse_id, quantity }) => ({ product_id, warehouse_id, quantity })),
+          expires_at,
+        })
+        if (!result.ok) {
+          throw new Error(result.message)
+        }
+        return { ...order, reservation_expires_at: expires_at }
+      },
+    },
+    {
+      action: "release",
+      from: ["reserved"],
+      to: "draft",
+      respond: (order) => {
+        releaseReservationForOrder(order.id)
+        return { ...order, reservation_expires_at: "" }
+      },
+    },
+    {
+      action: "confirm",
+      from: ["draft", "reserved"],
       to: "confirmed",
       check: checkOrderCanBeConfirmed,
     },
-    { action: "cancel", from: ["draft", "confirmed"], to: "cancelled", requiresReason: true, apply: (_o, body) => ({ cancel_reason: String(body.reason).trim() }) },
+    {
+      action: "cancel",
+      from: ["draft", "reserved", "confirmed"],
+      to: "cancelled",
+      requiresReason: true,
+      apply: (current, body) => {
+        if (current.status === "reserved") releaseReservationForOrder(current.id)
+        return { cancel_reason: String(body.reason).trim() }
+      },
+    },
     {
       action: "invoice",
-      from: ["confirmed"],
+      from: ["confirmed", "reserved"],
       to: "invoiced",
       check: (order, body) => {
         const parsed = issueInvoiceSchema.safeParse(body)
@@ -389,16 +435,20 @@ const orders = createDocumentHandlers<Order, OrderInput, Order["status"]>({
       // El comprobante formaliza la venta y genera una única salida de inventario.
       respond: (order, body) => {
         const type = issueInvoiceSchema.parse(body).type
-        order.items.forEach((item) => {
-          applyInventoryMovement({
-            product_id: item.product_id,
-            warehouse_id: item.warehouse_id,
-            quantity: item.quantity,
-            direction: "out",
-            type: "sale",
-            reference: order.number,
+        if (order.reservation_expires_at) {
+          releaseReservationForOrder(order.id)
+        } else {
+          order.items.forEach((item) => {
+            applyInventoryMovement({
+              product_id: item.product_id,
+              warehouse_id: item.warehouse_id,
+              quantity: item.quantity,
+              direction: "out",
+              type: "sale",
+              reference: order.number,
+            })
           })
-        })
+        }
         invoiceCounters[type] += 1
         const invoice = makeInvoice(0, order, type, String(invoiceCounters[type]).padStart(8, "0"), todayInLima(), "0.00", "issued", {
           id: newId(),
