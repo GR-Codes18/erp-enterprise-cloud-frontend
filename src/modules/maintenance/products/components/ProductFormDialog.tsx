@@ -20,14 +20,13 @@ import {
   SelectValue,
 } from "@/shared/components/ui/select"
 import { getErrorMessage, isApiError } from "@/shared/lib/api/errors"
+import { useMasterCatalogOptions } from "../../catalogs/hooks"
 import { useCategoryOptions } from "../../categories/hooks"
 import { useCreateProduct, useUpdateProduct } from "../hooks"
 import {
   EMPTY_PRODUCT,
   PRODUCT_STATUSES,
-  PRODUCT_UNITS,
   STATUS_LABELS,
-  UNIT_LABELS,
   isSoldBelowCost,
   productCreateSchema,
   toProductUpdateInput,
@@ -52,7 +51,9 @@ function ProductForm({ product, onDone }: { product: Product | null; onDone: () 
   const createProduct = useCreateProduct()
   const updateProduct = useUpdateProduct()
   const categories = useCategoryOptions({ includeId: product?.category_id })
+  const units = useMasterCatalogOptions("units")
   const isPending = createProduct.isPending || updateProduct.isPending
+  const hasAvailableUnit = units.data?.some((unit) => unit.value) ?? false
   const [serverError, setServerError] = useState<string | null>(null)
 
   const {
@@ -141,7 +142,11 @@ function ProductForm({ product, onDone }: { product: Product | null; onDone: () 
             control={control}
             name="unit"
             render={({ field }) => (
-              <Select value={field.value} onValueChange={field.onChange}>
+              <Select
+                value={field.value}
+                onValueChange={field.onChange}
+                disabled={units.isPending || units.isError || (!hasAvailableUnit && !product)}
+              >
                 <SelectTrigger
                   id="unit"
                   className="w-full"
@@ -151,15 +156,22 @@ function ProductForm({ product, onDone }: { product: Product | null; onDone: () 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PRODUCT_UNITS.map((unit) => (
-                    <SelectItem key={unit} value={unit}>
-                      {UNIT_LABELS[unit]}
+                  {product?.unit && !units.data?.some((unit) => unit.value === product.unit) && (
+                    <SelectItem value={product.unit}>{product.unit} (inactiva o no disponible)</SelectItem>
+                  )}
+                  {(units.data ?? []).filter((unit) => unit.value).map((unit) => (
+                    <SelectItem key={unit.id} value={unit.value}>
+                      {unit.name} ({unit.value})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
           />
+          {units.isError && <p role="alert" className="text-sm text-danger-text">{getErrorMessage(units.error)}</p>}
+          {!units.isError && !units.isPending && (units.data?.filter((unit) => unit.value).length ?? 0) === 0 && (
+            <p role="alert" className="text-sm text-danger-text">No hay unidades activas configuradas en Maestro.</p>
+          )}
           {product && !errors.unit && (
             <p id="unit-hint" className="text-xs text-muted-foreground">
               No se puede cambiar si el producto ya tiene movimientos.
@@ -226,7 +238,10 @@ function ProductForm({ product, onDone }: { product: Product | null; onDone: () 
         <Button type="button" variant="outline" disabled={isPending} onClick={onDone}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={isPending}>
+        <Button
+          type="submit"
+          disabled={isPending || ((units.isPending || units.isError || !hasAvailableUnit) && !product)}
+        >
           {isPending ? "Guardando..." : product ? "Guardar cambios" : "Crear producto"}
         </Button>
       </DialogFooter>

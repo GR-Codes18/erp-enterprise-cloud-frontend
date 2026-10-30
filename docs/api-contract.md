@@ -353,12 +353,16 @@ El permiso sobre un documento sigue al del registro relacionado: quien no puede 
 
 CRUD estándar (sección 5) con `PATCH` para activar/desactivar. Opcionales como `""`. Un catálogo con uso responde 409 `IN_USE` al borrar; un duplicado, 409 `DUPLICATE` con el campo en `errors`.
 
+Los demás catálogos de Maestro usan las rutas `/maintenance/catalogs/{resource}` con los campos `id`, `code`, `name`, `detail`, `status` (`active` | `inactive`) y `value` (cadena, puede ser `""` salvo donde se indica). Recursos: `companies`, `branches`, `brands`, `units`, `unit-conversions`, `transporters`, `sellers`, `zones`, `currencies`, `taxes`, `payment-methods` y `price-lists`. `code` es único; las monedas, unidades y formas de pago también tienen `value` único. Estos catálogos se simulan en memoria con MSW hasta que exista API real.
+
+Integraciones frontend disponibles: Ventas, Compras, Inventario, Finanzas y Reportes ya consumen hooks compartidos de clientes, proveedores, productos, categorías y almacenes. Productos consulta las unidades activas de Maestro (`value` es el código de unidad). Tesorería consulta monedas activas para las cuentas bancarias (`value` es un código de tres letras, como `PEN` o `USD`) y sucursales para asociarlas a cuentas bancarias. Cobros y pagos consultan las formas de pago activas; las opciones compatibles actualmente son `cash`, `transfer` y `card`. Agregar una moneda no realiza conversión de importes; agregar otro medio de pago requiere primero soporte de flujo en Tesorería.
+
 | Recurso | Campos | Únicos e inmutables | Filtros |
 |---|---|---|---|
 | `/suppliers` | `document_type`, `document_number`, `name`, `email`, `phone`, `credit_days` (entero ≥ 0), `status` | `document_type` + `document_number` únicos e inmutables | `status`, `document_type` |
 | `/categories` | `name`, `status` | `name` único (sin distinguir mayúsculas) | `status` |
 | `/warehouses` | `code` (mayúsculas, ej. `ALM-001`), `name`, `address` (`""` si no hay), `status` | `code` único e inmutable | `status` |
-| `/products` | `sku` (2 a 30 caracteres `A-Z 0-9 _ -`, se guarda en mayúsculas), `name`, `category_id`, `unit` (`UND`, `KG`, `LT`, `M`, `CAJA`, `BOLSA`, `PAQ`), `sale_price`, `cost_price` (texto decimal ≥ 0), `min_stock` (entero ≥ 0), `status` | `sku` único e inmutable | `status`, `category_id` |
+| `/products` | `sku` (2 a 30 caracteres `A-Z 0-9 _ -`, se guarda en mayúsculas), `name`, `category_id`, `unit` (código activo de `/maintenance/catalogs/units`), `sale_price`, `cost_price` (texto decimal ≥ 0), `min_stock` (entero ≥ 0), `status` | `sku` único e inmutable | `status`, `category_id` |
 
 - Respuesta de productos: además `category_name` y `stock_total` (suma de almacenes, calculada; solo lectura).
 - Cambiar `unit` de un producto con movimientos: 409 `UNIT_LOCKED` con el error en `unit`.
@@ -421,22 +425,28 @@ Las líneas de documento son `{ product_id, quantity (entero > 0), unit_price (t
 
 ## 18. Propuesta del frontend: Finanzas
 
+Las pantallas de Cobros y Pagos se separan en la interfaz, aunque comparten el recurso `/finance/payments` y el filtro `type`. Los flujos de instrumentos y tributos que aún no tienen API real se respaldan temporalmente con MSW en el frontend; las rutas siguientes son una propuesta de contrato pendiente de confirmar con backend.
+
 | Ruta | Operación | Notas |
 |---|---|---|
 | `GET /finance/receivables` | Listar | Filtros `customer_id`, `status`; rango sobre `due_date`. Campos: `invoice_id`, `invoice_code`, `customer_*`, `issue_date`, `due_date`, `total`, `paid`, `balance`, `status` (`pending`, `partially_paid`, `paid`, `overdue`) |
 | `GET /finance/payables` | Listar | Igual, con `supplier_*` |
-| `GET /finance/payments` | Listar | Filtros `type`, `method`, `status`, `document_id`; rango sobre `payment_date` |
-| `POST /finance/payments` | Registrar cobro o pago | Cuerpo: `type` (`collection` \| `payment`), `document_type` (`sales_invoice` \| `supplier_invoice`), `document_id`, `method` (`cash` \| `transfer` \| `card`), `amount` (> 0 y ≤ saldo), `payment_date` (no futura), `bank_account_id` y `operation_number` (obligatorios con transferencia), `reference`. Efectivo sin caja abierta: 409 `CASH_CLOSED`. Actualiza el saldo y el estado del documento; el efectivo entra como movimiento de caja y la transferencia como movimiento bancario |
-| `POST /finance/payments/{id}/void` | Anular | `{ reason }`. No se edita; al anular se restituye el saldo y se registra el movimiento inverso en la caja o el banco donde entró (409 si la caja ya se cerró) |
-| `GET /finance/cash/registers` | Cajas | Paginado (formato de la sección 4). `id`, `name`, `open_session_id` (`""` si no hay) |
+| `GET /finance/payments` | Listar | Filtros `type` (`collection` \| `payment`), `method`, `status` (`registered`, `approved`, `executed`, `void`), `document_id`; rango sobre `payment_date` |
+| `POST /finance/payments` | Registrar cobro o pago | Cuerpo: `type`, `document_type` (`sales_invoice` \| `supplier_invoice`), `applications` (`[{ document_id, amount }]`; documentos únicos, del mismo tercero y cada monto > 0 y ≤ saldo disponible), `method` (`cash` \| `transfer` \| `card`), `payment_date` (no futura), `bank_account_id` y `operation_number` (obligatorios con transferencia), `reference`. Crea estado `registered`; no modifica saldos ni movimientos |
+| `POST /finance/payments/{id}/approve` | Aprobar | Solo desde `registered`; cambia a `approved` sin aplicar el movimiento |
+| `POST /finance/payments/{id}/execute` | Ejecutar | Solo desde `approved`. Valida nuevamente saldo y destino; cambia a `executed`, actualiza el saldo del documento y registra el movimiento en caja o banco. Efectivo sin caja abierta: 409 `CASH_CLOSED` |
+| `POST /finance/payments/{id}/void` | Anular | `{ reason }`. Operaciones no ejecutadas liberan el saldo reservado. Si ya se ejecutó, se restituye el saldo y se registra el movimiento inverso (409 si la caja donde entró ya se cerró) |
+| `GET /finance/cash/registers` | Cajas | Paginado (formato de la sección 4). `id`, `name`, `kind` (`petty` \| `general`), `branch_id`, `responsible_id`, `assigned_fund`, `open_session_id` (`""` si no hay) |
 | `GET /finance/cash/sessions`, `GET /finance/cash/sessions/{id}` | Sesiones | Filtros `status`, `register_id`; rango sobre `opened_at`. Incluyen `movements`, `expected_amount` (calculado), `counted_amount`, `difference`, `closing_note` |
 | `POST /finance/cash/sessions` | Abrir | `{ register_id, opening_amount }`. Una sola sesión abierta por caja (409 `SESSION_ALREADY_OPEN`) |
 | `POST /finance/cash/sessions/{id}/movements` | Ingreso o egreso | `{ type, concept (obligatorio), amount }`. Sesión cerrada: 409 |
 | `POST /finance/cash/sessions/{id}/close` | Cerrar | `{ counted_amount, note }`. La nota es obligatoria si hay diferencia. Responde la sesión con `difference` (+ sobrante, − faltante). Cerrada es solo lectura |
-| `/finance/bank-accounts` | Catálogo | `bank`, `number` (único), `currency` (`PEN` \| `USD`), `status`; respuesta con `balance` calculado. Filtros `status`, `currency`. Con movimientos no se borra. Los cobros y pagos en soles solo usan cuentas en `PEN` |
+| `/finance/bank-accounts` | Catálogo | `bank`, `number` (único), `currency` (`PEN` \| `USD`), `branch_id` (opcional), `status`; respuesta con `balance` calculado. Filtros `status`, `currency`. Con movimientos no se borra. Los cobros y pagos en soles solo usan cuentas en `PEN` |
 | `GET`/`POST /finance/bank-accounts/{id}/movements` | Movimientos | Filtros `type`, `source`; rango sobre `movement_date`. Manual: `{ type, concept, amount, movement_date }`. Los de cobros y pagos por transferencia entran solos (`source: "payment"`) |
 | `PATCH /finance/bank-accounts/{id}/movements/{movementId}` | Conciliar | `{ "reconciled": true \| false }` (opcional v1) |
 | `GET /finance/statements` | Estado de cuenta | Query `party_type` (`customer` \| `supplier`), `party_id`, `date_from`, `date_to` (obligatorios). Responde `party_name`, `party_document`, `opening_balance`, `lines` (`date`, `type`, `document_code`, `debit`, `credit`, `balance` acumulado) y `closing_balance`. Los saldos los calcula el backend |
+| `GET /finance/instruments`, `POST /finance/instruments`, `PATCH /finance/instruments/{id}/status` | Letras, pagarés y cheques | Endpoints temporales de MSW. Campos: `type`, `number`, `third_party`, `amount`, `issue_date`, `due_date`, `status` (`pending`, `paid`, `void`) |
+| `GET /finance/taxes`, `POST /finance/taxes`, `PATCH /finance/taxes/{id}/status` | Tributos financieros | Endpoints temporales de MSW. Campos: `tax_type`, `period`, `base`, `amount`, `document_origin`, `status` (`pending`, `paid`) |
 
 ## 19. Propuesta del frontend: Dashboard y Reportes
 

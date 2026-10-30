@@ -26,6 +26,7 @@ import { getErrorMessage } from "@/shared/lib/api/errors"
 import { formatDateTimeLima } from "@/shared/lib/dates"
 import { formatCents, formatMoney } from "@/shared/lib/money"
 import {
+  CASH_MOVEMENT_CONCEPTS,
   CASH_MOVEMENT_TYPES,
   CASH_MOVEMENT_TYPE_LABELS,
   CASH_SESSION_STATUS_LABELS,
@@ -60,6 +61,8 @@ function MovementDialog({ session, open, onClose }: { session: CashSession; open
     defaultValues: { type: "income", concept: "", amount: "" },
   })
   const type = useWatch({ control, name: "type" })
+  const concept = useWatch({ control, name: "concept" })
+  const standardConcept = CASH_MOVEMENT_CONCEPTS.some((item) => item === concept && item !== "Otros")
   const close = () => {
     reset()
     setServerError(null)
@@ -96,13 +99,31 @@ function MovementDialog({ session, open, onClose }: { session: CashSession; open
             </Select>
           </Field>
           <Field id="concept" label="Concepto" error={errors.concept?.message}>
-            <Input
-              id="concept"
+            <Select
+              value={standardConcept ? concept : "Otros"}
+              onValueChange={(value) => setValue("concept", value === "Otros" ? "" : value, { shouldValidate: true })}
               disabled={add.isPending}
-              aria-invalid={!!errors.concept}
-              aria-describedby={errors.concept ? "concept-error" : undefined}
-              {...register("concept")}
-            />
+            >
+              <SelectTrigger id="concept" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CASH_MOVEMENT_CONCEPTS.filter((item) => item !== "Otros").map((item) => (
+                  <SelectItem key={item} value={item}>{item}</SelectItem>
+                ))}
+                <SelectItem value="Otros">Otro (especificar)</SelectItem>
+              </SelectContent>
+            </Select>
+            {!standardConcept && (
+              <Input
+                id="custom-concept"
+                placeholder="Escribe el concepto"
+                disabled={add.isPending}
+                aria-invalid={!!errors.concept}
+                aria-describedby={errors.concept ? "custom-concept-error" : undefined}
+                {...register("concept")}
+              />
+            )}
           </Field>
           <Field id="movement-amount" label="Monto (S/)" error={errors.amount?.message}>
             <Input

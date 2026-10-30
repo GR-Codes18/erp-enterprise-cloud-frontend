@@ -12,9 +12,9 @@ export const BANK_ACCOUNT_STATUS_LABELS: Record<BankAccountStatus, string> = {
 }
 
 export const CURRENCIES = ["PEN", "USD"] as const
-export type Currency = (typeof CURRENCIES)[number]
+export type Currency = string
 
-export const CURRENCY_LABELS: Record<Currency, string> = {
+export const CURRENCY_LABELS: Record<string, string> = {
   PEN: "Soles (PEN)",
   USD: "Dólares (USD)",
 }
@@ -26,7 +26,8 @@ export const bankAccountInputSchema = z.object({
     .string()
     .trim()
     .regex(/^[0-9-]{6,30}$/, "Solo números y guiones, de 6 a 30 caracteres"),
-  currency: z.enum(CURRENCIES),
+  currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Selecciona una moneda activa"),
+  branch_id: z.string().trim().max(80, "Máximo 80 caracteres").optional(),
   status: z.enum(BANK_ACCOUNT_STATUSES),
 })
 export type BankAccountInput = z.infer<typeof bankAccountInputSchema>
@@ -38,7 +39,7 @@ export const bankAccountSchema = bankAccountInputSchema.extend({
 })
 export type BankAccount = z.infer<typeof bankAccountSchema>
 
-export const EMPTY_BANK_ACCOUNT: BankAccountInput = { bank: "", number: "", currency: "PEN", status: "active" }
+export const EMPTY_BANK_ACCOUNT: BankAccountInput = { bank: "", number: "", currency: "PEN", branch_id: "", status: "active" }
 
 export const bankAccountLabel = (account: Pick<BankAccount, "bank" | "number" | "currency">) =>
   `${account.bank} ${account.number} (${account.currency})`

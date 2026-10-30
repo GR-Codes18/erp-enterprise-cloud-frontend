@@ -13,6 +13,8 @@ export { useWarehouseOptions } from "./warehouses/hooks"
 export type { WarehouseOption } from "./warehouses/hooks"
 export { useProductOptions } from "./products/hooks"
 export type { ProductOption } from "./products/hooks"
+export { useMasterCatalog, useMasterCatalogOptions } from "./catalogs/hooks"
+export type { MasterCatalogRecord, MasterCatalogResource } from "./catalogs/schema"
 
 export const maintenanceModule: AppModule = {
   id: "maintenance",

@@ -150,7 +150,7 @@ export default function BankAccountPage() {
   const accounts = useBankAccounts({ page: 1, size: 100 })
   const account = accounts.data?.items.find((candidate) => candidate.id === id)
   const reconcile = useReconcileBankMovement()
-  const canCreate = useHasPermission("finance.banks:create")
+  const canCreate = useHasPermission("finance.bank_movements:create")
   const canEdit = useHasPermission("finance.banks:edit")
   const [movementOpen, setMovementOpen] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)

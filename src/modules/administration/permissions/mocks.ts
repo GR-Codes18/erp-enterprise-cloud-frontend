@@ -38,10 +38,17 @@ export const permissionSeed: PermissionScreen[] = [
 
   screen(15, "finance", "Finanzas", "finance.receivables", "Cuentas por cobrar", V),
   screen(16, "finance", "Finanzas", "finance.payables", "Cuentas por pagar", V),
-  screen(17, "finance", "Finanzas", "finance.payments", "Pagos y cobros", ["view", "create", "void"]),
+  screen(17, "finance", "Finanzas", "finance.payments", "Pagos a proveedores", ["view", "create", "approve", "execute", "void"]),
   screen(18, "finance", "Finanzas", "finance.cash", "Caja", ["view", "create", "edit"]),
   screen(19, "finance", "Finanzas", "finance.banks", "Bancos", ["view", "create", "edit"]),
   screen(20, "finance", "Finanzas", "finance.statements", "Estados de cuenta", V),
+  screen(45, "finance", "Finanzas", "finance.collections", "Cobros a clientes", ["view", "create", "approve", "execute", "void"]),
+  screen(46, "finance", "Finanzas", "finance.cash_small", "Caja chica", ["view", "create", "edit"]),
+  screen(47, "finance", "Finanzas", "finance.bank_movements", "Movimientos bancarios", ["view", "create", "edit"]),
+  screen(48, "finance", "Finanzas", "finance.reconciliation", "Conciliación bancaria", ["view", "edit"]),
+  screen(49, "finance", "Finanzas", "finance.cash_flow", "Flujo de caja", V),
+  screen(50, "finance", "Finanzas", "finance.instruments", "Letras, pagarés y cheques", ["view", "create", "edit", "void"]),
+  screen(51, "finance", "Finanzas", "finance.taxes", "Tributos financieros", ["view", "create", "edit"]),
 
   screen(21, "documents", "Documentos", "documents.files", "Archivos", ["view", "create", "void"]),
 

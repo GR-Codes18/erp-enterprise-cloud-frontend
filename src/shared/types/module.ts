@@ -17,6 +17,11 @@ export interface ModuleItem {
   label: string
   /** Ruta relativa al basePath del módulo, sin "/" inicial */
   path: string
+  /** Descripción y campos funcionales que se muestran en la tarjeta de portada */
+  description?: string
+  keyFields?: string[]
+  /** Mantiene rutas existentes sin publicarlas en el menú ni en las tarjetas */
+  hidden?: boolean
   /** Si no existe, se muestra una pantalla provisional */
   page?: PageLoader
   /** Permiso para ver la pantalla, ej. "sales.quotes:view". Sin él, la ve cualquiera con sesión */

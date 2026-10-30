@@ -112,7 +112,10 @@ export function filterModulesByPermission(
     if (!module.sections) return allowed(module.permission) ? [module] : []
 
     const sections = module.sections
-      .map((section) => ({ ...section, items: section.items.filter((item) => allowed(item.permission)) }))
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => !item.hidden && allowed(item.permission)),
+      }))
       .filter((section) => section.items.length > 0)
 
     return sections.length > 0 ? [{ ...module, sections }] : []

@@ -24,8 +24,10 @@ const PAYMENTS = "/finance/payments"
 export const paymentService = {
   list: (params: PageParams, signal?: AbortSignal) =>
     api.get<Paginated<Payment>>(PAYMENTS, { query: toListQuery(params), signal }),
-  /** El backend valida saldo, caja abierta (efectivo) y cuenta (transferencia), y actualiza el documento */
+  /** Registra aplicaciones; los saldos y movimientos solo cambian al ejecutar */
   create: (input: PaymentInput) => api.post<Payment>(PAYMENTS, input),
+  approve: (id: string) => api.post<Payment>(path(PAYMENTS, id, "approve"), {}),
+  execute: (id: string) => api.post<Payment>(path(PAYMENTS, id, "execute"), {}),
   /** No se edita: se anula con motivo y el saldo se restituye */
   void: (id: string, reason: string) => api.post<Payment>(path(PAYMENTS, id, "void"), { reason }),
 }

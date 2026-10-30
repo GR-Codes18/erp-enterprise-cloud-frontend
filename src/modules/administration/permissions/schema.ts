@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-export const PERMISSION_ACTIONS = ["view", "create", "edit", "void", "approve"] as const
+export const PERMISSION_ACTIONS = ["view", "create", "edit", "void", "approve", "execute"] as const
 export type PermissionAction = (typeof PERMISSION_ACTIONS)[number]
 
 export const ACTION_LABELS: Record<PermissionAction, string> = {
@@ -9,10 +9,11 @@ export const ACTION_LABELS: Record<PermissionAction, string> = {
   edit: "Editar",
   void: "Anular / Eliminar",
   approve: "Aprobar",
+  execute: "Ejecutar",
 }
 
 /** Un permiso es "<código de pantalla>:<acción>", por ejemplo "inventory.stock:view" */
-export const PERMISSION_PATTERN = /^[a-z]+\.[a-z_]+:(view|create|edit|void|approve)$/
+export const PERMISSION_PATTERN = /^[a-z]+\.[a-z_]+:(view|create|edit|void|approve|execute)$/
 
 /** Una pantalla del catálogo y las acciones que existen para ella */
 export const permissionScreenSchema = z.object({

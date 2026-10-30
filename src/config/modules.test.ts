@@ -54,6 +54,41 @@ describe("appModules", () => {
     expect(items.every((item) => Boolean(item.page))).toBe(true)
   })
 
+  it("Tesorería publica los doce submódulos funcionales con campos propios", () => {
+    const finance = appModules.find((module) => module.id === "finance")
+    const items = finance?.sections?.flatMap((section) => section.items.filter((item) => !item.hidden)) ?? []
+
+    expect(items.map((item) => item.label)).toEqual([
+      "Cobros",
+      "Pagos a proveedores",
+      "Cuentas por cobrar",
+      "Cuentas por pagar",
+      "Caja chica",
+      "Caja general",
+      "Cuentas bancarias",
+      "Movimientos bancarios",
+      "Conciliación bancaria",
+      "Flujo de caja",
+      "Letras, pagarés y cheques",
+      "Tributos y reportes financieros",
+    ])
+    expect(items.every((item) => item.description && item.keyFields && item.keyFields.length > 0)).toBe(true)
+  })
+
+  it("los accesos visibles y detalles de Tesorería usan permisos del catálogo", () => {
+    const finance = appModules.find((module) => module.id === "finance")
+    const catalog = new Set(
+      permissionSeed.flatMap((screen) => screen.actions.map((action) => `${screen.code}:${action}`)),
+    )
+    const items = finance?.sections?.flatMap((section) => section.items) ?? []
+    const declared = items.flatMap((item) => [
+      ...(item.permission ? [item.permission] : []),
+      ...(item.subRoutes ?? []).flatMap((route) => route.permission ? [route.permission] : []),
+    ])
+
+    expect(declared.every((permission) => catalog.has(permission))).toBe(true)
+  })
+
   it("no repite el basePath entre módulos", () => {
     expect(findDuplicates(appModules.map((module) => module.basePath))).toEqual([])
   })

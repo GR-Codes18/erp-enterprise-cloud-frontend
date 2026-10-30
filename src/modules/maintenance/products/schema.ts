@@ -39,7 +39,7 @@ const SKU_PATTERN = /^[A-Z0-9_-]+$/
 const editableFields = {
   name: z.string().trim().min(2, "Ingresa el nombre del producto").max(120, "Máximo 120 caracteres"),
   category_id: z.string().min(1, "Selecciona una categoría"),
-  unit: z.enum(PRODUCT_UNITS, { message: "Selecciona una unidad" }),
+  unit: z.string().trim().min(1, "Selecciona una unidad").max(20, "Máximo 20 caracteres"),
   sale_price: priceSchema("precio de venta"),
   cost_price: priceSchema("costo"),
   min_stock: z

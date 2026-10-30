@@ -49,6 +49,8 @@ export const usePayables = (params: PageParams) =>
 export const usePayments = (params: PageParams) =>
   useQuery(listQuery("payments", params, (signal) => paymentService.list(params, signal)))
 export const useCreatePayment = () => useFinanceMutation((input: PaymentInput) => paymentService.create(input))
+export const useApprovePayment = () => useFinanceMutation((id: string) => paymentService.approve(id))
+export const useExecutePayment = () => useFinanceMutation((id: string) => paymentService.execute(id))
 export const useVoidPayment = () =>
   useFinanceMutation(({ id, reason }: { id: string; reason: string }) => paymentService.void(id, reason))
 
@@ -59,7 +61,17 @@ export function useDocumentPayments(documentId: string, { enabled = true }: { en
     queryKey: financeKeys.list("payments", params),
     queryFn: ({ signal }) => paymentService.list(params, signal),
     enabled: enabled && documentId !== "",
-    select: (data) => data.items,
+    select: (data) =>
+      data.items.flatMap((payment) =>
+        payment.applications
+          .filter((application) => application.document_id === documentId)
+          .map((application) => ({
+            ...payment,
+            document_id: application.document_id,
+            document_code: application.document_code,
+            amount: application.amount,
+          })),
+      ),
   })
 }
 
