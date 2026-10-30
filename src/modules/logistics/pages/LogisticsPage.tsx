@@ -94,7 +94,10 @@ export default function LogisticsPage() {
 
   return (
     <>
-      <PageHeader title="Logística y transporte" description="Programa y da seguimiento a los envíos y sus costos." actions={createButton} />
+      <PageHeader title="Planificación de despachos" description="Planifica despachos y consulta sus fechas, destinos y costos de transporte." actions={createButton} />
+      <p className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        Datos de demostración: los cambios se mantienen en memoria y se reinician al recargar la aplicación.
+      </p>
       <div className="mb-4 flex flex-wrap gap-3 rounded-xl border bg-card p-4 shadow-sm">
         <Input
           type="search"

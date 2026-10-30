@@ -92,7 +92,10 @@ export default function CommissionsPage() {
 
   return (
     <>
-      <PageHeader title="Comisiones de vendedores" description="Calcula y administra las comisiones según las ventas de cada período." actions={createButton} />
+      <PageHeader title="Comisión generada" description="Calcula y administra las comisiones según las ventas de cada período." actions={createButton} />
+      <p className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        Datos de demostración: los cambios se mantienen en memoria y se reinician al recargar la aplicación.
+      </p>
       <div className="mb-4 flex flex-wrap gap-3 rounded-xl border bg-card p-4 shadow-sm">
         <Input
           type="search"

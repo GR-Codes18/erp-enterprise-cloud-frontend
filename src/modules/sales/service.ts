@@ -37,6 +37,8 @@ export const orderService = {
   remove: (id: string) => api.delete(path(ORDERS, id)),
   /** El backend valida cliente activo, stock y límite de crédito (409 con el motivo) */
   confirm: (id: string) => api.post<Order>(path(ORDERS, id, "confirm"), {}),
+  reserve: (id: string, expires_at: string) => api.post<Order>(path(ORDERS, id, "reserve"), { expires_at }),
+  release: (id: string) => api.post<Order>(path(ORDERS, id, "release"), {}),
   cancel: (id: string, reason: string) => api.post<Order>(path(ORDERS, id, "cancel"), { reason }),
   updateDeliveryStatus: (id: string, status: DeliveryStatus) =>
     api.patch<Order>(path(ORDERS, id, "delivery-status"), { status }),

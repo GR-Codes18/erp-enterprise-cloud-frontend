@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link, useNavigate, useParams } from "react-router"
-import { useHasPermission } from "@/modules/auth"
+import { useAuth, useHasPermission } from "@/modules/auth"
 import { DocumentsPanel } from "@/modules/documents"
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog"
 import { DetailGrid } from "@/shared/components/DetailGrid"
@@ -11,8 +11,18 @@ import ReasonDialog from "@/shared/components/ReasonDialog"
 import { StatusBadge } from "@/shared/components/StatusBadge"
 import { TotalsSummary } from "@/shared/components/TotalsSummary"
 import { Button } from "@/shared/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog"
+import { Input } from "@/shared/components/ui/input"
 import { getErrorMessage } from "@/shared/lib/api/errors"
 import { formatDateTimeLima } from "@/shared/lib/dates"
+import { createApprovalNotification } from "@/shared/lib/approvals"
 import { formatMoney } from "@/shared/lib/money"
 import { IssueInvoiceDialog } from "../components/IssueInvoiceDialog"
 import {
@@ -21,8 +31,11 @@ import {
   useDeleteOrder,
   useIssueInvoice,
   useOrder,
+  useReleaseReservation,
+  useReserveOrder,
   useUpdateDeliveryStatus,
 } from "../hooks"
+import { getReservationSummary } from "../reservations"
 import {
   DELIVERY_METHOD_LABELS,
   ORDER_STATUS_LABELS,
@@ -34,13 +47,16 @@ import {
   getNextDeliveryStatus,
 } from "../orders/schema"
 
-type Action = "confirm" | "cancel" | "invoice" | "delete"
+type Action = "confirm" | "cancel" | "invoice" | "delete" | "reserve" | "release"
 
 export default function OrderDetailPage() {
   const { id = "" } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const order = useOrder(id)
   const confirm = useConfirmOrder()
+  const reserve = useReserveOrder()
+  const releaseReservation = useReleaseReservation()
   const cancel = useCancelOrder()
   const issue = useIssueInvoice()
   const updateDeliveryStatus = useUpdateDeliveryStatus()
@@ -53,7 +69,14 @@ export default function OrderDetailPage() {
   const canSeeQuotes = useHasPermission("sales.quotes:view")
   const [dialog, setDialog] = useState<Action | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
-  const isPending = confirm.isPending || cancel.isPending || issue.isPending || updateDeliveryStatus.isPending || remove.isPending
+  type Notice = ReturnType<typeof createApprovalNotification> | { message: string } | null
+  const [notice, setNotice] = useState<Notice>(null)
+  const [reserveDate, setReserveDate] = useState(() => {
+    const date = new Date()
+    date.setDate(date.getDate() + 3)
+    return date.toISOString().slice(0, 10)
+  })
+  const isPending = confirm.isPending || cancel.isPending || issue.isPending || reserve.isPending || releaseReservation.isPending || updateDeliveryStatus.isPending || remove.isPending
 
   if (order.isPending) return <p role="status">Cargando orden de venta…</p>
   if (order.isError) return <ErrorState message={getErrorMessage(order.error)} onRetry={() => void order.refetch()} />
@@ -61,6 +84,22 @@ export default function OrderDetailPage() {
   const document = order.data
   const isDraft = document.status === "draft"
   const nextDeliveryStatus = getNextDeliveryStatus(document.delivery_method, document.delivery_status)
+  const reservationSummary = getReservationSummary({
+    status: document.status,
+    items: document.items,
+  })
+  const currentNotice =
+    notice ??
+    (document.status === "confirmed"
+      ? createApprovalNotification({
+          entity: "Orden de venta",
+          entityCode: document.number,
+          actor: user?.name || "Usuario",
+          decision: "approved",
+        })
+      : document.status === "reserved" && document.reservation_expires_at
+        ? { message: `Reserva activa hasta ${formatDateTimeLima(document.reservation_expires_at)}` }
+        : null)
   const done = {
     onSuccess: () => setDialog(null),
     // Mensajes del backend tal cual (stock insuficiente, límite de crédito...)
@@ -76,6 +115,11 @@ export default function OrderDetailPage() {
 
   const actions = (
     <>
+      {(canApprove || canEdit) && (document.status === "draft" || document.status === "reserved") && (
+        <Button disabled={isPending} onClick={() => setDialog(document.status === "reserved" ? "release" : "reserve")}>
+          {document.status === "reserved" ? "Liberar reserva" : "Reservar"}
+        </Button>
+      )}
       {canApprove && canTransitionOrder(document.status, "confirmed") && (
         <Button disabled={isPending} onClick={() => setDialog("confirm")}>
           Confirmar orden de venta
@@ -118,7 +162,7 @@ export default function OrderDetailPage() {
           <Link to={`/sales/orders/${document.id}/edit`}>Editar borrador</Link>
         </Button>
       )}
-      {canVoid && canTransitionOrder(document.status, "cancelled") && (
+      {canVoid && !isDraft && canTransitionOrder(document.status, "cancelled") && (
         <Button variant="destructive" disabled={isPending} onClick={() => setDialog("cancel")}>
           Cancelar orden de venta
         </Button>
@@ -137,14 +181,28 @@ export default function OrderDetailPage() {
   return (
     <>
       <PageHeader
-        title="Detalle de la orden de venta"
-        description="Revisa el estado, los datos de la venta y los productos."
+        title={isDraft ? "Detalle del borrador de venta" : "Detalle de la orden de venta"}
+        description={
+          isDraft
+            ? "Este documento aún no es una orden activa: puedes editarlo, reservarlo o eliminarlo."
+            : "Revisa el estado, los datos de la venta y los productos."
+        }
         actions={<div className="flex flex-wrap gap-2">{actions}</div>}
       />
 
       {actionError && (
         <p role="alert" className="mb-4 rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-text">
           {actionError}
+        </p>
+      )}
+      {currentNotice && (
+        <p role="status" className="mb-4 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success-foreground">
+          {currentNotice.message}
+        </p>
+      )}
+      {(document.status === "confirmed" || document.status === "invoiced") && (
+        <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {reservationSummary.message}
         </p>
       )}
 
@@ -226,6 +284,77 @@ export default function OrderDetailPage() {
         <DocumentsPanel entity={{ type: "sale", id: document.id, label: `la orden de venta ${document.number}` }} canUpload={canAttach} />
       </div>
 
+      {dialog === "reserve" && (
+        <Dialog open onOpenChange={(open) => setDialog(open ? "reserve" : null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Reservar stock</DialogTitle>
+              <DialogDescription>Define la fecha límite de la reserva para esta orden de venta.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium" htmlFor="reservation_date">
+                Fecha límite
+              </label>
+              <Input
+                id="reservation_date"
+                type="date"
+                min={new Date().toISOString().slice(0, 10)}
+                value={reserveDate}
+                onChange={(event) => setReserveDate(event.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" disabled={isPending} onClick={() => setDialog(null)}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                disabled={isPending || reserveDate === ""}
+                onClick={() =>
+                  run(() =>
+                    reserve.mutate(
+                      { id: document.id, expires_at: reserveDate },
+                      {
+                        onSuccess: () => {
+                          setDialog(null)
+                          setActionError(null)
+                          setNotice({ message: `Reserva creada hasta ${formatDateTimeLima(`${reserveDate}T23:59:59Z`)}` })
+                        },
+                        onError: done.onError,
+                      },
+                    ),
+                  )
+                }
+              >
+                {reserve.isPending ? "Reservando..." : "Reservar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+      {dialog === "release" && (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => setDialog(open ? "release" : null)}
+          title="Liberar reserva"
+          description="La cantidad reservada volverá a estar disponible en el inventario."
+          confirmText="Liberar reserva"
+          confirmVariant="default"
+          isLoading={isPending}
+          onConfirm={() =>
+            run(() =>
+              releaseReservation.mutate(document.id, {
+                onSuccess: () => {
+                  setDialog(null)
+                  setActionError(null)
+                  setNotice(null)
+                },
+                onError: done.onError,
+              }),
+            )
+          }
+        />
+      )}
       <ConfirmDialog
         open={dialog === "confirm"}
         onOpenChange={(open) => setDialog(open ? "confirm" : null)}
@@ -234,7 +363,24 @@ export default function OrderDetailPage() {
         confirmText="Confirmar"
         confirmVariant="default"
         isLoading={isPending}
-        onConfirm={() => run(() => confirm.mutate(document.id, done))}
+        onConfirm={() =>
+          run(() =>
+            confirm.mutate(document.id, {
+              onSuccess: () => {
+                setDialog(null)
+                setNotice(
+                  createApprovalNotification({
+                    entity: "Orden de venta",
+                    entityCode: document.number,
+                    actor: user?.name || "Usuario",
+                    decision: "approved",
+                  }),
+                )
+              },
+              onError: done.onError,
+            }),
+          )
+        }
       />
       <ReasonDialog
         open={dialog === "cancel"}
