@@ -1,0 +1,46 @@
+/* Movimiento suave del vehículo entre una lectura GPS y la siguiente (misma duración que LIVE_REFRESH_MS) */
+.live-vehicle-marker {
+  transition: transform 4s linear;
+}
+.live-vehicle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  background: #2563eb;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 0.35);
+  color: #fff;
+}
+.live-vehicle::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 9999px;
+  border: 2px solid #2563eb;
+  opacity: 0;
+  animation: live-pulse 1.8s ease-out infinite;
+}
+.live-vehicle[data-stopped="true"] { background: #64748b; }
+.live-vehicle[data-stopped="true"]::after { display: none; }
+.live-stop {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 0.35);
+  font: 600 12px/1 system-ui, sans-serif;
+  color: #fff;
+}
+@keyframes live-pulse {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-vehicle-marker { transition: none; }
+  .live-vehicle::after { animation: none; }
+}
