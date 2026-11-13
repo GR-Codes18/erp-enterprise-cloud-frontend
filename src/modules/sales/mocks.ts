@@ -4,6 +4,7 @@ import { PRODUCTS, customerRef, findCustomer, productName, productRef, warehouse
 import { createDocumentHandlers, nextNumber, totalsOf } from "@/mocks/utils/documents"
 import { applyInventoryMovement, getAvailableQuantity, releaseReservationForOrder, reserveStockForOrder } from "@/modules/inventory/state"
 import { getMockCustomer } from "@/modules/maintenance/customers/mocks"
+import { registerOrderTrackingTrip } from "@/modules/logistics/tracking/trackingMocks"
 import { addDays, todayInLima } from "@/shared/lib/dates"
 import { newId } from "@/shared/lib/id"
 import { fromCents, toCents } from "@/shared/lib/money"
@@ -406,6 +407,15 @@ const orders = createDocumentHandlers<Order, OrderInput, Order["status"]>({
       from: ["draft", "reserved"],
       to: "confirmed",
       check: checkOrderCanBeConfirmed,
+      respond: (updated) => {
+        if (updated.delivery_method === "shipping") {
+          const trip = registerOrderTrackingTrip(updated)
+          if (trip) {
+            updated.delivery_status = "pending"
+          }
+        }
+        return updated
+      },
     },
     {
       action: "cancel",
