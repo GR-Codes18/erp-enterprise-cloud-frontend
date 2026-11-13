@@ -1,6 +1,7 @@
 import { delay, http, HttpResponse } from "msw"
 import { env } from "@/config/env"
 import {
+  buildTrackingTripFromOrder,
   haversineKm,
   type GeoPoint,
   type LiveTrackingResponse,
@@ -40,6 +41,7 @@ interface SimTrip {
   cursor: number
   dwellUntil: number | null
   frozen: boolean
+  notified: boolean
 }
 
 const point = (lat: number, lng: number): GeoPoint => ({ lat, lng })
@@ -53,7 +55,7 @@ function buildSim(trip: TrackingTrip, departAt: number, frozen = false): SimTrip
   const cumulative = [0]
   for (let i = 1; i < path.length; i++) cumulative.push(cumulative[i - 1] + haversineKm(path[i - 1], path[i]))
   trip.route_path = path
-  return { trip, departAt, stopKm: cumulative.slice(1), path, cumulative, km: 0, cursor: departAt, dwellUntil: null, frozen }
+  return { trip, departAt, stopKm: cumulative.slice(1), path, cumulative, km: 0, cursor: departAt, dwellUntil: null, frozen, notified: false }
 }
 
 function locate(sim: SimTrip): { position: GeoPoint; heading: number } {
@@ -70,7 +72,14 @@ function locate(sim: SimTrip): { position: GeoPoint; heading: number } {
 
 function advance(sim: SimTrip, now: number) {
   const { trip } = sim
-  if (sim.frozen || trip.status === "delivered") return
+  if (sim.frozen || trip.status === "delivered") {
+    if (trip.status === "delivered" && !sim.notified && typeof window !== "undefined" && typeof window.alert === "function") {
+      sim.notified = true
+      const customer = trip.stops.at(-1)?.customer ?? "el cliente"
+      window.alert(`Entrega confirmada: ${trip.reference} llegó a ${customer}.`)
+    }
+    return
+  }
 
   if (trip.status === "planned") {
     if (now < sim.departAt) return
@@ -124,6 +133,21 @@ function advance(sim: SimTrip, now: number) {
     recorded_at: iso(Math.min(now, sim.cursor)),
   }
   trip.trail = [...trip.trail, position].slice(-TRAIL_LIMIT)
+}
+
+export function registerOrderTrackingTrip(order: {
+  id: string
+  number: string
+  customer_name: string
+  delivery_address: string
+  items: Array<{ warehouse_id: string; warehouse_name?: string }>
+}): TrackingTrip | null {
+  const trip = buildTrackingTripFromOrder(order)
+  if (!trip) return null
+  const departAt = Date.now() + 5_000
+  const sim = buildSim(trip, departAt)
+  sims.push(sim)
+  return trip
 }
 
 const base = (data: Omit<TrackingTrip, "vehicle" | "trail" | "route_path" | "started_at" | "status">): TrackingTrip => ({

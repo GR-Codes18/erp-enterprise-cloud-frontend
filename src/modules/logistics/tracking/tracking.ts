@@ -1,3 +1,5 @@
+import { warehouseRef } from "@/mocks/refs"
+
 /** Tipos y cálculos del seguimiento en vivo. Todo son funciones puras (fáciles de probar). */
 
 export interface GeoPoint {
@@ -74,6 +76,75 @@ export const getTripMode = (trip: TrackingTrip): TripMode => (trip.stops.length 
 export const TRIP_MODE_LABELS: Record<TripMode, string> = {
   direct: "Destino directo",
   multi_stop: "Varias entregas",
+}
+
+export const WAREHOUSE_COORDS: Record<string, GeoPoint> = {
+  [warehouseRef(1)]: { lat: -12.0464, lng: -77.0428 },
+  [warehouseRef(2)]: { lat: -12.0613, lng: -77.0407 },
+  [warehouseRef(3)]: { lat: -12.0564, lng: -77.0364 },
+  [warehouseRef(4)]: { lat: -11.9892, lng: -77.0556 },
+  [warehouseRef(5)]: { lat: -12.2148, lng: -76.9558 },
+  [warehouseRef(6)]: { lat: -11.9876, lng: -77.0714 },
+  [warehouseRef(8)]: { lat: -12.0706, lng: -77.0153 },
+  [warehouseRef(10)]: { lat: -12.0644, lng: -76.9801 },
+}
+
+export function getWarehousePosition(warehouseId: string): GeoPoint {
+  return WAREHOUSE_COORDS[warehouseId] ?? { lat: -12.0464, lng: -77.0428 }
+}
+
+function geocodeCustomerPosition(address: string): GeoPoint {
+  const text = address.toLowerCase()
+  if (text.includes("arequipa")) return { lat: -16.409, lng: -71.5375 }
+  if (text.includes("trujillo")) return { lat: -8.1091, lng: -79.0215 }
+  if (text.includes("cusco")) return { lat: -13.5319, lng: -71.9675 }
+  if (text.includes("ica")) return { lat: -14.0678, lng: -75.7286 }
+  if (text.includes("nasca")) return { lat: -14.8309, lng: -74.9385 }
+  return { lat: -12.0464, lng: -77.0428 }
+}
+
+export function buildTrackingTripFromOrder(order: {
+  id: string
+  number: string
+  customer_name: string
+  delivery_address: string
+  items: Array<{ warehouse_id: string; warehouse_name?: string }>
+}): TrackingTrip | null {
+  if (!order.items.length) return null
+
+  const firstItem = order.items[0]
+  const warehouseName = firstItem.warehouse_name?.trim() || "Almacén"
+  const originPosition = getWarehousePosition(firstItem.warehouse_id)
+  const destinationAddress = order.delivery_address?.trim() || `Dirección del cliente: ${order.customer_name}`
+  const customerName = order.customer_name?.trim() || "Cliente"
+  const destinationPosition = geocodeCustomerPosition(destinationAddress)
+
+  return {
+    id: `trip-${order.id}`,
+    reference: `ENV-${order.number}`,
+    transporter: "Logística ERP",
+    driver_name: "Chofer asignado",
+    vehicle_plate: `TRK-${order.number.slice(-3) || "001"}`,
+    route: `${warehouseName} → ${customerName}`,
+    status: "planned",
+    origin: { name: warehouseName, position: originPosition },
+    started_at: "",
+    stops: [
+      {
+        id: `stop-${order.id}`,
+        sequence: 1,
+        customer: customerName,
+        address: destinationAddress,
+        position: destinationPosition,
+        status: "pending",
+        arrived_at: "",
+        delivered_at: "",
+      },
+    ],
+    vehicle: null,
+    trail: [],
+    route_path: [originPosition, destinationPosition],
+  }
 }
 
 const EARTH_RADIUS_KM = 6371

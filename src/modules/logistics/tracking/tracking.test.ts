@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  buildTrackingTripFromOrder,
   formatDuration,
   getStopTimings,
   getTripMode,
@@ -68,6 +69,22 @@ describe("tracking", () => {
     expect(progress.nextStop?.id).toBe("s2")
     expect(progress.nextEta).toBeGreaterThan(Date.parse("2026-10-24T14:00:00Z"))
     expect(progress.remainingKm).toBeGreaterThan(progress.nextStopKm ?? 0)
+  })
+
+  it("crea un viaje desde el almacén hacia la dirección del cliente", () => {
+    const tripFromOrder = buildTrackingTripFromOrder({
+      id: "order-1",
+      number: "PED-000005",
+      customer_name: "Comercial Andina S.A.C.",
+      delivery_address: "Dirección de prueba 123, Lima",
+      items: [{ warehouse_id: "00000000-0000-4000-8003-000000000001", warehouse_name: "Almacén Central Principal" }],
+    })
+
+    expect(tripFromOrder).not.toBeNull()
+    expect(tripFromOrder?.status).toBe("planned")
+    expect(tripFromOrder?.origin.name).toContain("Almacén Central Principal")
+    expect(tripFromOrder?.stops[0].customer).toBe("Comercial Andina S.A.C.")
+    expect(tripFromOrder?.stops[0].address).toContain("Lima")
   })
 
   it("formatea duraciones y distancias", () => {
